@@ -11,6 +11,7 @@ Thumbs.db
 
 # Rust
 /target/
+**/target/
 **/*.rs.bk
 Cargo.lock
 
@@ -21,3 +22,11 @@ Cargo.lock
 # Build artifacts
 /dist/
 /build/
+
+# Node
+node_modules/
+.expo/
+*.hprof
+
+# Tauri
+desktop/src-tauri/target/

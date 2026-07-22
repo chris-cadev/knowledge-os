@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "knowledge-core",
+    "knowledge-storage",
+    "knowledge-import",
+    "knowledge-derive",
+]
+resolver = "2"
