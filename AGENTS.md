@@ -24,6 +24,7 @@ docs/
     philosophy.md             Core philosophy and immutable principles
     vision.md                 The knowledge problem and the Knowledge OS vision
     boundaries.md             What we build and what we skip
+    open-infrastructure.md    Why Knowledge OS is available to everyone
     engineering-principles.md How software is developed
     product-vision.md         Long-term direction and ecosystem
     governance.md             How decisions are made
@@ -44,9 +45,11 @@ docs/
     synchronization.md        Consistency and derived data updates
     architectural-principles.md  Consolidated architectural invariants (Part VI)
     adrs/                     Architecture Decision Records
-      adr-0001.md through adr-0005.md
+      adr-0001.md through adr-0006.md
   reference/                  Glossary and specifications
     glossary.md               Every project term, defined once (Part XIV)
+  research/                   Landscape analysis and evidence
+    landscape-2026.md         2026 knowledge management landscape
   engineering/                Engineering practices
     testing-strategy.md       Test philosophy and pipeline testing
     security.md               Threat model and access control
@@ -57,6 +60,8 @@ docs/
     ui-design-system.md       Design tokens, component specs, accessibility
     api-specification.md      REST and MCP API surfaces
     infrastructure-handbook.md Provisioning, scaling, monitoring, CI/CD
+    prds/                     Product Requirements Documents
+      prd-0001-core-entity-model.md Core entity model and markdown import pipeline
   guides/                     How-to guides
     plugin-development.md     How to build plugins
     ai-agent-guidelines.md    How AI agents work

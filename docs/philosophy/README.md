@@ -16,9 +16,10 @@ Why Knowledge OS exists and what it believes. These documents define the immutab
 | [engineering-principles.md](engineering-principles.md) | How software is developed -- coding standards, crate structure, error handling, documentation requirements, and the feature evaluation checklist |
 | [product-vision.md](product-vision.md) | Long-term product direction -- a five-year roadmap from foundation through ecosystem to scale |
 | [governance.md](governance.md) | How decisions are made -- the three-tier decision framework, the RFC process, and the ADR lifecycle |
+| [open-infrastructure.md](open-infrastructure.md) | Knowledge as open infrastructure -- why Knowledge OS is available to everyone, not restricted to any group |
 
 ---
 
 ## Reading Order
 
-Start with [philosophy.md](philosophy.md) for the foundational principles, then [vision.md](vision.md) for the problem statement. Read [boundaries.md](boundaries.md) to understand scope. The remaining documents address engineering practices, product direction, and governance.
+Start with [philosophy.md](philosophy.md) for the foundational principles, then [vision.md](vision.md) for the problem statement. Read [boundaries.md](boundaries.md) to understand scope. [open-infrastructure.md](open-infrastructure.md) explains why the system is open infrastructure available to everyone. The remaining documents address engineering practices, product direction, and governance.

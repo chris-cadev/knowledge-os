@@ -37,7 +37,7 @@ How the system is designed and why. These documents specify the canonical techni
 
 | Document | Purpose |
 |----------|---------|
-| [adrs/](adrs/) | Architecture Decision Records -- accepted decisions that shape the system (5 accepted) |
+| [adrs/](adrs/) | Architecture Decision Records -- accepted decisions that shape the system (6 accepted) |
 
 ---
 

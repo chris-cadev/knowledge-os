@@ -62,9 +62,11 @@ Documentation follows the [Diataxis framework](https://diataxis.fr/) -- four typ
 | [Philosophy](docs/philosophy/philosophy.md) | Core philosophy and immutable principles |
 | [Vision](docs/philosophy/vision.md) | Why Knowledge OS exists |
 | [Boundaries](docs/philosophy/boundaries.md) | What we build and what we intentionally skip |
+| [Open Infrastructure](docs/philosophy/open-infrastructure.md) | Why Knowledge OS is available to everyone |
 | [Mental Model](docs/architecture/mental-model.md) | The canonical way of thinking about the system |
 | [Domain Model](docs/architecture/domain-model.md) | Entity, relationship, and component types |
 | [System Overview](docs/architecture/overview.md) | Current technical architecture |
+| [Landscape 2026](docs/research/landscape-2026.md) | 2026 knowledge management landscape |
 | [Glossary](docs/reference/glossary.md) | Every project term, defined once (Part XIV) |
 | [Appendices](docs/appendices.md) | Reference diagrams, patterns, and examples (Part XV) |
 
@@ -136,13 +138,16 @@ Current status:
 - [x] Engineering architecture constitution
 - [x] Documentation structure
 - [x] Complete documentation (manifesto parts I-XV covered)
-- [x] Architecture Decision Records (5 accepted)
+- [x] Architecture Decision Records (6 accepted)
 - [x] Engineering practices (testing, security, deployment)
 - [x] Guides (plugin development, AI agents)
 - [x] Tutorials (first import, custom importer)
 - [x] Engineering handbook, runbooks, product requirements, UI design system
 - [x] Language selection and project setup
-- [ ] First implementation milestone
+- [x] First implementation milestone
+- [x] 2026 landscape research (landscape-2026.md)
+- [x] PRD-0001: Core Entity Model
+- [x] Open infrastructure philosophy
 
 ---
 
