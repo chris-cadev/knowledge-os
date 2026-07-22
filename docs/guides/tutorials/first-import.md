@@ -1,0 +1,221 @@
+# Tutorial: Importing Your First Document
+
+> This tutorial walks through importing a single Markdown document into Knowledge OS and tracing its path through the pipeline.
+
+---
+
+## Prerequisites
+
+- Knowledge OS installed (`cargo install knowledge-os`)
+- A terminal with access to the `knowledge-os` CLI
+- A Markdown file to import (the tutorial uses an example below)
+
+---
+
+## Step 1: Create a Sample Document
+
+Create a file called `my-first-note.md` in your working directory:
+
+```markdown
+---
+title: "On Knowledge Management"
+author: "Jane Smith"
+tags: [knowledge-management, productivity, notes]
+date: 2026-01-15
+---
+
+# On Knowledge Management
+
+Knowledge management is the practice of capturing, organizing, and sharing
+an organization's intellectual capital. Effective knowledge management
+requires both tools and culture.
+
+## Key Principles
+
+1. **Capture early.** Knowledge degrades quickly. Write it down before
+   it fades.
+2. **Organize by meaning, not by source.** A note about machine learning
+   belongs with other machine learning concepts, not in the folder where
+   the PDF was downloaded.
+3. **Make connections.** Isolated knowledge is nearly useless. Connect
+   new notes to existing knowledge.
+
+## References
+
+- [Personal Knowledge Management](https://example.com/pkm) by Tiago Forte
+- *How to Take Smart Notes* by Sönke Ahrens
+```
+
+---
+
+## Step 2: Import the Document
+
+Run the import command:
+
+```bash
+knowledge-os import my-first-note.md
+```
+
+The CLI produces output confirming the import:
+
+```
+Importing my-first-note.md...
+  Format detected: markdown
+  Entity created: Article (id: ent_01HXYZ...)
+  Components attached: Title, Content, Tags, Timeline, Author, Language
+  Import complete.
+```
+
+---
+
+## Step 3: Understand What Happened
+
+The import command triggered the first two layers of the seven-layer pipeline.
+
+### Layer 1 -- Import
+
+The system identified the file as Markdown (`.md` extension) and selected the built-in Markdown importer. The importer read the file contents and passed raw bytes to the parsing layer.
+
+### Layer 2 -- Parsing
+
+The parser extracted:
+
+- **Frontmatter:** YAML metadata block (title, author, tags, date)
+- **Body:** Markdown content with headings, lists, and links
+- **Structure:** One `h1` heading, two `h2` sections, one ordered list, one bulleted list, one external link
+
+### Layer 3 -- Normalization (partial)
+
+The normalization layer processed parsed output:
+
+- The frontmatter `title` became a `Title` component with `name: "On Knowledge Management"`.
+- The body became a `Content` component with `markdown: "# On Knowledge Management\n\nKnowledge management is..."`.
+- The `tags` array became a `Tags` component with `values: ["knowledge-management", "productivity", "notes"]`.
+- The `date` became part of a `Timeline` component with `created_at: 2026-01-15T00:00:00Z`.
+- The `author` string `"Jane Smith"` was normalized: the system searched for an existing `Person` entity named "Jane Smith" and found none, so it created a new `Person` entity with a `Title` component and linked the article via an `authored_by` relationship.
+- The `language` was auto-detected as `en` and attached as a `Language` component.
+- A `Provenance` component was attached recording `source: "file:///path/to/my-first-note.md"`, `importer: "markdown"`, and `imported_at: <current time>`.
+
+### Layer 4 -- Knowledge Model
+
+The final entity was persisted:
+
+```
+Entity
+  id:        ent_01HXYZ...
+  type:      Article
+  version:   1
+  components:
+    Title          { name: "On Knowledge Management" }
+    Content        { markdown: "..." }
+    Tags           { values: ["knowledge-management", "productivity", "notes"] }
+    Timeline       { created_at: 2026-01-15T00:00:00Z, modified_at: 2026-01-15T00:00:00Z }
+    Author         { people: [ref(per_01...)], organizations: [] }
+    Language       { code: "en" }
+    Provenance     { source: "file:///...", importer: "markdown", imported_at: "..." }
+  relationships:
+    authored_by -> per_01... (Person: "Jane Smith")
+```
+
+A separate `Person` entity was created:
+
+```
+Entity
+  id:        per_01...
+  type:      Person
+  version:   1
+  components:
+    Title        { name: "Jane Smith" }
+    Timeline     { created_at: "..." }
+    Provenance   { source: "inferred", importer: "normalization" }
+```
+
+---
+
+## Step 4: Verify the Import
+
+List all entities:
+
+```bash
+knowledge-os list --type Article
+```
+
+Inspect a specific entity:
+
+```bash
+knowledge-os inspect ent_01HXYZ...
+```
+
+Search for content:
+
+```bash
+knowledge-os search "knowledge management"
+```
+
+---
+
+## Step 5: Observe Derived Data Generation
+
+After import, the derivation layer (Layer 6) ran in the background:
+
+- A **search index** was updated with the article's title and content.
+- An **embedding** vector was generated for semantic search.
+- A **summary** was generated by the AI adapter.
+- A **classification** was assigned (taxonomy: "domain", labels: ["knowledge-management", "productivity"]).
+
+All derived data is disposable. If deleted, it regenerates from the canonical entity.
+
+Run:
+
+```bash
+knowledge-os derived status --entity ent_01HXYZ...
+```
+
+This shows which derived artifacts exist and when they were last generated.
+
+---
+
+## Step 6: View the Result
+
+Open the presentation layer:
+
+```bash
+knowledge-os view tree
+```
+
+Navigate to the newly imported article in the tree. The same entity appears in multiple views:
+
+- **Tree View:** Nested under Articles or the folder structure.
+- **Graph View:** Connected to "Jane Smith" via the `authored_by` edge.
+- **Timeline View:** Positioned at 2026-01-15.
+- **Table View:** Listed with its tags, author, and import date.
+
+Every view is a projection of the same canonical entity. No view owns the data.
+
+---
+
+## What You Learned
+
+- Knowledge OS imports documents through a seven-layer pipeline.
+- The Markdown importer extracts structure and metadata.
+- Normalization creates canonical entities with typed components.
+- Relationships connect entities (e.g., `authored_by`).
+- Derived data (search indexes, embeddings) is generated in the background and is fully disposable.
+- Views are projections, not data stores.
+
+---
+
+## Next Steps
+
+- [Tutorial: Build a Custom Importer](build-custom-importer.md) -- Extend the system with a new format.
+- [Plugin Development Guide](../plugin-development.md) -- Full plugin development reference.
+- [Pipeline](../../architecture/pipeline.md) -- Deep dive into the seven-layer architecture.
+
+---
+
+## Further Reading
+
+- [Domain Model](../../architecture/domain-model.md) -- Entity, relationship, and component types
+- [Data Model](../../architecture/data-model.md) -- Canonical vs derived data
+- [Composition](../../architecture/composition.md) -- Entity component model
+- [Storage](../../architecture/storage.md) -- Where canonical data lives

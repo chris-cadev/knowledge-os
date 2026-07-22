@@ -56,3 +56,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Expanded glossary with additional terms: Agent, Automation, Capability, Knowledge Graph, Metadata, Resource, Synchronization
 - Updated ADR index with accepted status for all 5 ADRs
 - Updated documentation README with complete reading order and new directory structure
+
+## [0.3.0] - 2026-07-21
+
+### Added
+
+- Architectural principles document (`docs/architecture/architectural-principles.md`) -- Part VI consolidated invariants
+- Appendices (`docs/appendices.md`) -- Part XV with diagrams, patterns, examples, model tables
+- Expanded glossary (`docs/reference/glossary.md`) -- Part XIV canonical vocabulary with ~30 terms
+- Expanded vision (`docs/philosophy/vision.md`) -- Part I deepened with concrete examples
+- Expanded philosophy (`docs/philosophy/philosophy.md`) -- Part II deepened with implications and anti-goals
+- Engineering handbook (`docs/engineering/engineering-handbook.md`) -- Git workflow, code review, CI/CD, debugging
+- Operational runbooks (`docs/engineering/operational-runbooks.md`) -- 8 incident response procedures
+- Product requirements (`docs/engineering/product-requirements.md`) -- Year 1 scope, FR/NFR, user stories
+- UI design system (`docs/engineering/ui-design-system.md`) -- Design tokens, component specs, accessibility
+- Tutorial: First Import (`docs/guides/tutorials/first-import.md`) -- Step-by-step walkthrough
+- Tutorial: Build a Custom Importer (`docs/guides/tutorials/build-custom-importer.md`) -- Plugin development walkthrough
+- API specification (`docs/engineering/api-specification.md`) -- REST and MCP API surfaces
+- Infrastructure handbook (`docs/engineering/infrastructure-handbook.md`) -- Provisioning, scaling, monitoring, CI/CD
+
+### Changed
+
+- Converted all ASCII diagrams to Mermaid across 12+ architecture and engineering documents for consistent rendering
+- Fixed Diataxis classification table in `docs/README.md` to accurately map each file to its actual content type instead of grouping all `engineering/` as How-to
+- Expanded `docs/architecture/pipeline.md` with dedicated Indexing, Embedding, and Search subsections in Layer 6, plus Synchronization cross-reference
+- Renamed "Core Belief" heading to "Core Philosophy" in `docs/philosophy/philosophy.md` for manifesto consistency
+- Updated `docs/README.md` with new documents and tutorial reading order
+- Updated root `README.md` with new status items and appendix documentation section
+- Updated `AGENTS.md` with expanded repository structure

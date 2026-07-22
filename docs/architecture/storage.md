@@ -114,15 +114,13 @@ This approach follows Martin Fowler's [Polyglot Persistence](https://martinfowle
 
 Each storage engine is accessed through an adapter. Adapters implement a common interface. The domain model never depends on a specific storage technology.
 
-```
-Domain Model
-     |
-  Adapter Interface
-     |
-  +----------+----------+----------+----------+
-  | Object   | Relational| Graph    | Search   | ...
-  | Storage  | Storage   | Storage  | Storage  |
-  +----------+----------+----------+----------+
+```mermaid
+graph TD
+    DM[Domain Model] --> AI[Adapter Interface]
+    AI --> OS[Object Storage]
+    AI --> RS[Relational Storage]
+    AI --> GS[Graph Storage]
+    AI --> SS[Search Storage]
 ```
 
 Replacing a storage engine requires:

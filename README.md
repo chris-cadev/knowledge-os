@@ -24,22 +24,15 @@ The system is engineered as a **knowledge compiler**: information enters through
 
 The system follows a seven-layer pipeline inspired by compiler architecture:
 
-```
-External Sources
-       |
-  Import Layer          Receive information from any external system
-       |
-  Parsing Layer         Extract structured information
-       |
-  Normalization Layer   Convert to canonical representations
-       |
-  Knowledge Model       Everything becomes a first-class entity
-       |
-  Relationship Engine   Connect entities through typed, versioned edges
-       |
-  Derivation Layer      Generate search indexes, embeddings, recommendations
-       |
-  Presentation Layer    Render projections: tree, graph, timeline, table, conversation
+```mermaid
+graph TD
+    ES[External Sources] --> IL[Import Layer<br/>Receive information from any external system]
+    IL --> PL[Parsing Layer<br/>Extract structured information]
+    PL --> NL[Normalization Layer<br/>Convert to canonical representations]
+    NL --> KM[Knowledge Model<br/>Everything becomes a first-class entity]
+    KM --> RE[Relationship Engine<br/>Connect entities through typed, versioned edges]
+    RE --> DL[Derivation Layer<br/>Generate search indexes, embeddings, recommendations]
+    DL --> PR[Presentation Layer<br/>Render projections: tree, graph, timeline, table, conversation]
 ```
 
 For a detailed explanation of each layer, see [Pipeline](docs/architecture/pipeline.md).
@@ -55,8 +48,9 @@ Documentation follows the [Diataxis framework](https://diataxis.fr/) -- four typ
 | **Philosophy** | Why this project exists and what it believes | [docs/philosophy/](docs/philosophy/) |
 | **Architecture** | How the system is designed and why | [docs/architecture/](docs/architecture/) |
 | **Reference** | Definitive specifications and glossary | [docs/reference/](docs/reference/) |
-| **Engineering** | Testing, security, and deployment practices | [docs/engineering/](docs/engineering/) |
-| **Guides** | How-to guides for plugins and AI agents | [docs/guides/](docs/guides/) |
+| **Engineering** | Testing, security, deployment, and practices | [docs/engineering/](docs/engineering/) |
+| **Guides** | How-to guides, tutorials, and AI agent workflows | [docs/guides/](docs/guides/) |
+| **Appendices** | Diagrams, patterns, and canonical examples | [docs/appendices.md](docs/appendices.md) |
 | **Contributing** | How to participate in the project | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ### Key Documents
@@ -71,7 +65,8 @@ Documentation follows the [Diataxis framework](https://diataxis.fr/) -- four typ
 | [Mental Model](docs/architecture/mental-model.md) | The canonical way of thinking about the system |
 | [Domain Model](docs/architecture/domain-model.md) | Entity, relationship, and component types |
 | [System Overview](docs/architecture/overview.md) | Current technical architecture |
-| [Glossary](docs/reference/glossary.md) | Every project term, defined once |
+| [Glossary](docs/reference/glossary.md) | Every project term, defined once (Part XIV) |
+| [Appendices](docs/appendices.md) | Reference diagrams, patterns, and examples (Part XV) |
 
 ---
 
@@ -97,6 +92,8 @@ Current status:
 - [x] Architecture Decision Records (5 accepted)
 - [x] Engineering practices (testing, security, deployment)
 - [x] Guides (plugin development, AI agents)
+- [x] Tutorials (first import, custom importer)
+- [x] Engineering handbook, runbooks, product requirements, UI design system
 - [ ] Language selection and project setup
 - [ ] First implementation milestone
 

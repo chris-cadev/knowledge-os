@@ -75,22 +75,19 @@ The system supports multiple retrieval modes, each optimized for different query
 
 ### Retrieval Pipeline
 
-```
-User Query
-     |
-  Query Analysis           (parse intent, extract entities, detect type)
-     |
-  +---+---+---+
-  |   |   |   |
-  FT  Sem Gr  Hyb         (parallel retrieval across modes)
-  |   |   |   |
-  +---+---+---+
-     |
-  Result Merging           (score, rank, deduplicate)
-     |
-  Context Assembly         (select top results, build context)
-     |
-  Response Generation      (AI generates response using context)
+```mermaid
+graph TD
+    UQ[User Query] --> QA[Query Analysis<br/>parse intent, extract entities, detect type]
+    QA --> FTS[Full-text Search]
+    QA --> Semantic[Semantic Search]
+    QA --> Graph[Graph Traversal]
+    QA --> Hybrid[Hybrid Search]
+    FTS --> RM[Result Merging<br/>score, rank, deduplicate]
+    Semantic --> RM
+    Graph --> RM
+    Hybrid --> RM
+    RM --> CA[Context Assembly<br/>select top results, build context]
+    CA --> RG[Response Generation<br/>AI generates response using context]
 ```
 
 ### Retrieval Rules

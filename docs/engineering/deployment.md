@@ -10,16 +10,15 @@
 
 The simplest deployment model. Knowledge OS runs on the user's machine.
 
-```
-+-------------------------------------+
-|  User's Machine                     |
-|                                     |
-|  Knowledge OS Binary                |
-|    +-- SQLite (local file)          |
-|    +-- Tantivy (local directory)    |
-|    +-- Object Storage (local dir)   |
-|    +-- Cache (in-process)           |
-+-------------------------------------+
+```mermaid
+graph TD
+    subgraph "User's Machine"
+        KOS[Knowledge OS Binary]
+        KOS --> SQLite[SQLite<br/>local file]
+        KOS --> Tantivy[Tantivy<br/>local directory]
+        KOS --> OS[Object Storage<br/>local directory]
+        KOS --> Cache[Cache<br/>in-process]
+    end
 ```
 
 **Characteristics:**
@@ -34,23 +33,19 @@ The simplest deployment model. Knowledge OS runs on the user's machine.
 
 Knowledge OS runs in a private network, accessible to authorized users.
 
-```
-+-------------------------------------+
-|  Private Network                    |
-|                                     |
-|  Knowledge OS API Server            |
-|    +-- PostgreSQL                   |
-|    +-- Tantivy / Elasticsearch      |
-|    +-- Qdrant                       |
-|    +-- S3 / MinIO                   |
-|    +-- Redis                        |
-+-------------------------------------+
-         |
-    Authentication
-         |
-    +---+---+
-    |       |
-  User A  User B
+```mermaid
+graph TD
+    subgraph "Private Network"
+        KOS[Knowledge OS API Server]
+        KOS --> PG[PostgreSQL]
+        KOS --> Search[Tantivy / Elasticsearch]
+        KOS --> Vector[Qdrant]
+        KOS --> S3[S3 / MinIO]
+        KOS --> Redis[Redis]
+    end
+    KOS --> Auth[Authentication]
+    Auth --> UA[User A]
+    Auth --> UB[User B]
 ```
 
 **Characteristics:**
@@ -64,22 +59,18 @@ Knowledge OS runs in a private network, accessible to authorized users.
 
 Knowledge OS runs as a managed service, handling infrastructure for users.
 
-```
-+-------------------------------------+
-|  Managed Service                    |
-|                                     |
-|  Load Balancer                      |
-|    +-- API Servers (horizontal)     |
-|    +-- Pipeline Workers (horizontal)|
-|    +-- Storage (managed)            |
-|    +-- Observability (managed)      |
-+-------------------------------------+
-         |
-    Internet (TLS)
-         |
-    +---+---+
-    |       |
-  User A  User B
+```mermaid
+graph TD
+    subgraph "Managed Service"
+        LB[Load Balancer]
+        LB --> AS[API Servers<br/>horizontal]
+        LB --> PW[Pipeline Workers<br/>horizontal]
+        LB --> Storage[Storage<br/>managed]
+        LB --> Obs[Observability<br/>managed]
+    end
+    AS --> Internet[Internet<br/>TLS]
+    Internet --> UA[User A]
+    Internet --> UB[User B]
 ```
 
 **Characteristics:**

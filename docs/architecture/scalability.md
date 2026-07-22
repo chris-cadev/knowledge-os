@@ -34,12 +34,12 @@ The seven-layer pipeline scales horizontally. Each layer processes work independ
 
 Events enable natural parallelism. When canonical data changes, multiple derivation handlers process the event independently:
 
-```
-EntityUpdated
-  +---> SearchIndexHandler     (concurrent)
-  +---> EmbeddingHandler       (concurrent)
-  +---> GraphProjectionHandler (concurrent)
-  +---> CacheHandler           (concurrent)
+```mermaid
+graph TD
+    EU[EntityUpdated] --> SIH[SearchIndexHandler<br/>concurrent]
+    EU --> EH[EmbeddingHandler<br/>concurrent]
+    EU --> GPH[GraphProjectionHandler<br/>concurrent]
+    EU --> CH[CacheHandler<br/>concurrent]
 ```
 
 Each handler is independent. Each handler scales independently. The system adds capacity by adding handlers.

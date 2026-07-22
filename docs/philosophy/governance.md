@@ -60,11 +60,15 @@ Significant changes undergo a Request for Comments (RFC) process before acceptan
 
 ### RFC Lifecycle
 
-```
-Draft  -->  Review  -->  Accepted  -->  Implemented
-  |            |            |
-  +---> Revise +            +---> Deferred
-        (loop)              +---> Rejected
+```mermaid
+graph TD
+    D[Draft] --> R[Review]
+    R --> A[Accepted]
+    R --> REV[Revise]
+    REV --> R
+    A --> I[Implemented]
+    A --> DEF[Deferred]
+    A --> REJ[Rejected]
 ```
 
 **Draft.** The author writes the RFC: problem statement, proposed solution, alternatives considered, consequences. The draft is published for review.

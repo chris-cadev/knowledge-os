@@ -99,14 +99,13 @@ Receive Event
 
 When canonical data changes, derived artifacts are updated through event subscriptions:
 
-```
-EntityUpdated
-     |
-  +---> SearchIndexHandler    --> Rebuilds search index entry
-  +---> EmbeddingHandler      --> Recomputes vector embedding
-  +---> GraphProjectionHandler --> Updates graph storage
-  +---> RecommendationHandler --> Regenerates recommendations
-  +---> CacheInvalidationHandler --> Clears affected caches
+```mermaid
+graph TD
+    EU[EntityUpdated] --> SIH[SearchIndexHandler<br/>Rebuilds search index entry]
+    EU --> EH[EmbeddingHandler<br/>Recomputes vector embedding]
+    EU --> GPH[GraphProjectionHandler<br/>Updates graph storage]
+    EU --> RH[RecommendationHandler<br/>Regenerates recommendations]
+    EU --> CIH[CacheInvalidationHandler<br/>Clears affected caches]
 ```
 
 Each handler is independent. Each handler can fail without affecting others. Each handler is idempotent -- processing the same event twice produces the same result.

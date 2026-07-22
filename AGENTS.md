@@ -19,6 +19,7 @@ Knowledge OS is a deterministic knowledge engine. It is documentation-first -- n
 docs/
   foundational-manifesto.md   Foundational manifesto (read first)
   engineering-architecture.md Engineering architecture constitution
+  appendices.md               Reference diagrams, patterns, examples (Part XV)
   philosophy/                 Why the project exists
     philosophy.md             Core philosophy and immutable principles
     vision.md                 The knowledge problem and the Knowledge OS vision
@@ -41,17 +42,27 @@ docs/
     extensibility.md          Plugin system and extension points
     scalability.md            Scaling strategies
     synchronization.md        Consistency and derived data updates
+    architectural-principles.md  Consolidated architectural invariants (Part VI)
     adrs/                     Architecture Decision Records
       adr-0001.md through adr-0005.md
   reference/                  Glossary and specifications
-    glossary.md               Every project term, defined once
+    glossary.md               Every project term, defined once (Part XIV)
   engineering/                Engineering practices
     testing-strategy.md       Test philosophy and pipeline testing
     security.md               Threat model and access control
     deployment.md             Deployment models and configuration
+    engineering-handbook.md   Git workflow, code review, CI/CD, debugging
+    operational-runbooks.md   Operational procedures and incident response
+    product-requirements.md   Product scope, functional and non-functional requirements
+    ui-design-system.md       Design tokens, component specs, accessibility
+    api-specification.md      REST and MCP API surfaces
+    infrastructure-handbook.md Provisioning, scaling, monitoring, CI/CD
   guides/                     How-to guides
     plugin-development.md     How to build plugins
     ai-agent-guidelines.md    How AI agents work
+    tutorials/
+      first-import.md         Step-by-step: importing your first document
+      build-custom-importer.md Step-by-step: building a custom importer plugin
 README.md              Project entry point
 CONTRIBUTING.md        How to participate
 CHANGELOG.md           Release history

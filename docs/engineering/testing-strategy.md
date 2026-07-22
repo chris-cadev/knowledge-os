@@ -6,19 +6,14 @@
 
 ## Test Pyramid
 
-```
-         +-----------+
-         |  System   |     End-to-end tests, full pipeline
-         |   Tests   |
-         +-----------+
-        +-------------+
-        | Integration |     Layer contract tests, adapter tests
-        |    Tests    |
-        +-------------+
-       +---------------+
-       |     Unit      |    Component tests, function tests
-       |     Tests     |
-       +---------------+
+```mermaid
+graph TD
+    ST[System Tests<br/>End-to-end tests, full pipeline]
+    IT[Integration Tests<br/>Layer contract tests, adapter tests]
+    UT[Unit Tests<br/>Component tests, function tests]
+    
+    ST --> IT
+    IT --> UT
 ```
 
 - **Unit tests** verify individual functions and components. They are fast, isolated, and numerous.

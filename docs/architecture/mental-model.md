@@ -64,16 +64,15 @@ An entity is not defined by its type. An entity is defined by its components. Tw
 
 ### Entity Lifecycle
 
-```
-Import  -->  Normalize  -->  Create Entity  -->  Attach Components  -->  Extract Relationships
-                                          |
-                                     Entity exists in canonical model
-                                          |
-                                     +-----+-----+
-                                     |           |
-                                  Update      Archive
-                                  (increment   (soft delete,
-                                   version)    mark inactive)
+```mermaid
+graph TD
+    I[Import] --> N[Normalize]
+    N --> CE[Create Entity]
+    CE --> AC[Attach Components]
+    AC --> ER[Extract Relationships]
+    ER --> EIC[Entity exists in canonical model]
+    EIC --> UP[Update<br/>increment version]
+    EIC --> AR[Archive<br/>soft delete, mark inactive]
 ```
 
 Entities are never hard-deleted. Archiving marks an entity as inactive while preserving its history. This ensures auditability and temporal queries.
@@ -155,16 +154,15 @@ A projection is a view of canonical data optimized for a specific access pattern
 
 The same canonical entity may appear in many projections:
 
-```
-Canonical Entity: "Attention Is All You Need"
-  |
-  +---> Search Index Projection    (optimized for text retrieval)
-  +---> Graph Projection           (optimized for relationship traversal)
-  +---> Vector Projection          (optimized for semantic similarity)
-  +---> Tree View Projection       (optimized for hierarchical navigation)
-  +---> Timeline Projection        (optimized for temporal ordering)
-  +---> Table Projection           (optimized for structured comparison)
-  +---> AI Context Projection      (optimized for retrieval-augmented generation)
+```mermaid
+graph LR
+    CE[Canonical Entity<br/>Attention Is All You Need] --> SIP[Search Index Projection<br/>optimized for text retrieval]
+    CE --> GP[Graph Projection<br/>optimized for relationship traversal]
+    CE --> VP[Vector Projection<br/>optimized for semantic similarity]
+    CE --> TVP[Tree View Projection<br/>optimized for hierarchical navigation]
+    CE --> TP[Timeline Projection<br/>optimized for temporal ordering]
+    CE --> TAP[Table Projection<br/>optimized for structured comparison]
+    CE --> AICP[AI Context Projection<br/>optimized for RAG]
 ```
 
 Projections follow these rules:

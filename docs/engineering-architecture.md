@@ -48,7 +48,13 @@ Each layer communicates through explicit contracts.
 
 The architecture follows the principle:
 
-Knowledge → Canonical Representation → Derived Representations → Storage Engines → User Interfaces
+```mermaid
+graph LR
+    K[Knowledge] --> CR[Canonical Representation]
+    CR --> DR[Derived Representations]
+    DR --> SE[Storage Engines]
+    SE --> UI[User Interfaces]
+```
 
 No user interface accesses storage directly.
 
@@ -327,39 +333,17 @@ The pipeline is deterministic.
 
 Pipeline
 
-External Resource
-
-↓
-
-Importer
-
-↓
-
-Parser
-
-↓
-
-Normalizer
-
-↓
-
-Canonical Entity Model
-
-↓
-
-Relationship Extraction
-
-↓
-
-Knowledge Engine
-
-↓
-
-Derived Representations
-
-↓
-
-Views
+```mermaid
+graph TD
+    ER[External Resource] --> I[Importer]
+    I --> P[Parser]
+    P --> N[Normalizer]
+    N --> CEM[Canonical Entity Model]
+    CEM --> RE[Relationship Extraction]
+    RE --> KE[Knowledge Engine]
+    KE --> DR[Derived Representations]
+    DR --> V[Views]
+```
 
 Every transformation has one responsibility.
 
@@ -659,27 +643,14 @@ Events trigger asynchronous processing.
 
 Every asynchronous operation follows the pipeline.
 
-Receive Event
-
-↓
-
-Validate
-
-↓
-
-Normalize
-
-↓
-
-Persist Canonical Data
-
-↓
-
-Generate Derived Data
-
-↓
-
-Publish New Events
+```mermaid
+graph TD
+    RE[Receive Event] --> V[Validate]
+    V --> N[Normalize]
+    N --> PCD[Persist Canonical Data]
+    PCD --> GDD[Generate Derived Data]
+    GDD --> PNE[Publish New Events]
+```
 
 Each stage is isolated.
 

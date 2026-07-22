@@ -8,51 +8,54 @@ This directory contains all project documentation, organized following the [Diat
 
 ```
 docs/
-  foundational-manifesto.md   Foundational seed manifesto (Constitution Outline v1.0)
-  engineering-architecture.md Engineering architecture constitution (v1.0)
-
-  philosophy/                 Why this project exists
-    philosophy.md             Core philosophy and immutable principles
-    vision.md                 The knowledge problem and the Knowledge OS vision
-    boundaries.md             What we build and what we intentionally skip
-    engineering-principles.md How software is developed
-    product-vision.md         Long-term direction and ecosystem
-    governance.md             How decisions are made
-
-  architecture/               How the system is designed
-    overview.md               Current technical architecture overview
-    mental-model.md           The canonical way of thinking about the system
-    pipeline.md               The seven-layer pipeline
-    data-model.md             The distinction between canonical and derived data
-    storage.md                Polyglot persistence and storage independence
-    composition.md            Composition over inheritance
-    compilation.md            Knowledge as compilation
-    events.md                 Event sourcing and processing
-    domain-model.md           Entity types, relationship types, component types
-    ai.md                     Artificial intelligence as a system component
-    ui-philosophy.md          User interface philosophy and view types
-    extensibility.md          Plugin system and extension points
-    scalability.md            Scaling strategies and capacity planning
-    synchronization.md        Event-driven consistency and derived data updates
-    adrs/                     Architecture Decision Records
-      README.md               ADR index and template
-      adr-0001.md             Knowledge Model as Canonical Source of Truth
-      adr-0002.md             Storage Independence via Adapter Pattern
-      adr-0003.md             Entity Component Model for Knowledge Entities
-      adr-0004.md             Event-Driven Derivation Pipeline
-      adr-0005.md             Compiler-Inspired Architecture
-
-  reference/                  Definitive specifications
-    glossary.md               Every project term, defined once
-
-  engineering/                Engineering practices
-    testing-strategy.md       Test philosophy, pyramid, and pipeline testing
-    security.md               Threat model, authentication, authorization
-    deployment.md             Deployment models and storage configuration
-
-  guides/                     How-to guides
-    plugin-development.md     How to develop, test, and distribute plugins
-    ai-agent-guidelines.md    How AI agents interact with the knowledge model
+├── foundational-manifesto.md
+├── engineering-architecture.md
+│
+├── philosophy/
+│   ├── philosophy.md
+│   ├── vision.md
+│   ├── boundaries.md
+│   ├── engineering-principles.md
+│   ├── product-vision.md
+│   └── governance.md
+│
+├── architecture/
+│   ├── overview.md
+│   ├── mental-model.md
+│   ├── pipeline.md
+│   ├── data-model.md
+│   ├── storage.md
+│   ├── composition.md
+│   ├── compilation.md
+│   ├── events.md
+│   ├── domain-model.md
+│   ├── ai.md
+│   ├── ui-philosophy.md
+│   ├── extensibility.md
+│   ├── scalability.md
+│   ├── synchronization.md
+│   └── adrs/
+│
+├── reference/
+│   └── glossary.md
+│
+├── engineering/
+│   ├── testing-strategy.md
+│   ├── security.md
+│   ├── deployment.md
+│   ├── engineering-handbook.md
+│   ├── operational-runbooks.md
+│   ├── product-requirements.md
+│   ├── ui-design-system.md
+│   ├── api-specification.md
+│   └── infrastructure-handbook.md
+│
+├── guides/
+│   ├── plugin-development.md
+│   ├── ai-agent-guidelines.md
+│   └── tutorials/
+│
+└── appendices.md
 ```
 
 ---
@@ -94,15 +97,22 @@ For **plugin developers**, also read:
 22. [Plugin Development Guide](guides/plugin-development.md) -- How to build plugins
 23. [AI Agent Guidelines](guides/ai-agent-guidelines.md) -- How AI agents work
 
+For **learners**, start with:
+
+24. [Tutorial: First Import](guides/tutorials/first-import.md) -- Import your first document
+25. [Tutorial: Build a Custom Importer](guides/tutorials/build-custom-importer.md) -- Extend the system
+
 ---
 
 ## Document Types
 
-Following Diataxis:
+Following [Diataxis](https://diataxis.fr/):
 
-| Type | Purpose | Location |
-|------|---------|----------|
-| **Explanation** | Understanding and context | `philosophy/`, `architecture/` |
-| **Reference** | Factual specifications | `reference/` |
-| **How-to** | Task-oriented guides | `guides/`, `engineering/` |
-| **Tutorial** | Learning experiences | `guides/` (planned) |
+| Type | Purpose | Locations |
+|------|---------|-----------|
+| **Explanation** | Understanding and context | `philosophy/`, `architecture/`, `engineering/deployment.md`, `engineering/testing-strategy.md` |
+| **Reference** | Factual specifications | `reference/`, `engineering/security.md`, `engineering/product-requirements.md`, `engineering/ui-design-system.md`, `engineering/api-specification.md`, `engineering/infrastructure-handbook.md`, `engineering/testing-strategy.md` |
+| **How-to** | Task-oriented guides | `guides/`, `engineering/operational-runbooks.md`, `engineering/engineering-handbook.md` |
+| **Tutorial** | Learning experiences | `guides/tutorials/` |
+
+> **Note:** The `engineering/` directory contains mixed Diataxis types. Each file's type is determined by its content, not its location.

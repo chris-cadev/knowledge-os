@@ -23,16 +23,14 @@ This model is a deliberate trade-off. Strong consistency across all derived data
 
 When canonical data changes, derived artifacts are updated through event subscriptions:
 
-```
-Canonical Change
-     |
-  Event Published
-     |
-  +---> Search Index Updated
-  +---> Embeddings Recomputed
-  +---> Graph Projection Updated
-  +---> Caches Invalidated
-  +---> AI Context Regenerated
+```mermaid
+graph TD
+    CC[Canonical Change] --> EP[Event Published]
+    EP --> SI[Search Index Updated]
+    EP --> ER[Embeddings Recomputed]
+    EP --> GP[Graph Projection Updated]
+    EP --> CI[Caches Invalidated]
+    EP --> AIC[AI Context Regenerated]
 ```
 
 Each handler is independent. Each handler can fail without affecting others. Each handler is idempotent.
@@ -41,14 +39,12 @@ Each handler is independent. Each handler can fail without affecting others. Eac
 
 Canonical data may be stored in multiple storage engines (relational, object, graph). Synchronization across engines is managed through events:
 
-```
-EntityUpdated (relational)
-     |
-  Event Published
-     |
-  +---> Graph Engine Updated
-  +---> Object Storage Updated
-  +---> Search Index Updated
+```mermaid
+graph TD
+    EU[EntityUpdated<br/>relational] --> EP[Event Published]
+    EP --> GE[Graph Engine Updated]
+    EP --> OS[Object Storage Updated]
+    EP --> SI[Search Index Updated]
 ```
 
 Cross-engine synchronization is eventually consistent. The system does not guarantee that all engines reflect the same state at the same instant.
