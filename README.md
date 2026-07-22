@@ -1,0 +1,115 @@
+# Knowledge Operating System
+
+> A deterministic knowledge engine that treats knowledge as source code and retrieval as compilation.
+
+Knowledge OS is an open-source platform for ingesting, normalizing, and reasoning over heterogeneous knowledge. It replaces the document-centric mental model with an entity-centric one, where everything -- concepts, people, papers, code, decisions -- becomes a first-class citizen in a queryable knowledge graph.
+
+The system is engineered as a **knowledge compiler**: information enters through importers, is normalized into a canonical model, and is projected into derived representations optimized for search, AI, graph traversal, and human interfaces. No single storage engine defines the truth. The canonical knowledge model does.
+
+---
+
+## Core Principles
+
+**Knowledge is the source of truth.** Storage engines, search indexes, embeddings, and caches are derived artifacts that can be rebuilt at any time.
+
+**Composition over inheritance.** Entities acquire behavior through components, not class hierarchies. Every entity is assembled from reusable, interchangeable parts.
+
+**Storage independence.** The architecture never depends on a specific database, AI model, or search engine. Adapters isolate implementation details. The domain model remains independent.
+
+**Every projection is disposable.** Views, indexes, graphs, and embeddings are derived from canonical data. They may be discarded and reconstructed without loss.
+
+---
+
+## Architecture
+
+The system follows a seven-layer pipeline inspired by compiler architecture:
+
+```
+External Sources
+       |
+  Import Layer          Receive information from any external system
+       |
+  Parsing Layer         Extract structured information
+       |
+  Normalization Layer   Convert to canonical representations
+       |
+  Knowledge Model       Everything becomes a first-class entity
+       |
+  Relationship Engine   Connect entities through typed, versioned edges
+       |
+  Derivation Layer      Generate search indexes, embeddings, recommendations
+       |
+  Presentation Layer    Render projections: tree, graph, timeline, table, conversation
+```
+
+For a detailed explanation of each layer, see [Pipeline](docs/architecture/pipeline.md).
+
+---
+
+## Documentation
+
+Documentation follows the [Diataxis framework](https://diataxis.fr/) -- four types of content for four different needs.
+
+| Section | Purpose | Link |
+|---------|---------|------|
+| **Philosophy** | Why this project exists and what it believes | [docs/philosophy/](docs/philosophy/) |
+| **Architecture** | How the system is designed and why | [docs/architecture/](docs/architecture/) |
+| **Reference** | Definitive specifications and glossary | [docs/reference/](docs/reference/) |
+| **Engineering** | Testing, security, and deployment practices | [docs/engineering/](docs/engineering/) |
+| **Guides** | How-to guides for plugins and AI agents | [docs/guides/](docs/guides/) |
+| **Contributing** | How to participate in the project | [CONTRIBUTING.md](CONTRIBUTING.md) |
+
+### Key Documents
+
+| Document | Description |
+|----------|-------------|
+| [Seed Manifesto](docs/foundational-manifesto.md) | The constitutional outline of the entire project |
+| [Technical Foundation](docs/engineering-architecture.md) | The engineering architecture constitution |
+| [Philosophy](docs/philosophy/philosophy.md) | Core philosophy and immutable principles |
+| [Vision](docs/philosophy/vision.md) | Why Knowledge OS exists |
+| [Boundaries](docs/philosophy/boundaries.md) | What we build and what we intentionally skip |
+| [Mental Model](docs/architecture/mental-model.md) | The canonical way of thinking about the system |
+| [Domain Model](docs/architecture/domain-model.md) | Entity, relationship, and component types |
+| [System Overview](docs/architecture/overview.md) | Current technical architecture |
+| [Glossary](docs/reference/glossary.md) | Every project term, defined once |
+
+---
+
+## Mental Model
+
+Knowledge OS is not a database. It is a knowledge engine.
+
+Databases are implementation details. Storage technologies exist to optimize specific access patterns. No storage engine defines the knowledge model. The application owns the knowledge model.
+
+This distinction is the foundation of every architectural decision in the system. For a full explanation, see [Philosophy](docs/philosophy/philosophy.md).
+
+---
+
+## Status
+
+This project is in the **documentation-first** phase. The complete architectural foundation is being written before any implementation begins. No source code exists yet.
+
+Current status:
+- [x] Foundational seed manifesto
+- [x] Engineering architecture constitution
+- [x] Documentation structure
+- [x] Complete documentation (manifesto parts I-XV covered)
+- [x] Architecture Decision Records (5 accepted)
+- [x] Engineering practices (testing, security, deployment)
+- [x] Guides (plugin development, AI agents)
+- [ ] Language selection and project setup
+- [ ] First implementation milestone
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to participate in this project.
+
+All contributors -- human engineers, AI agents, designers, product managers, and researchers -- must read the [Seed Manifesto](docs/foundational-manifesto.md) before contributing.
+
+---
+
+## License
+
+[MIT](LICENSE)
