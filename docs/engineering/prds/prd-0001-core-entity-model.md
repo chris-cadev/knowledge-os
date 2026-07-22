@@ -29,8 +29,10 @@ The first implementation must prove this thesis: a Markdown file enters the syst
 - Component attachment and lifecycle
 - Relationship storage and 1-hop traversal
 - Markdown importer (file → entity with components)
-- Full-text search index (derived, disposable)
-- CLI interface for import and query
+- Entity resolution (duplicate detection and merge at import time)
+- Full-text search index (derived, disposable, pluggable)
+- CLI interface (`kos` binary) for import and query
+- Durable event log for pipeline processing
 
 ### Out of Scope
 
@@ -40,6 +42,7 @@ The first implementation must prove this thesis: a Markdown file enters the syst
 - Plugin system (designed alongside, not critical for first working system)
 - Multi-user collaboration (Year 3)
 - AI-assisted extraction (Year 2)
+- N-hop relationship traversal (deferred to PRD-0003)
 
 ---
 
@@ -61,44 +64,44 @@ No new relationship types are introduced. The system uses the core relationship 
 
 No new component types are introduced. The system uses the core component types from `docs/architecture/domain-model.md`. The Markdown importer produces entities with these components:
 
-| Component | Source |
-|-----------|--------|
-| `Title` | YAML frontmatter `title` field, or first H1 heading, or filename |
-| `Content` | Full Markdown body |
-| `Tags` | YAML frontmatter `tags` field |
-| `Timeline` | File modification date for `created_at`, import time for `modified_at` |
-| `Language` | Detected from content (defaults to `en`) |
-| `Provenance` | Import source path, import timestamp, importer name |
+| Component    | Source                                                                 |
+| ------------ | ---------------------------------------------------------------------- |
+| `Title`      | YAML frontmatter `title` field, or first H1 heading, or filename       |
+| `Content`    | Full Markdown body                                                     |
+| `Tags`       | YAML frontmatter `tags` field                                          |
+| `Timeline`   | File modification date for `created_at`, import time for `modified_at` |
+| `Language`   | Detected from content (defaults to `en`)                               |
+| `Provenance` | Import source path, import timestamp, importer name                    |
 
 ### 4. Which events are emitted?
 
-| Event | Trigger | Consumers |
-|-------|---------|-----------|
-| `EntityCreated` | New entity stored | Search index updater |
-| `EntityUpdated` | Entity component changed | Search index updater |
-| `EntityArchived` | Entity marked inactive | Search index updater |
-| `RelationshipCreated` | New relationship stored | Search index updater |
+| Event                  | Trigger                      | Consumers            |
+| ---------------------- | ---------------------------- | -------------------- |
+| `EntityCreated`        | New entity stored            | Search index updater |
+| `EntityUpdated`        | Entity component changed     | Search index updater |
+| `EntityArchived`       | Entity marked inactive       | Search index updater |
+| `RelationshipCreated`  | New relationship stored      | Search index updater |
 | `RelationshipArchived` | Relationship marked inactive | Search index updater |
 
 ### 5. Which derived representations are generated?
 
-| Derived Artifact | Source | Regeneration |
-|-----------------|--------|-------------|
+| Derived Artifact       | Source                        | Regeneration                    |
+| ---------------------- | ----------------------------- | ------------------------------- |
 | Full-text search index | Entity Title + Content + Tags | Drop and rebuild from canonical |
-| Entity type index | Entity type field | Rebuild from canonical |
-| Tag index | Entity Tags component | Rebuild from canonical |
+| Entity type index      | Entity type field             | Rebuild from canonical          |
+| Tag index              | Entity Tags component         | Rebuild from canonical          |
 
 All derived data is disposable. The search index is rebuilt from canonical data at any time.
 
 ### 6. Which layer owns the feature?
 
-| Feature | Layer |
-|---------|-------|
-| Entity storage | Layer 4 — Knowledge Model |
-| Component storage | Layer 4 — Knowledge Model |
-| Relationship storage | Layer 5 — Relationship Engine |
-| Markdown import | Layer 1 (Import) + Layer 2 (Parsing) + Layer 3 (Normalization) |
-| Search index | Layer 6 — Derivation |
+| Feature              | Layer                                                          |
+| -------------------- | -------------------------------------------------------------- |
+| Entity storage       | Layer 4 — Knowledge Model                                      |
+| Component storage    | Layer 4 — Knowledge Model                                      |
+| Relationship storage | Layer 5 — Relationship Engine                                  |
+| Markdown import      | Layer 1 (Import) + Layer 2 (Parsing) + Layer 3 (Normalization) |
+| Search index         | Layer 6 — Derivation                                           |
 
 ### 7. Can every derived artifact be regenerated?
 
@@ -126,14 +129,14 @@ The system spine determines the fundamental flow through the pipeline. The corre
 
 The spine must follow this order because of data dependencies:
 
-| Step | Action | Why This Order |
-|------|--------|----------------|
-| **Import** | Read raw input from file system, API, or other source | Nothing exists until data enters the system |
-| **Extract** | Transform raw input into structured data (entities, components) | Structured data must exist before we can resolve it |
-| **Resolve** | Identify duplicates, assign canonical IDs, normalize metadata | Resolution must happen before storage — dirty data in = dirty graph forever |
-| **Store** | Persist resolved entities to the canonical model | Storage happens after resolution ensures data quality |
-| **Connect** | Establish relationships between stored entities | Connections require both source and target entities to exist |
-| **Search** | Index stored entities for retrieval | Search indexes what is stored, not what is being processed |
+| Step        | Action                                                          | Why This Order                                                              |
+| ----------- | --------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Import**  | Read raw input from file system, API, or other source           | Nothing exists until data enters the system                                 |
+| **Extract** | Transform raw input into structured data (entities, components) | Structured data must exist before we can resolve it                         |
+| **Resolve** | Identify duplicates, assign canonical IDs, normalize metadata   | Resolution must happen before storage — dirty data in = dirty graph forever |
+| **Store**   | Persist resolved entities to the canonical model                | Storage happens after resolution ensures data quality                       |
+| **Connect** | Establish relationships between stored entities                 | Connections require both source and target entities to exist                |
+| **Search**  | Index stored entities for retrieval                             | Search indexes what is stored, not what is being processed                  |
 
 ### Why Resolution Before Storage
 
@@ -149,13 +152,13 @@ Resolution before storage means the canonical model is clean from the first impo
 
 ### Alternative Spines Considered
 
-| Spine | Description | Why Rejected |
-|-------|-------------|-------------|
-| Import → Store → Extract → Connect → Search | Store raw data first, process later | Raw data contaminates the canonical model |
-| Import → Extract → Store → Connect → Resolve → Search | Resolve after storage and connections | Duplicates compound before correction; relationships are built on noisy data |
-| Import → Extract → Connect → Store → Search | Connect before store | Requires entities to exist before storage, which is architecturally incorrect |
-| Import → Resolve → Extract → Store → Connect → Search | Resolve before extraction | Resolution requires structured data; raw input cannot be resolved without extraction |
-| Import → Extract → Resolve → Store → Connect → Search | **Chosen spine** | Resolution happens on extracted data before storage; canonical model is clean by construction |
+| Spine                                                 | Description                           | Why Rejected                                                                                  |
+| ----------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Import → Store → Extract → Connect → Search           | Store raw data first, process later   | Raw data contaminates the canonical model                                                     |
+| Import → Extract → Store → Connect → Resolve → Search | Resolve after storage and connections | Duplicates compound before correction; relationships are built on noisy data                  |
+| Import → Extract → Connect → Store → Search           | Connect before store                  | Requires entities to exist before storage, which is architecturally incorrect                 |
+| Import → Resolve → Extract → Store → Connect → Search | Resolve before extraction             | Resolution requires structured data; raw input cannot be resolved without extraction          |
+| Import → Extract → Resolve → Store → Connect → Search | **Chosen spine**                      | Resolution happens on extracted data before storage; canonical model is clean by construction |
 
 ### Resolution as Continuous Process
 
@@ -173,47 +176,61 @@ This ensures quality is maintained by construction, not corrected after the fact
 
 ### F1: Entity Management
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|----|-------------|----------|-------------------|
-| F1.1 | Create entities with a type and components | P0 | Entity is created with UUID, type, and initial components |
-| F1.2 | Update entity components | P0 | Component change increments entity version |
-| F1.3 | Archive entities (soft delete) | P0 | Entity is marked inactive, history preserved |
-| F1.4 | Restore archived entities | P1 | Entity is marked active again |
-| F1.5 | Query entities by type | P0 | Returns all entities of a given type |
-| F1.6 | Query entities by component | P1 | Returns entities with a specific component type |
-| F1.7 | Query entities by tag | P1 | Returns entities with a specific tag |
-| F1.8 | Version history for entities | P1 | Entity version history is queryable |
+| ID   | Requirement                                | Priority | Acceptance Criteria                                       |
+| ---- | ------------------------------------------ | -------- | --------------------------------------------------------- |
+| F1.1 | Create entities with a type and components | P0       | Entity is created with UUID, type, and initial components |
+| F1.2 | Update entity components                   | P0       | Component change increments entity version                |
+| F1.3 | Archive entities (soft delete)             | P0       | Entity is marked inactive, history preserved              |
+| F1.4 | Restore archived entities                  | P1       | Entity is marked active again                             |
+| F1.5 | Query entities by type                     | P0       | Returns all entities of a given type                      |
+| F1.6 | Query entities by component                | P1       | Returns entities with a specific component type           |
+| F1.7 | Query entities by tag                      | P1       | Returns entities with a specific tag                      |
+| F1.8 | Version history for entities               | P1       | Entity version history is queryable                       |
 
 ### F2: Relationship Management
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|----|-------------|----------|-------------------|
-| F2.1 | Create typed relationships between entities | P0 | Relationship is created with type, source, and target |
-| F2.2 | Update relationship attributes | P1 | Relationship attributes are updated |
-| F2.3 | Archive relationships | P0 | Relationship is marked inactive |
-| F2.4 | Traverse relationships (1 hop) | P0 | From any entity, retrieve directly connected entities |
-| F2.5 | Traverse relationships (N hops) | P1 | From any entity, retrieve entities within N hops |
-| F2.6 | Query relationships by type | P0 | Returns all relationships of a given type |
+| ID   | Requirement                                 | Priority | Acceptance Criteria                                   |
+| ---- | ------------------------------------------- | -------- | ----------------------------------------------------- |
+| F2.1 | Create typed relationships between entities | P0       | Relationship is created with type, source, and target |
+| F2.2 | Update relationship attributes              | P1       | Relationship attributes are updated                   |
+| F2.3 | Archive relationships                       | P0       | Relationship is marked inactive                       |
+| F2.4 | Traverse relationships (1 hop)              | P0       | From any entity, retrieve directly connected entities |
+| F2.5 | Traverse relationships (N hops)             | P1       | From any entity, retrieve entities within N hops      |
+| F2.6 | Query relationships by type                 | P0       | Returns all relationships of a given type             |
 
 ### F3: Import Pipeline
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|----|-------------|----------|-------------------|
-| F3.1 | Import Markdown files | P0 | Markdown file produces Entity with Content component |
-| F3.3 | Extract metadata from imports | P0 | Author, date, language are extracted from YAML frontmatter |
-| F3.4 | Import from file system | P0 | Local files are importable |
-| F3.6 | Batch import | P1 | Multiple files are importable in one operation |
-| F3.7 | Import progress reporting | P1 | Import progress is visible to the user |
-| F3.8 | Import error handling | P0 | Malformed input is logged, not silently swallowed |
+| ID   | Requirement                   | Priority | Acceptance Criteria                                               |
+| ---- | ----------------------------- | -------- | ----------------------------------------------------------------- |
+| F3.1 | Import Markdown files         | P0       | Markdown file produces Entity with Content component              |
+| F3.2 | Extract metadata from imports | P0       | Author, date, language are extracted from YAML frontmatter        |
+| F3.3 | Import from file system       | P0       | Local files are importable                                        |
+| F3.4 | Batch import                  | P1       | Multiple files are importable in one operation                    |
+| F3.5 | Import progress reporting     | P1       | Import progress is visible to the user                            |
+| F3.6 | Import error handling         | P0       | Malformed input is logged, not silently swallowed                 |
+| F3.7 | Cross-reference extraction    | P0       | Markdown links between files produce `references` relationships   |
+| F3.8 | Idempotent reimport           | P0       | Reimporting same file updates existing entity (version increment) |
 
-### F4: Search and Retrieval
+### F4: Entity Resolution
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|----|-------------|----------|-------------------|
-| F4.1 | Full-text search | P0 | Query matches against indexed text fields |
-| F4.2 | Entity type filtering | P0 | Search results can be filtered by entity type |
-| F4.3 | Tag filtering | P1 | Search results can be filtered by tags |
-| F4.4 | Search result ranking | P0 | Results are ranked by relevance |
+| ID   | Requirement               | Priority | Acceptance Criteria                                                |
+| ---- | ------------------------- | -------- | ------------------------------------------------------------------ |
+| F4.1 | Exact match resolution    | P0       | Duplicate detection by title + entity type                         |
+| F4.2 | Fuzzy match resolution    | P1       | Duplicate detection by title similarity (Levenshtein/Jaro-Winkler) |
+| F4.3 | Confidence scoring        | P0       | Each resolution candidate has a confidence score                   |
+| F4.4 | Auditable merge decisions | P0       | Merge operations are logged with reason and confidence             |
+| F4.5 | Import-time resolution    | P0       | New imports checked against existing entities before storage       |
+
+### F5: Search and Retrieval
+
+| ID   | Requirement               | Priority | Acceptance Criteria                                                 |
+| ---- | ------------------------- | -------- | ------------------------------------------------------------------- |
+| F5.1 | Full-text search          | P0       | Query matches against indexed text fields via `SearchIndex` trait   |
+| F5.2 | Entity type filtering     | P0       | Search results can be filtered by entity type                       |
+| F5.3 | Tag filtering             | P1       | Search results can be filtered by tags                              |
+| F5.4 | Search result ranking     | P0       | Results are ranked by relevance                                     |
+| F5.5 | Search index rebuild      | P0       | Index can be dropped and rebuilt from canonical entities             |
+| F5.6 | Pluggable search backend  | P0       | Search implementation is swappable via trait interface               |
 
 ---
 
@@ -221,36 +238,36 @@ This ensures quality is maintained by construction, not corrected after the fact
 
 ### NF1: Performance
 
-| ID | Requirement | Target | Acceptable |
-|----|-------------|--------|-----------|
+| ID    | Requirement                  | Target       | Acceptable  |
+| ----- | ---------------------------- | ------------ | ----------- |
 | NF1.1 | Import throughput (Markdown) | 100 docs/sec | 50 docs/sec |
-| NF1.3 | Search query latency | < 50ms | < 200ms |
-| NF1.4 | Entity retrieval latency | < 10ms | < 50ms |
-| NF1.6 | Entity creation latency | < 10ms | < 50ms |
+| NF1.3 | Search query latency         | < 50ms       | < 200ms     |
+| NF1.4 | Entity retrieval latency     | < 10ms       | < 50ms      |
+| NF1.6 | Entity creation latency      | < 10ms       | < 50ms      |
 
 ### NF2: Scalability
 
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NF2.1 | Entity volume | 100K entities |
+| ID    | Requirement         | Target           |
+| ----- | ------------------- | ---------------- |
+| NF2.1 | Entity volume       | 100K entities    |
 | NF2.2 | Relationship volume | 1M relationships |
-| NF2.3 | Component volume | 10M components |
-| NF2.4 | Concurrent users | 1 user (Year 1) |
-| NF2.5 | Import batch size | 10K files |
+| NF2.3 | Component volume    | 10M components   |
+| NF2.4 | Concurrent users    | 1 user (Year 1)  |
+| NF2.5 | Import batch size   | 10K files        |
 
 ### NF3: Reliability
 
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NF3.1 | Data durability | Zero canonical data loss |
-| NF3.2 | Derived data rebuildability | All derived data rebuildable from canonical |
-| NF3.3 | Event processing reliability | Zero event loss (durable event log) |
-| NF3.4 | Pipeline idempotency | Reprocessing same input produces same output |
+| ID    | Requirement                  | Target                                       |
+| ----- | ---------------------------- | -------------------------------------------- |
+| NF3.1 | Data durability              | Zero canonical data loss                     |
+| NF3.2 | Derived data rebuildability  | All derived data rebuildable from canonical  |
+| NF3.3 | Event processing reliability | Zero event loss (durable event log)          |
+| NF3.4 | Pipeline idempotency         | Reprocessing same input produces same output |
 
 ### NF4: Usability
 
-| ID | Requirement | Acceptance Criteria |
-|----|-------------|-------------------|
+| ID    | Requirement                   | Acceptance Criteria                                                              |
+| ----- | ----------------------------- | -------------------------------------------------------------------------------- |
 | NF4.1 | First import within 5 minutes | User can import a Markdown file and see results within 5 minutes of installation |
 
 ---
@@ -271,8 +288,10 @@ This ensures quality is maintained by construction, not corrected after the fact
 5. System extracts Tags from YAML frontmatter.
 6. System sets Timeline from file metadata.
 7. System stores Provenance with import source and timestamp.
-8. Entity is stored in the canonical model.
-9. Search index is updated.
+8. System checks for duplicate entities (resolution) before storage.
+9. Entity is stored in the canonical model.
+10. Search index is updated.
+11. If a duplicate is found, the existing entity is updated (version incremented).
 
 ### US2: Import a Directory of Markdown Files
 
@@ -330,44 +349,105 @@ This ensures quality is maintained by construction, not corrected after the fact
 
 ## Architecture
 
+### Crate Structure
+
+| Crate               | Purpose                                                          |
+| ------------------- | ---------------------------------------------------------------- |
+| `knowledge-core`    | Domain model: entities, components, relationships, ports, events |
+| `knowledge-storage` | Storage adapters (SQLite canonical, SQLite FTS5 search)          |
+| `knowledge-import`  | Import pipeline: Markdown parsing, entity creation, resolution   |
+| `knowledge-derive`  | Derivation pipeline: pluggable search interface                  |
+| `knowledge-cli`     | `kos` binary: CLI commands for user interaction                  |
+| `knowledge-api`     | REST/MCP API (future, not PRD-0001 scope)                        |
+
 ### Storage
 
-| Store | Technology | Purpose |
-|-------|-----------|---------|
-| Canonical entities | SQLite | Entity, component, and relationship storage |
-| Search index | Tantivy | Full-text search (derived, disposable) |
-| Event log | SQLite | Durable event log for pipeline processing |
+| Store              | Technology            | Purpose                                           |
+| ------------------ | --------------------- | ------------------------------------------------- |
+| Canonical entities | SQLite                | Entity, component, and relationship storage       |
+| Search index       | SQLite FTS5 (initial) | Full-text search (derived, disposable, pluggable) |
+| Event log          | SQLite                | Durable event log for pipeline processing         |
+
+### Pluggable Search Architecture
+
+The search index is accessed through a `SearchIndex` trait (port). The initial implementation uses SQLite FTS5 for simplicity. Alternative implementations (Tantivy, Quickwit) may be added as separate adapters without changing the domain model.
+
+```rust
+#[async_trait]
+pub trait SearchIndex: Send + Sync {
+    async fn index_entity(&self, entity: &Entity, components: &[Component]) -> Result<()>;
+    async fn remove_entity(&self, entity_id: Uuid) -> Result<()>;
+    async fn search(&self, query: &SearchQuery) -> Result<SearchResults>;
+    async fn rebuild(&self, entities: &[(Entity, Vec<Component>)]) -> Result<()>;
+}
+```
+
+The search index is derived data. It is disposable and rebuildable from canonical entities at any time.
+
+### Entity Resolution System
+
+Entity resolution is the critical quality layer per ADR-0006. The resolution system is accessed through a trait:
+
+```rust
+#[async_trait]
+pub trait EntityResolver: Send + Sync {
+    async fn find_candidates(&self, entity: &Entity) -> Result<Vec<ResolutionCandidate>>;
+    async fn merge(&self, canonical_id: Uuid, duplicate_id: Uuid, confidence: f64) -> Result<()>;
+}
+```
+
+Resolution strategies:
+- **Exact match:** Title + entity type equality (fast, high confidence)
+- **Fuzzy match:** Levenshtein / Jaro-Winkler distance on title (handles typos)
+- **Configurable per entity type:** Different strategies for Person vs. Concept vs. Article
+
+Resolution runs at import time (before storage) and continuously (periodic passes). Every merge decision is auditable with a confidence score.
+
+### Event System
+
+Every meaningful modification to canonical data emits a durable event. Events are stored in SQLite and processed asynchronously through the derivation pipeline.
+
+Canonical events:
+- `EntityCreated`, `EntityUpdated`, `EntityArchived`
+- `RelationshipCreated`, `RelationshipUpdated`, `RelationshipArchived`
+- `ComponentAdded`, `ComponentUpdated`, `ComponentRemoved`
+
+Events support idempotent processing (via event deduplication), replay (for derived data rebuild), and dead-letter queue (for failed processing).
 
 ### Pipeline Flow
 
 ```
 Markdown File
       |
-  Import Layer         kos import command
+  Import Layer         knowledge-cli: kos import command
       |
-  Parsing Layer        YAML frontmatter extraction, Markdown parsing
+  Parsing Layer        pulldown-cmark: YAML frontmatter + Markdown body
       |
-  Normalization Layer  Entity identification, metadata normalization
+  Normalization Layer  Entity resolution, metadata normalization
       |
-  Knowledge Model      Entity + Components stored in SQLite
+  Knowledge Model      Entity + Components stored in SQLite (knowledge-storage)
       |
   Relationship Engine  Cross-reference extraction, relationship storage
       |
-  Derivation Layer     Search index update via Tantivy
+  Derivation Layer     Search index update via SearchIndex trait (knowledge-derive)
       |
-  (Presentation)       CLI output (no UI in this PRD)
+  Event Log            Durable event emission to SQLite
+      |
+  (Presentation)       CLI output (knowledge-cli)
 ```
 
 ### Data Flow
 
 1. User invokes `kos import <file.md>`.
-2. Import layer reads the file.
-3. Parsing layer extracts YAML frontmatter and Markdown body.
+2. Import layer reads the file from the file system.
+3. Parsing layer extracts YAML frontmatter (title, tags, date, author) and Markdown body.
 4. Normalization layer creates an Entity with type, Title, Content, Tags, Timeline, Language, Provenance.
-5. Knowledge model stores the entity in SQLite.
-6. Relationship engine extracts cross-references and stores relationships.
-7. Derivation layer updates the Tantivy search index.
-8. CLI outputs the created entity.
+5. Entity resolution checks for duplicates against existing entities.
+6. Knowledge model stores the resolved entity in SQLite.
+7. Relationship engine extracts cross-references and stores relationships.
+8. Derivation layer updates the search index via the `SearchIndex` trait.
+9. Event log records all canonical changes.
+10. CLI outputs the created entity with formatted results.
 
 ---
 
@@ -441,11 +521,13 @@ Found 3 entities:
 - [ ] Markdown import produces entities with correct components
 - [ ] YAML frontmatter is extracted (title, tags, date)
 - [ ] Cross-references between Markdown files produce relationships
-- [ ] Full-text search returns ranked results
+- [ ] Entity resolution detects duplicates at import time
+- [ ] Full-text search returns ranked results via pluggable `SearchIndex` trait
 - [ ] Search supports filtering by entity type and tags
-- [ ] All derived data (search index) is rebuildable from canonical
+- [ ] Search index is rebuildable from canonical data
 - [ ] CLI commands work as specified
 - [ ] Pipeline is idempotent (reimporting same file produces same result)
+- [ ] Durable event log records all canonical changes
 - [ ] All tests pass
 - [ ] No canonical data loss on any failure path
 
@@ -463,6 +545,62 @@ Found 3 entities:
 10. **Archive entity** — Entity marked inactive, removed from search
 11. **Restore entity** — Entity marked active, reappears in search
 12. **Cross-reference extraction** — Creates `references` relationships
+13. **Duplicate detection** — Same title + type triggers resolution
+14. **Fuzzy duplicate detection** — Similar titles flagged as candidates
+15. **Search index rebuild** — Drop index, rebuild from canonical, search still works
+16. **Event emission** — EntityCreated event emitted on import
+
+---
+
+## Testing Strategy
+
+Tests are written alongside each phase of implementation, not deferred to the end. Every feature has corresponding tests before moving to the next phase.
+
+### Test Levels
+
+| Level             | Scope                                                     | Framework                       |
+| ----------------- | --------------------------------------------------------- | ------------------------------- |
+| Unit tests        | Domain model, component operations, resolution strategies | `#[cfg(test)]` modules          |
+| Integration tests | Storage adapter, search index, import pipeline            | `tests/` directories            |
+| End-to-end tests  | CLI commands, full import→search flow                     | `tests/` with process execution |
+
+### Test Coverage by Phase
+
+| Phase                      | Test Focus                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| Phase 1: Core entity model | Entity CRUD, version incrementing, archive/restore, component lifecycle, relationship operations |
+| Phase 2: Storage adapters  | SQLite CRUD for all repository types, schema migrations, error handling                          |
+| Phase 3: Search interface  | FTS5 indexing, query parsing, type/tag filtering, rebuild from canonical                         |
+| Phase 4: Entity resolution | Exact match, fuzzy match, confidence scoring, merge undo                                         |
+| Phase 5: Import pipeline   | Markdown parsing, frontmatter extraction, cross-references, idempotent reimport                  |
+| Phase 6: CLI               | Command parsing, output formatting, error messages                                               |
+| Phase 7: Event system      | Event emission, idempotent processing, replay                                                    |
+
+### Test Data
+
+Sample Markdown files with varying complexity:
+- Simple file without frontmatter
+- File with full YAML frontmatter (title, tags, date, author)
+- File with cross-references to other files
+- Directory of files with inter-linking
+- Edge cases: empty files, very large files, non-UTF-8 content
+
+---
+
+## Current State
+
+The project has initial scaffolding in place:
+
+| Crate               | Status                                                                  |
+| ------------------- | ----------------------------------------------------------------------- |
+| `knowledge-core`    | Basic entity/relationship/component types (incomplete), ports defined   |
+| `knowledge-storage` | SQLite adapter for entities only (no components, relationships, events) |
+| `knowledge-import`  | Stub importer (creates empty Note entity)                               |
+| `knowledge-derive`  | Stub search index (no-op)                                               |
+| `knowledge-api`     | REST API with basic CRUD (not PRD-0001 scope)                           |
+| `knowledge-cli`     | Does not exist yet                                                      |
+
+The PRD implementation builds on this scaffolding, completing the domain model, adding missing adapters, and building the full import pipeline.
 
 ---
 
@@ -470,16 +608,25 @@ Found 3 entities:
 
 ### External Crates
 
-| Crate | Purpose | Justification |
-|-------|---------|--------------|
-| `rusqlite` | SQLite bindings | Storage adapter for canonical data |
-| `tantivy` | Full-text search | Derived search index |
-| `pulldown-cmark` | Markdown parsing | Parse Markdown to AST |
-| `serde` / `serde_yaml` | Serialization | YAML frontmatter parsing |
-| `uuid` | Entity identifiers | Stable, unique, immutable entity IDs |
-| `chrono` | Date/time | Timeline component |
-| `tokio` | Async runtime | Event processing, pipeline |
-| `clap` | CLI argument parsing | Command-line interface |
+| Crate                  | Purpose              | Justification                                      |
+| ---------------------- | -------------------- | -------------------------------------------------- |
+| `rusqlite`             | SQLite bindings      | Storage adapter for canonical data and FTS5 search |
+| `pulldown-cmark`       | Markdown parsing     | Parse Markdown to AST for import pipeline          |
+| `serde` / `serde_yaml` | Serialization        | YAML frontmatter parsing                           |
+| `uuid`                 | Entity identifiers   | Stable, unique, immutable entity IDs               |
+| `chrono`               | Date/time            | Timeline component                                 |
+| `tokio`                | Async runtime        | Event processing, pipeline                         |
+| `clap`                 | CLI argument parsing | `kos` command-line interface                       |
+| `indicatif`            | Progress bars        | Import progress reporting                          |
+| `thiserror`            | Error types          | Structured error handling                          |
+| `async-trait`          | Async traits         | Port/adapter interfaces                            |
+
+### Future Search Adapters (Not in PRD-0001)
+
+| Crate           | Purpose            | When                            |
+| --------------- | ------------------ | ------------------------------- |
+| `tantivy`       | Full-text search   | PRD-0002 (if FTS5 insufficient) |
+| Quickwit client | Distributed search | PRD-0003 (at scale)             |
 
 ### Internal Dependencies
 
@@ -488,32 +635,37 @@ Found 3 entities:
 - `docs/architecture/data-model.md` — Canonical vs derived distinction
 - `docs/architecture/events.md` — Event system design
 - `docs/architecture/storage.md` — Storage adapter pattern
+- `docs/architecture/composition.md` — Entity component model
 
 ---
 
 ## Risks and Mitigations
 
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|-----------|------------|
-| SQLite performance at 100K entities | High | Low | Benchmark early; adapter pattern allows PostgreSQL swap |
-| Tantivy integration complexity | Medium | Medium | Start with simple indexing; iterate on query complexity |
-| Markdown parsing edge cases | Medium | High | Use battle-tested `pulldown-cmark`; extensive test suite |
-| Cross-reference extraction accuracy | Medium | High | Start with explicit Markdown links; AI extraction deferred |
-| Event ordering guarantees | High | Low | Use SQLite事务 for canonical writes + event emission |
+| Risk                                | Impact | Likelihood | Mitigation                                                        |
+| ----------------------------------- | ------ | ---------- | ----------------------------------------------------------------- |
+| SQLite performance at 100K entities | High   | Low        | Benchmark early; adapter pattern allows PostgreSQL swap           |
+| FTS5 relevance quality              | Medium | Medium     | Start with basic ranking; pluggable interface allows Tantivy swap |
+| Markdown parsing edge cases         | Medium | High       | Use battle-tested `pulldown-cmark`; extensive test suite          |
+| Cross-reference extraction accuracy | Medium | High       | Start with explicit Markdown links; AI extraction deferred        |
+| Entity resolution false positives   | High   | Medium     | Confidence scoring, auditable merge decisions, undo capability    |
+| Event ordering guarantees           | High   | Low        | Use SQLite transactions for canonical writes + event emission     |
 
 ---
 
 ## Timeline
 
-| Phase | Duration | Deliverables |
-|-------|----------|-------------|
-| Phase 1: Core entity model | 2 weeks | Entity CRUD, component storage, relationship storage |
-| Phase 2: Markdown importer | 1 week | File parsing, metadata extraction, entity creation |
-| Phase 3: Search index | 1 week | Tantivy integration, full-text search, filtering |
-| Phase 4: CLI | 1 week | Import, search, get, list, archive commands |
-| Phase 5: Integration + testing | 1 week | End-to-end tests, performance benchmarks |
+| Phase                          | Duration | Deliverables                                                                       |
+| ------------------------------ | -------- | ---------------------------------------------------------------------------------- |
+| Phase 1: Core entity model     | 1 week   | Complete domain model, ports, events, entity resolution interface                  |
+| Phase 2: Storage adapters      | 1 week   | Full SQLite adapter, component/relationship/event storage                          |
+| Phase 3: Search interface      | 3 days   | Pluggable SearchIndex trait, SQLite FTS5 adapter                                   |
+| Phase 4: Entity resolution     | 3 days   | Resolution strategies, import-time dedup, confidence scoring                       |
+| Phase 5: Import pipeline       | 1 week   | Markdown parsing, frontmatter extraction, cross-references, resolution integration |
+| Phase 6: CLI                   | 3 days   | `kos` binary with all commands                                                     |
+| Phase 7: Event system          | 2 days   | Durable event log, event processing, search index updates                          |
+| Phase 8: Integration + testing | 3 days   | End-to-end tests, performance benchmarks                                           |
 
-**Total: 6 weeks**
+**Total: ~5 weeks**
 
 ---
 
@@ -529,6 +681,7 @@ Found 3 entities:
 - [ADR-0002](../architecture/adrs/adr-0002.md) — Storage Independence via Adapter Pattern
 - [ADR-0003](../architecture/adrs/adr-0003.md) — Entity Component Model
 - [ADR-0004](../architecture/adrs/adr-0004.md) — Event-Driven Derivation Pipeline
+- [ADR-0005](../architecture/adrs/adr-0005.md) — Compiler-Inspired Architecture
 - [ADR-0006](../architecture/adrs/adr-0006.md) — Entity Resolution as Critical Layer
 - [Landscape 2026](../research/landscape-2026.md) — 2026 knowledge management landscape
 - [Open Infrastructure](../philosophy/open-infrastructure.md) — Knowledge as open infrastructure
