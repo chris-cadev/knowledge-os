@@ -54,10 +54,12 @@ The distinction is not semantic. It is architectural. Information can be represe
 
 A file named `attention-is-all-you-need.pdf` exists at path `/research/papers/attention.pdf`. The file system records:
 
-- File name: `attention-is-all-you-need.pdf`
-- File size: 2.4 MB
-- Creation date: 2024-01-15
-- Modification date: 2024-01-15
+```
+File name: attention-is-all-you-need.pdf
+File size: 2.4 MB
+Creation date: 2024-01-15
+Modification date: 2024-01-15
+```
 
 This is information. It tells you the file exists. It does not tell you what the file is about.
 
