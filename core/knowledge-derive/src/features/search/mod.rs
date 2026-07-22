@@ -2,6 +2,12 @@ use knowledge_core::features::entity::Entity;
 
 pub struct SearchIndex;
 
+impl Default for SearchIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SearchIndex {
     pub fn new() -> Self {
         Self

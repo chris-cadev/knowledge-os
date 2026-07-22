@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::features::component::Component;
 use crate::features::entity::Entity;
 use crate::features::relationship::Relationship;
-use crate::features::component::Component;
 
 #[async_trait]
 pub trait EntityRepository: Send + Sync {

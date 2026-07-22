@@ -1,0 +1,115 @@
+[tools]
+rust = "stable"
+node = "26"
+
+# ── Aggregate ──────────────────────────────────────────────
+
+[tasks.build]
+description = "Build everything (Rust + mobile)"
+depends = ["build-rust", "build-mobile"]
+
+[tasks.build-rust]
+description = "Build all Rust crates"
+run = "cargo build"
+
+[tasks.test]
+description = "Run all Rust tests"
+run = "cargo test"
+
+[tasks.lint]
+description = "Lint all Rust code (clippy + fmt check)"
+run = "cargo clippy -- -D warnings && cargo fmt --check"
+
+[tasks.fmt]
+description = "Format all Rust code"
+run = "cargo fmt"
+
+[tasks.clean]
+description = "Clean all build artifacts"
+run = ["cargo clean", "rm -rf mobile/node_modules"]
+
+[tasks.api]
+description = "Run the API server"
+run = "cargo run -p knowledge-api"
+
+[tasks.install]
+description = "Install API + desktop binaries and mobile dependencies"
+run = [
+    "cargo install --path api",
+    "cargo install --path desktop/src-tauri",
+    { task = "build-mobile" },
+]
+
+# ── Rust per-package ───────────────────────────────────────
+
+[tasks.build-core]
+description = "Build knowledge-core"
+run = "cargo build -p knowledge-core"
+
+[tasks.build-api]
+description = "Build knowledge-api"
+run = "cargo build -p knowledge-api"
+
+[tasks.build-desktop]
+description = "Build knowledge-desktop"
+run = "cargo build -p knowledge-desktop"
+
+[tasks.test-core]
+description = "Test knowledge-core"
+run = "cargo test -p knowledge-core"
+
+[tasks.test-api]
+description = "Test knowledge-api"
+run = "cargo test -p knowledge-api"
+
+[tasks.lint-core]
+description = "Lint knowledge-core"
+run = "cargo clippy -p knowledge-core -- -D warnings && cargo fmt --check"
+
+[tasks.lint-api]
+description = "Lint knowledge-api"
+run = "cargo clippy -p knowledge-api -- -D warnings && cargo fmt --check"
+
+[tasks.fmt-core]
+description = "Format knowledge-core"
+run = "cargo fmt -p knowledge-core"
+
+[tasks.fmt-api]
+description = "Format knowledge-api"
+run = "cargo fmt -p knowledge-api"
+
+[tasks.desktop]
+description = "Run the desktop app (Tauri dev)"
+run = "cargo tauri dev"
+
+# ── Mobile ─────────────────────────────────────────────────
+
+[tasks.build-mobile]
+description = "Install mobile dependencies"
+dir = "mobile"
+run = "npm install"
+
+[tasks.mobile-dev]
+description = "Start Metro bundler"
+dir = "mobile"
+run = "npm start"
+
+[tasks.mobile-test]
+description = "Run mobile tests (Jest)"
+dir = "mobile"
+run = "npm test"
+
+[tasks.mobile-lint]
+description = "Lint mobile code (ESLint)"
+dir = "mobile"
+run = "npm run lint"
+
+[tasks.mobile-android]
+description = "Run mobile on Android"
+dir = "mobile"
+run = "npm run android"
+
+[tasks.mobile-ios]
+description = "Run mobile on iOS"
+dir = "mobile"
+run = "npm run ios"

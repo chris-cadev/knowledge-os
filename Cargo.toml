@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "core/knowledge-core",
+    "core/knowledge-storage",
+    "core/knowledge-import",
+    "core/knowledge-derive",
+    "api",
+    "desktop/src-tauri",
+]
+resolver = "2"

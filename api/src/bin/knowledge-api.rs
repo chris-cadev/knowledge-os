@@ -1,7 +1,7 @@
 use axum::{
+    extract::State,
     routing::{get, post},
     Json, Router,
-    extract::State,
 };
 use knowledge_core::features::entity::{Entity, EntityType};
 use knowledge_core::ports::EntityRepository;
@@ -44,9 +44,7 @@ async fn create_entity(
     Json(entity)
 }
 
-async fn list_entities(
-    State(state): State<AppState>,
-) -> Json<Vec<Entity>> {
+async fn list_entities(State(state): State<AppState>) -> Json<Vec<Entity>> {
     let entities = state.store.list().await.unwrap();
     Json(entities)
 }
