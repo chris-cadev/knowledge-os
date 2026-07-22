@@ -271,7 +271,7 @@ Every feature must answer these questions before implementation:
 9. Does the feature introduce implementation leakage?
 10. Does the feature preserve the canonical model?
 
-**Reference:** [Engineering Principles](../philosophy/engineering-principles.md), [CONTRIBUTING.md](../../CONTRIBUTING.md)
+**Reference:** [Engineering Principles](philosophy/engineering-principles.md), [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ### D.2 The Compiler Analogy
 
@@ -422,7 +422,7 @@ Completed the manifesto documentation:
 
 ## Further Reading
 
-- [Foundational Manifesto](../foundational-manifesto.md) -- The constitutional outline
-- [Engineering Architecture](../engineering-architecture.md) -- The engineering constitution
-- [Glossary](glossary.md) -- Every project term, defined once
+- [Foundational Manifesto](foundational-manifesto.md) -- The constitutional outline
+- [Engineering Architecture](engineering-architecture.md) -- The engineering constitution
+- [Glossary](reference/glossary.md) -- Every project term, defined once
 - [ADR Index](architecture/adrs/README.md) -- Architecture Decision Records

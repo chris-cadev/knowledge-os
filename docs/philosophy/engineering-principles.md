@@ -42,7 +42,7 @@ The primary implementation language is Rust. All new code follows Rust conventio
 
 ## Feature Evaluation
 
-Every feature must answer ten engineering questions before implementation begins. This checklist is derived from the [Engineering Architecture Constitution](engineering-architecture.md).
+Every feature must answer ten engineering questions before implementation begins. This checklist is derived from the [Engineering Architecture Constitution](../engineering-architecture.md).
 
 1. **Which canonical entities are introduced?** If the feature creates new entity types, define them.
 2. **Which relationships are introduced?** If the feature creates new relationship types, define them.

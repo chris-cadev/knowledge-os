@@ -113,3 +113,9 @@ run = "npm run android"
 description = "Run mobile on iOS"
 dir = "mobile"
 run = "npm run ios"
+
+# ── Docs ───────────────────────────────────────────────────
+
+[tasks.docs]
+description = "Build & serve docs in Docker (http://localhost:8080)"
+run = "docker build -t knowledge-os-docs -f docs/Dockerfile . && docker run --rm -p 8080:3000 knowledge-os-docs"

@@ -1,5 +1,7 @@
 # Knowledge OS Documentation
 
+[Home](../README.md) > Documentation
+
 This directory contains all project documentation, organized following the [Diataxis framework](https://diataxis.fr/).
 
 ---

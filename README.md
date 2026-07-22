@@ -45,11 +45,11 @@ Documentation follows the [Diataxis framework](https://diataxis.fr/) -- four typ
 
 | Section | Purpose | Link |
 |---------|---------|------|
-| **Philosophy** | Why this project exists and what it believes | [docs/philosophy/](docs/philosophy/) |
-| **Architecture** | How the system is designed and why | [docs/architecture/](docs/architecture/) |
-| **Reference** | Definitive specifications and glossary | [docs/reference/](docs/reference/) |
-| **Engineering** | Testing, security, deployment, and practices | [docs/engineering/](docs/engineering/) |
-| **Guides** | How-to guides, tutorials, and AI agent workflows | [docs/guides/](docs/guides/) |
+| **Philosophy** | Why this project exists and what it believes | [docs/philosophy/](docs/philosophy/README.md) |
+| **Architecture** | How the system is designed and why | [docs/architecture/](docs/architecture/README.md) |
+| **Reference** | Definitive specifications and glossary | [docs/reference/](docs/reference/README.md) |
+| **Engineering** | Testing, security, deployment, and practices | [docs/engineering/](docs/engineering/README.md) |
+| **Guides** | How-to guides, tutorials, and AI agent workflows | [docs/guides/](docs/guides/README.md) |
 | **Appendices** | Diagrams, patterns, and canonical examples | [docs/appendices.md](docs/appendices.md) |
 | **Contributing** | How to participate in the project | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
