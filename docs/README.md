@@ -55,12 +55,18 @@ docs/
 │   ├── product-requirements.md
 │   ├── ui-design-system.md
 │   ├── api-specification.md
-│   └── infrastructure-handbook.md
+│   ├── infrastructure-handbook.md
+│   └── prds/
+│       ├── prd-0001-core-entity-model.md
+│       ├── prd-0002-rich-import-and-resolution.md
+│       └── prd-0003-graph-exploration-and-plugins.md
 │
 ├── guides/
 │   ├── plugin-development.md
 │   ├── ai-agent-guidelines.md
 │   └── tutorials/
+│       ├── first-import.md
+│       └── build-custom-importer.md
 │
 └── appendices.md
 ```
@@ -93,24 +99,29 @@ For **architects and engineers**, also read:
 17. [Scalability](architecture/scalability.md) -- Scaling strategies
 18. [Synchronization](architecture/synchronization.md) -- Consistency model
 19. [ADR-0006: Entity Resolution](architecture/adrs/adr-0006.md) -- Critical quality layer
+20. [ADR-0007: Multi-Format Import](architecture/adrs/adr-0007.md) -- ImportAdapter trait pattern
+21. [ADR-0008: Fuzzy Entity Resolution](architecture/adrs/adr-0008.md) -- Confidence scoring and merge strategies
+22. [ADR-0009: Extended Cross-References](architecture/adrs/adr-0009.md) -- Wikilinks, URLs, @mentions
+23. [ADR-0010: Entity Type Inference](architecture/adrs/adr-0010.md) -- Frontmatter type field
+24. [ADR-0011: BinaryContent Component](architecture/adrs/adr-0011.md) -- Binary data references
 
 For **product managers and stakeholders**, also read:
 
-20. [Product Vision](philosophy/product-vision.md) -- Long-term direction
-21. [Governance](philosophy/governance.md) -- Decision-making process
-22. [Engineering Principles](philosophy/engineering-principles.md) -- How code is developed
-23. [Landscape 2026](research/landscape-2026.md) -- 2026 knowledge management landscape
+25. [Product Vision](philosophy/product-vision.md) -- Long-term direction
+26. [Governance](philosophy/governance.md) -- Decision-making process
+27. [Engineering Principles](philosophy/engineering-principles.md) -- How code is developed
+28. [Landscape 2026](research/landscape-2026.md) -- 2026 knowledge management landscape
 
 For **plugin developers**, also read:
 
-24. [Extensibility](architecture/extensibility.md) -- Plugin system
-25. [Plugin Development Guide](guides/plugin-development.md) -- How to build plugins
-26. [AI Agent Guidelines](guides/ai-agent-guidelines.md) -- How AI agents work
+29. [Extensibility](architecture/extensibility.md) -- Plugin system
+30. [Plugin Development Guide](guides/plugin-development.md) -- How to build plugins
+31. [AI Agent Guidelines](guides/ai-agent-guidelines.md) -- How AI agents work
 
 For **learners**, start with:
 
-27. [Tutorial: First Import](guides/tutorials/first-import.md) -- Import your first document
-28. [Tutorial: Build a Custom Importer](guides/tutorials/build-custom-importer.md) -- Extend the system
+32. [Tutorial: First Import](guides/tutorials/first-import.md) -- Import your first document
+33. [Tutorial: Build a Custom Importer](guides/tutorials/build-custom-importer.md) -- Extend the system
 
 ---
 

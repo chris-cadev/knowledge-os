@@ -140,7 +140,7 @@ The spine must follow this order because of data dependencies:
 
 ### Why Resolution Before Storage
 
-Entity resolution is the critical quality layer. The evidence from the 2026 landscape (see [Landscape 2026](../research/landscape-2026.md)) confirms that enterprise knowledge graphs fail when resolution is deferred:
+Entity resolution is the critical quality layer. The evidence from the 2026 landscape (see [Landscape 2026](../../research/landscape-2026.md)) confirms that enterprise knowledge graphs fail when resolution is deferred:
 
 - Children's Medical Center Dallas found 22% of records were duplicates before proper resolution.
 - LLMs consistently produce duplicate entities in GraphRAG pipelines.
@@ -700,16 +700,16 @@ The project has the core entity model and import pipeline implemented:
 ## Further Reading
 
 - [Product Requirements](product-requirements.md) — Year 1 functional and non-functional requirements
-- [Domain Model](../architecture/domain-model.md) — Entity, relationship, and component types
-- [Pipeline](../architecture/pipeline.md) — Seven-layer architecture
-- [Data Model](../architecture/data-model.md) — Canonical vs derived data
-- [Storage](../architecture/storage.md) — Storage adapter pattern
-- [Events](../architecture/events.md) — Event-driven architecture
-- [ADR-0001](../architecture/adrs/adr-0001.md) — Knowledge Model as Canonical Source of Truth
-- [ADR-0002](../architecture/adrs/adr-0002.md) — Storage Independence via Adapter Pattern
-- [ADR-0003](../architecture/adrs/adr-0003.md) — Entity Component Model
-- [ADR-0004](../architecture/adrs/adr-0004.md) — Event-Driven Derivation Pipeline
-- [ADR-0005](../architecture/adrs/adr-0005.md) — Compiler-Inspired Architecture
-- [ADR-0006](../architecture/adrs/adr-0006.md) — Entity Resolution as Critical Layer
-- [Landscape 2026](../research/landscape-2026.md) — 2026 knowledge management landscape
-- [Open Infrastructure](../philosophy/open-infrastructure.md) — Knowledge as open infrastructure
+- [Domain Model](../../architecture/domain-model.md) — Entity, relationship, and component types
+- [Pipeline](../../architecture/pipeline.md) — Seven-layer architecture
+- [Data Model](../../architecture/data-model.md) — Canonical vs derived data
+- [Storage](../../architecture/storage.md) — Storage adapter pattern
+- [Events](../../architecture/events.md) — Event-driven architecture
+- [ADR-0001](../../architecture/adrs/adr-0001.md) — Knowledge Model as Canonical Source of Truth
+- [ADR-0002](../../architecture/adrs/adr-0002.md) — Storage Independence via Adapter Pattern
+- [ADR-0003](../../architecture/adrs/adr-0003.md) — Entity Component Model
+- [ADR-0004](../../architecture/adrs/adr-0004.md) — Event-Driven Derivation Pipeline
+- [ADR-0005](../../architecture/adrs/adr-0005.md) — Compiler-Inspired Architecture
+- [ADR-0006](../../architecture/adrs/adr-0006.md) — Entity Resolution as Critical Layer
+- [Landscape 2026](../../research/landscape-2026.md) — 2026 knowledge management landscape
+- [Open Infrastructure](../../philosophy/open-infrastructure.md) — Knowledge as open infrastructure

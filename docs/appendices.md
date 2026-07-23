@@ -357,6 +357,12 @@ Architecture Decision Records (ADRs) capture significant architectural decisions
 | [ADR-0003](architecture/adrs/adr-0003.md) | Entity Component Model for Knowledge Entities | Accepted | 2026-07-21 |
 | [ADR-0004](architecture/adrs/adr-0004.md) | Event-Driven Derivation Pipeline              | Accepted | 2026-07-21 |
 | [ADR-0005](architecture/adrs/adr-0005.md) | Compiler-Inspired Architecture                | Accepted | 2026-07-21 |
+| [ADR-0006](architecture/adrs/adr-0006.md) | Entity Resolution as Critical Layer           | Accepted | 2026-07-22 |
+| [ADR-0007](architecture/adrs/adr-0007.md) | Multi-Format Import via ImportAdapter Trait   | Accepted | 2026-07-22 |
+| [ADR-0008](architecture/adrs/adr-0008.md) | Fuzzy Entity Resolution with Confidence Scoring | Accepted | 2026-07-22 |
+| [ADR-0009](architecture/adrs/adr-0009.md) | Extended Cross-Reference Patterns             | Accepted | 2026-07-22 |
+| [ADR-0010](architecture/adrs/adr-0010.md) | Entity Type Inference from Frontmatter        | Accepted | 2026-07-22 |
+| [ADR-0011](architecture/adrs/adr-0011.md) | BinaryContent Component                       | Accepted | 2026-07-22 |
 
 **See also:** [ADR Index](architecture/adrs/README.md)
 
@@ -401,7 +407,7 @@ Expanded documentation to cover all manifesto parts:
 - Scalability and synchronization documents
 - Testing strategy, security architecture, deployment architecture
 - Plugin development guide and AI agent guidelines
-- 5 Architecture Decision Records (ADR-0001 through ADR-0005)
+- 11 Architecture Decision Records (ADR-0001 through ADR-0011)
 
 ### Version 0.3.0 (2026-07-21)
 

@@ -82,6 +82,11 @@ Proposed --> Accepted --> [Deprecated | Superseded]
 | ADR-0004 | [Event-Driven Derivation Pipeline](adr-0004.md)              | Accepted | 2026-07-21 |
 | ADR-0005 | [Compiler-Inspired Architecture](adr-0005.md)                | Accepted | 2026-07-21 |
 | ADR-0006 | [Entity Resolution as Critical Layer](adr-0006.md)           | Accepted | 2026-07-22 |
+| ADR-0007 | [Multi-Format Import via ImportAdapter Trait](adr-0007.md)   | Accepted | 2026-07-22 |
+| ADR-0008 | [Fuzzy Entity Resolution with Confidence Scoring](adr-0008.md) | Accepted | 2026-07-22 |
+| ADR-0009 | [Extended Cross-Reference Patterns](adr-0009.md)            | Accepted | 2026-07-22 |
+| ADR-0010 | [Entity Type Inference from Frontmatter](adr-0010.md)        | Accepted | 2026-07-22 |
+| ADR-0011 | [BinaryContent Component](adr-0011.md)                      | Accepted | 2026-07-22 |
 
 ---
 
