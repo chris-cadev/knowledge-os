@@ -4,6 +4,7 @@ members = [
     "core/knowledge-storage",
     "core/knowledge-import",
     "core/knowledge-derive",
+    "cli",
     "api",
     "desktop/src-tauri",
 ]

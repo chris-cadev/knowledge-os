@@ -54,6 +54,10 @@ run = "cargo build -p knowledge-api"
 description = "Build knowledge-desktop"
 run = "cargo build -p knowledge-desktop"
 
+[tasks.build-cli]
+description = "Build the kos CLI binary to build/"
+run = ["cargo build -p knowledge-cli", "mkdir -p build && cp target/debug/kos build/"]
+
 [tasks.test-core]
 description = "Test knowledge-core"
 run = "cargo test -p knowledge-core"

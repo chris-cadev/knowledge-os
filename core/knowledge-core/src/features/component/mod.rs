@@ -11,6 +11,9 @@ pub enum ComponentType {
     Author,
     Embedding,
     Summary,
+    Timeline,
+    Language,
+    Provenance,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

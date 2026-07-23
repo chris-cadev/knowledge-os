@@ -43,32 +43,32 @@ For a detailed explanation of each layer, see [Pipeline](docs/architecture/pipel
 
 Documentation follows the [Diataxis framework](https://diataxis.fr/) -- four types of content for four different needs.
 
-| Section | Purpose | Link |
-|---------|---------|------|
-| **Philosophy** | Why this project exists and what it believes | [docs/philosophy/](docs/philosophy/README.md) |
-| **Architecture** | How the system is designed and why | [docs/architecture/](docs/architecture/README.md) |
-| **Reference** | Definitive specifications and glossary | [docs/reference/](docs/reference/README.md) |
-| **Engineering** | Testing, security, deployment, and practices | [docs/engineering/](docs/engineering/README.md) |
-| **Guides** | How-to guides, tutorials, and AI agent workflows | [docs/guides/](docs/guides/README.md) |
-| **Appendices** | Diagrams, patterns, and canonical examples | [docs/appendices.md](docs/appendices.md) |
-| **Contributing** | How to participate in the project | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Section          | Purpose                                          | Link                                              |
+| ---------------- | ------------------------------------------------ | ------------------------------------------------- |
+| **Philosophy**   | Why this project exists and what it believes     | [docs/philosophy/](docs/philosophy/README.md)     |
+| **Architecture** | How the system is designed and why               | [docs/architecture/](docs/architecture/README.md) |
+| **Reference**    | Definitive specifications and glossary           | [docs/reference/](docs/reference/README.md)       |
+| **Engineering**  | Testing, security, deployment, and practices     | [docs/engineering/](docs/engineering/README.md)   |
+| **Guides**       | How-to guides, tutorials, and AI agent workflows | [docs/guides/](docs/guides/README.md)             |
+| **Appendices**   | Diagrams, patterns, and canonical examples       | [docs/appendices.md](docs/appendices.md)          |
+| **Contributing** | How to participate in the project                | [CONTRIBUTING.md](CONTRIBUTING.md)                |
 
 ### Key Documents
 
-| Document | Description |
-|----------|-------------|
-| [Seed Manifesto](docs/foundational-manifesto.md) | The constitutional outline of the entire project |
-| [Technical Foundation](docs/engineering-architecture.md) | The engineering architecture constitution |
-| [Philosophy](docs/philosophy/philosophy.md) | Core philosophy and immutable principles |
-| [Vision](docs/philosophy/vision.md) | Why Knowledge OS exists |
-| [Boundaries](docs/philosophy/boundaries.md) | What we build and what we intentionally skip |
-| [Open Infrastructure](docs/philosophy/open-infrastructure.md) | Why Knowledge OS is available to everyone |
-| [Mental Model](docs/architecture/mental-model.md) | The canonical way of thinking about the system |
-| [Domain Model](docs/architecture/domain-model.md) | Entity, relationship, and component types |
-| [System Overview](docs/architecture/overview.md) | Current technical architecture |
-| [Landscape 2026](docs/research/landscape-2026.md) | 2026 knowledge management landscape |
-| [Glossary](docs/reference/glossary.md) | Every project term, defined once (Part XIV) |
-| [Appendices](docs/appendices.md) | Reference diagrams, patterns, and examples (Part XV) |
+| Document                                                      | Description                                          |
+| ------------------------------------------------------------- | ---------------------------------------------------- |
+| [Seed Manifesto](docs/foundational-manifesto.md)              | The constitutional outline of the entire project     |
+| [Technical Foundation](docs/engineering-architecture.md)      | The engineering architecture constitution            |
+| [Philosophy](docs/philosophy/philosophy.md)                   | Core philosophy and immutable principles             |
+| [Vision](docs/philosophy/vision.md)                           | Why Knowledge OS exists                              |
+| [Boundaries](docs/philosophy/boundaries.md)                   | What we build and what we intentionally skip         |
+| [Open Infrastructure](docs/philosophy/open-infrastructure.md) | Why Knowledge OS is available to everyone            |
+| [Mental Model](docs/architecture/mental-model.md)             | The canonical way of thinking about the system       |
+| [Domain Model](docs/architecture/domain-model.md)             | Entity, relationship, and component types            |
+| [System Overview](docs/architecture/overview.md)              | Current technical architecture                       |
+| [Landscape 2026](docs/research/landscape-2026.md)             | 2026 knowledge management landscape                  |
+| [Glossary](docs/reference/glossary.md)                        | Every project term, defined once (Part XIV)          |
+| [Appendices](docs/appendices.md)                              | Reference diagrams, patterns, and examples (Part XV) |
 
 ---
 
@@ -84,16 +84,16 @@ This distinction is the foundation of every architectural decision in the system
 
 ## Technology
 
-| Layer | Choice | Why |
-|-------|--------|-----|
-| Core | Rust | Domain model, pipeline, storage adapters |
-| API | Axum | Tokio team, Tower middleware, type-safe |
-| Desktop | Tauri 2.x + Svelte 5 | Rust backend, small binary, fast UI |
-| Mobile | React Native | Cross-platform, TypeScript |
-| DB (local) | SQLite | Embedded, zero-config |
-| DB (cloud) | PostgreSQL | Production multi-user |
-| Search | Tantivy | Rust-native, embeddable |
-| Serialization | Serde | Already used in all code examples |
+| Layer         | Choice               | Why                                      |
+| ------------- | -------------------- | ---------------------------------------- |
+| Core          | Rust                 | Domain model, pipeline, storage adapters |
+| API           | Axum                 | Tokio team, Tower middleware, type-safe  |
+| Desktop       | Tauri 2.x + Svelte 5 | Rust backend, small binary, fast UI      |
+| Mobile        | React Native         | Cross-platform, TypeScript               |
+| DB (local)    | SQLite               | Embedded, zero-config                    |
+| DB (cloud)    | PostgreSQL           | Production multi-user                    |
+| Search        | Tantivy              | Rust-native, embeddable                  |
+| Serialization | Serde                | Already used in all code examples        |
 
 ---
 
