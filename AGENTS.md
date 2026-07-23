@@ -91,16 +91,19 @@ CHANGELOG.md           Release history
 2. `docs/engineering-architecture.md` -- The engineering architecture
 3. `docs/philosophy/philosophy.md` -- Core principles
 4. `docs/philosophy/vision.md` -- Why the project exists
-5. `CONTRIBUTING.md` -- Engineering rules and the 10-question checklist
+5. `docs/engineering/engineering-handbook.md` -- Day-to-day engineering practices, Git workflow, code review
+6. `docs/architecture/architectural-principles.md` -- Architectural invariants and validation checklist
+7. `CONTRIBUTING.md` -- Engineering rules and the 10-question checklist
 
 ---
 
 ## Git Workflow
 
-- Branch from `main`, prefix with `feat/`, `fix/`, or `docs/`
-- Commit messages: `type: description` (e.g., `docs: add storage philosophy`)
-- Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`
+- Branch from `main`, prefix with `feat/`, `fix/`, `docs/`, `chore/`, or `refactor/`
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): description`
+- Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `style`
 - Squash merge PRs
+- See [Engineering Handbook](docs/engineering/engineering-handbook.md) for full details
 
 ---
 
@@ -137,3 +140,6 @@ Every feature proposed for the system must answer these 10 questions (from `CONT
 8. Does the feature violate storage independence?
 9. Does the feature introduce implementation leakage?
 10. Does the feature preserve the canonical model?
+
+Detailed explanations for each question: [Engineering Principles](docs/philosophy/engineering-principles.md)
+Architectural validation checklist: [Architectural Principles](docs/architecture/architectural-principles.md)
