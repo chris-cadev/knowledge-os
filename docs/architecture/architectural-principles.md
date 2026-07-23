@@ -51,14 +51,14 @@ No storage engine defines the knowledge model. The application owns the knowledg
 
 **Storage categories and their roles:**
 
-| Category | Role | Canonical? |
-|----------|------|-----------|
-| Object Storage | Large binary artifacts | Yes |
-| Relational Storage | Structured data, metadata, transactions | Yes |
-| Graph Storage | Relationship traversal | No (derived projection) |
-| Search Storage | Full-text retrieval | No (derived projection) |
-| Vector Storage | Semantic retrieval | No (derived projection) |
-| Cache Storage | Performance optimization | No (derived projection) |
+| Category           | Role                                    | Canonical?              |
+| ------------------ | --------------------------------------- | ----------------------- |
+| Object Storage     | Large binary artifacts                  | Yes                     |
+| Relational Storage | Structured data, metadata, transactions | Yes                     |
+| Graph Storage      | Relationship traversal                  | No (derived projection) |
+| Search Storage     | Full-text retrieval                     | No (derived projection) |
+| Vector Storage     | Semantic retrieval                      | No (derived projection) |
+| Cache Storage      | Performance optimization                | No (derived projection) |
 
 **Implications for design:**
 
@@ -85,13 +85,13 @@ Search indexes, embeddings, recommendations, similarity graphs, caches -- all ma
 
 This mirrors the relationship between source code and compiled artifacts. Source code is the source of truth. Object files are derived. If you lose the object files, you recompile. If you lose the search index, you rebuild it.
 
-| Compiler Concept | Knowledge OS Equivalent |
-|------------------|------------------------|
-| Source code | Canonical entities, relationships, components |
-| Intermediate representation | Normalized knowledge model |
-| Compiled artifacts | Search indexes, embeddings, graphs |
-| Executable | Rendered views |
-| Object files | Cached projections |
+| Compiler Concept            | Knowledge OS Equivalent                       |
+| --------------------------- | --------------------------------------------- |
+| Source code                 | Canonical entities, relationships, components |
+| Intermediate representation | Normalized knowledge model                    |
+| Compiled artifacts          | Search indexes, embeddings, graphs            |
+| Executable                  | Rendered views                                |
+| Object files                | Cached projections                            |
 
 **Implications for design:**
 
@@ -188,15 +188,15 @@ Each layer receives input through a defined interface and produces output throug
 
 Each layer of the pipeline has exactly one responsibility. Understanding these responsibilities is essential for placing features correctly.
 
-| Layer | Responsibility | Owns | Does Not Own |
-|-------|---------------|------|-------------|
-| **Import** | Receive information from external systems | Format detection, extraction, transformation | Business logic, entity resolution |
-| **Parsing** | Extract structured information | Syntactic analysis, metadata extraction | Semantic interpretation, entity creation |
-| **Normalization** | Convert to canonical representations | Entity identification, duplicate detection, identity resolution | Storage, derived data generation |
-| **Knowledge Model** | Store and manage canonical entities | Entity lifecycle, component attachment, versioning | Derived data, view rendering |
-| **Relationship Engine** | Connect entities through typed edges | Relationship creation, traversal, versioning | Entity creation, view rendering |
-| **Derivation** | Generate derived representations | Search indexes, embeddings, recommendations, caches | Canonical data, view rendering |
-| **Presentation** | Render projections for interfaces | View rendering, navigation, context assembly | Canonical data modification, derived data generation |
+| Layer                   | Responsibility                            | Owns                                                            | Does Not Own                                         |
+| ----------------------- | ----------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------- |
+| **Import**              | Receive information from external systems | Format detection, extraction, transformation                    | Business logic, entity resolution                    |
+| **Parsing**             | Extract structured information            | Syntactic analysis, metadata extraction                         | Semantic interpretation, entity creation             |
+| **Normalization**       | Convert to canonical representations      | Entity identification, duplicate detection, identity resolution | Storage, derived data generation                     |
+| **Knowledge Model**     | Store and manage canonical entities       | Entity lifecycle, component attachment, versioning              | Derived data, view rendering                         |
+| **Relationship Engine** | Connect entities through typed edges      | Relationship creation, traversal, versioning                    | Entity creation, view rendering                      |
+| **Derivation**          | Generate derived representations          | Search indexes, embeddings, recommendations, caches             | Canonical data, view rendering                       |
+| **Presentation**        | Render projections for interfaces         | View rendering, navigation, context assembly                    | Canonical data modification, derived data generation |
 
 **Rules:**
 
@@ -288,15 +288,15 @@ The architecture scales horizontally through the pipeline and vertically through
 
 **Pipeline scaling:**
 
-| Layer | Scaling Strategy | Parallelism |
-|-------|-----------------|-------------|
-| Import | Multiple importers run concurrently | Per-source parallelism |
-| Parsing | Parsers run concurrently per document | Per-document parallelism |
-| Normalization | Normalizers run concurrently per entity | Per-entity parallelism |
-| Knowledge Model | Entity operations are independent | Per-entity parallelism |
-| Relationship Engine | Relationship extraction runs concurrently | Per-source parallelism |
-| Derivation | Each derivation type runs independently | Per-derivation-type parallelism |
-| Presentation | Each view renders independently | Per-view parallelism |
+| Layer               | Scaling Strategy                          | Parallelism                     |
+| ------------------- | ----------------------------------------- | ------------------------------- |
+| Import              | Multiple importers run concurrently       | Per-source parallelism          |
+| Parsing             | Parsers run concurrently per document     | Per-document parallelism        |
+| Normalization       | Normalizers run concurrently per entity   | Per-entity parallelism          |
+| Knowledge Model     | Entity operations are independent         | Per-entity parallelism          |
+| Relationship Engine | Relationship extraction runs concurrently | Per-source parallelism          |
+| Derivation          | Each derivation type runs independently   | Per-derivation-type parallelism |
+| Presentation        | Each view renders independently           | Per-view parallelism            |
 
 **Storage scaling:**
 
@@ -369,14 +369,14 @@ Artificial intelligence performs extraction, classification, summarization, rela
 
 **AI integration points:**
 
-| Pipeline Stage | AI Operation | Output |
-|---------------|--------------|--------|
-| Import | Content extraction, format detection | Parsed content |
-| Normalization | Entity resolution, duplicate detection | Canonical entities |
-| Knowledge Model | Classification, tagging | Entity metadata |
-| Relationship Engine | Relationship extraction, inference | Relationships |
-| Derivation | Embedding generation, summarization | Derived artifacts |
-| Presentation | Query understanding, response generation | Rendered responses |
+| Pipeline Stage      | AI Operation                             | Output             |
+| ------------------- | ---------------------------------------- | ------------------ |
+| Import              | Content extraction, format detection     | Parsed content     |
+| Normalization       | Entity resolution, duplicate detection   | Canonical entities |
+| Knowledge Model     | Classification, tagging                  | Entity metadata    |
+| Relationship Engine | Relationship extraction, inference       | Relationships      |
+| Derivation          | Embedding generation, summarization      | Derived artifacts  |
+| Presentation        | Query understanding, response generation | Rendered responses |
 
 **Implications for design:**
 

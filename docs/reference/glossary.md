@@ -438,19 +438,19 @@ A declaration of what a plugin provides. The system queries capabilities to dete
 
 **Capability types:**
 
-| Capability | Purpose | Interface |
-|-----------|---------|-----------|
-| `importer` | Import from external formats | `ImportAdapter` |
-| `exporter` | Export to external formats | `ExportAdapter` |
-| `renderer` | Render canonical data to output | `RenderAdapter` |
-| `storage` | Persist data to a storage engine | `StorageAdapter` |
-| `search` | Index and retrieve text | `SearchAdapter` |
-| `vector` | Store and query embeddings | `VectorAdapter` |
-| `graph` | Store and traverse relationships | `GraphAdapter` |
-| `cache` | Cache derived data | `CacheAdapter` |
-| `ai` | Provide AI operations | `AiAdapter` |
-| `automation` | Automate knowledge operations | `AutomationAdapter` |
-| `view` | Render a view projection | `ViewAdapter` |
+| Capability   | Purpose                          | Interface           |
+| ------------ | -------------------------------- | ------------------- |
+| `importer`   | Import from external formats     | `ImportAdapter`     |
+| `exporter`   | Export to external formats       | `ExportAdapter`     |
+| `renderer`   | Render canonical data to output  | `RenderAdapter`     |
+| `storage`    | Persist data to a storage engine | `StorageAdapter`    |
+| `search`     | Index and retrieve text          | `SearchAdapter`     |
+| `vector`     | Store and query embeddings       | `VectorAdapter`     |
+| `graph`      | Store and traverse relationships | `GraphAdapter`      |
+| `cache`      | Cache derived data               | `CacheAdapter`      |
+| `ai`         | Provide AI operations            | `AiAdapter`         |
+| `automation` | Automate knowledge operations    | `AutomationAdapter` |
+| `view`       | Render a view projection         | `ViewAdapter`       |
 
 **Capability negotiation:**
 
@@ -468,12 +468,12 @@ Importers implement the `ImportAdapter` trait. They receive an `ImportSource` an
 
 **Built-in importers:**
 
-| Importer | Source | Output |
-|----------|--------|--------|
-| Markdown | `.md` files | Entity with Content component |
-| PDF | `.pdf` files | Entity with Content + BinaryContent components |
-| HTML | URLs, `.html` files | Entity with Content component |
-| Git | Git repositories | Project entity with relationship to commits |
+| Importer | Source              | Output                                         |
+| -------- | ------------------- | ---------------------------------------------- |
+| Markdown | `.md` files         | Entity with Content component                  |
+| PDF      | `.pdf` files        | Entity with Content + BinaryContent components |
+| HTML     | URLs, `.html` files | Entity with Content component                  |
+| Git      | Git repositories    | Project entity with relationship to commits    |
 
 **Rules:**
 
@@ -492,11 +492,11 @@ A plugin that transforms canonical data into external formats. Exporters impleme
 
 **Built-in exporters:**
 
-| Exporter | Format | Output |
-|----------|--------|--------|
-| Markdown | `.md` | Markdown files |
-| JSON | `.json` | Structured entity data |
-| GraphML | `.graphml` | Graph structure |
+| Exporter | Format     | Output                 |
+| -------- | ---------- | ---------------------- |
+| Markdown | `.md`      | Markdown files         |
+| JSON     | `.json`    | Structured entity data |
+| GraphML  | `.graphml` | Graph structure        |
 
 **Rules:**
 
@@ -514,11 +514,11 @@ A plugin that transforms canonical data into output formats for consumption by e
 
 **Built-in renderers:**
 
-| Renderer | Format | Purpose |
-|----------|--------|---------|
-| HTML | `.html` | Web pages |
-| JSON API | `application/json` | API responses |
-| MCP | MCP protocol | AI agent communication |
+| Renderer | Format             | Purpose                |
+| -------- | ------------------ | ---------------------- |
+| HTML     | `.html`            | Web pages              |
+| JSON API | `application/json` | API responses          |
+| MCP      | MCP protocol       | AI agent communication |
 
 **See also:** [Plugin](#plugin), [Exporter](#exporter), [View](#view)
 
@@ -619,14 +619,14 @@ Knowledge OS uses a polyglot persistence strategy. Different storage engines are
 
 **Storage engine categories:**
 
-| Category | Purpose | Candidates |
-|----------|---------|-----------|
-| Object Storage | Large binary artifacts | MinIO, S3, local filesystem |
-| Relational Storage | Canonical structured data | PostgreSQL, SQLite, DuckDB |
-| Graph Storage | Relationship traversal | Neo4j, Memgraph, Apache AGE |
-| Search Storage | Full-text retrieval | Tantivy, Elasticsearch, Meilisearch |
-| Vector Storage | Semantic retrieval | Qdrant, Milvus, pgvector, Chroma |
-| Cache Storage | Performance optimization | Redis, in-process caches |
+| Category           | Purpose                   | Candidates                          |
+| ------------------ | ------------------------- | ----------------------------------- |
+| Object Storage     | Large binary artifacts    | MinIO, S3, local filesystem         |
+| Relational Storage | Canonical structured data | PostgreSQL, SQLite, DuckDB          |
+| Graph Storage      | Relationship traversal    | Neo4j, Memgraph, Apache AGE         |
+| Search Storage     | Full-text retrieval       | Tantivy, Elasticsearch, Meilisearch |
+| Vector Storage     | Semantic retrieval        | Qdrant, Milvus, pgvector, Chroma    |
+| Cache Storage      | Performance optimization  | Redis, in-process caches            |
 
 **Rules:**
 

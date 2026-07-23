@@ -18,29 +18,29 @@ This architecture follows the patterns described in Gregor Hohpe and Bobby Woolf
 
 Events that represent changes to canonical data:
 
-| Event | Trigger | Description |
-|-------|---------|-------------|
-| `EntityCreated` | New entity added | A new canonical entity is stored |
-| `EntityUpdated` | Entity modified | Entity components or metadata changed |
-| `EntityArchived` | Entity soft-deleted | Entity is marked as archived |
-| `RelationshipCreated` | New relationship | A typed edge between entities is established |
-| `RelationshipUpdated` | Relationship modified | Relationship metadata or confidence changed |
-| `RelationshipArchived` | Relationship removed | A relationship is marked as inactive |
-| `ComponentAdded` | New component | A new component is attached to an entity |
-| `ComponentUpdated` | Component modified | Component data is changed |
-| `ComponentRemoved` | Component detached | A component is removed from an entity |
+| Event                  | Trigger               | Description                                  |
+| ---------------------- | --------------------- | -------------------------------------------- |
+| `EntityCreated`        | New entity added      | A new canonical entity is stored             |
+| `EntityUpdated`        | Entity modified       | Entity components or metadata changed        |
+| `EntityArchived`       | Entity soft-deleted   | Entity is marked as archived                 |
+| `RelationshipCreated`  | New relationship      | A typed edge between entities is established |
+| `RelationshipUpdated`  | Relationship modified | Relationship metadata or confidence changed  |
+| `RelationshipArchived` | Relationship removed  | A relationship is marked as inactive         |
+| `ComponentAdded`       | New component         | A new component is attached to an entity     |
+| `ComponentUpdated`     | Component modified    | Component data is changed                    |
+| `ComponentRemoved`     | Component detached    | A component is removed from an entity        |
 
 ### Derivation Events
 
 Events that trigger derived data updates:
 
-| Event | Trigger | Description |
-|-------|---------|-------------|
-| `ArtifactImported` | Import complete | External data has been imported |
-| `EmbeddingGenerated` | Embedding computed | Vector representation created |
-| `SearchIndexed` | Index updated | Full-text index entry created or updated |
-| `GraphProjected` | Graph updated | Graph storage projection rebuilt |
-| `RecommendationGenerated` | Recommendation computed | AI-generated suggestion produced |
+| Event                     | Trigger                 | Description                              |
+| ------------------------- | ----------------------- | ---------------------------------------- |
+| `ArtifactImported`        | Import complete         | External data has been imported          |
+| `EmbeddingGenerated`      | Embedding computed      | Vector representation created            |
+| `SearchIndexed`           | Index updated           | Full-text index entry created or updated |
+| `GraphProjected`          | Graph updated           | Graph storage projection rebuilt         |
+| `RecommendationGenerated` | Recommendation computed | AI-generated suggestion produced         |
 
 ---
 

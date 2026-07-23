@@ -14,19 +14,19 @@ This guide explains how to develop, test, and distribute plugins.
 
 ## Plugin Types
 
-| Type | Interface | Purpose |
-|------|-----------|---------|
-| `importer` | `ImportAdapter` | Import from external formats |
-| `exporter` | `ExportAdapter` | Export to external formats |
-| `renderer` | `RenderAdapter` | Render canonical data to output |
-| `storage` | `StorageAdapter` | Persist data to a storage engine |
-| `search` | `SearchAdapter` | Index and retrieve text |
-| `vector` | `VectorAdapter` | Store and query embeddings |
-| `graph` | `GraphAdapter` | Store and traverse relationships |
-| `cache` | `CacheAdapter` | Cache derived data |
-| `ai` | `AiAdapter` | Provide AI operations |
-| `automation` | `AutomationAdapter` | Automate knowledge operations |
-| `view` | `ViewAdapter` | Render a view projection |
+| Type         | Interface           | Purpose                          |
+| ------------ | ------------------- | -------------------------------- |
+| `importer`   | `ImportAdapter`     | Import from external formats     |
+| `exporter`   | `ExportAdapter`     | Export to external formats       |
+| `renderer`   | `RenderAdapter`     | Render canonical data to output  |
+| `storage`    | `StorageAdapter`    | Persist data to a storage engine |
+| `search`     | `SearchAdapter`     | Index and retrieve text          |
+| `vector`     | `VectorAdapter`     | Store and query embeddings       |
+| `graph`      | `GraphAdapter`      | Store and traverse relationships |
+| `cache`      | `CacheAdapter`      | Cache derived data               |
+| `ai`         | `AiAdapter`         | Provide AI operations            |
+| `automation` | `AutomationAdapter` | Automate knowledge operations    |
+| `view`       | `ViewAdapter`       | Render a view projection         |
 
 ---
 

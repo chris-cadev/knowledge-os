@@ -14,16 +14,16 @@ Knowledge OS applies the same architecture to knowledge. Information enters as r
 
 ## Compiler Stages
 
-| Compiler | Knowledge OS |
-|----------|-------------|
-| Source code | External resources (documents, APIs, media) |
-| Lexical analysis | Import layer (format detection, extraction) |
-| Parsing | Parsing layer (structural analysis) |
-| Semantic analysis | Normalization layer (entity resolution, identity) |
-| Intermediate representation | Canonical entity model |
-| Optimization | Derivation layer (index generation, embedding) |
-| Code generation | Presentation layer (view rendering) |
-| Executable | Rendered knowledge projection |
+| Compiler                    | Knowledge OS                                      |
+| --------------------------- | ------------------------------------------------- |
+| Source code                 | External resources (documents, APIs, media)       |
+| Lexical analysis            | Import layer (format detection, extraction)       |
+| Parsing                     | Parsing layer (structural analysis)               |
+| Semantic analysis           | Normalization layer (entity resolution, identity) |
+| Intermediate representation | Canonical entity model                            |
+| Optimization                | Derivation layer (index generation, embedding)    |
+| Code generation             | Presentation layer (view rendering)               |
+| Executable                  | Rendered knowledge projection                     |
 
 ---
 

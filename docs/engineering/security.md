@@ -92,16 +92,16 @@
 
 ### Data Classification
 
-| Data Type | Classification | Encryption | Retention |
-|-----------|---------------|------------|-----------|
-| Canonical entities | Confidential | At rest + transit | Indefinite |
-| Relationships | Confidential | At rest + transit | Indefinite |
-| Artifacts (content) | Confidential | At rest + transit | Indefinite |
-| Search indexes | Internal | At rest | Rebuildable |
-| Embeddings | Internal | At rest | Rebuildable |
-| Caches | Internal | In transit | Ephemeral |
-| Logs | Internal | At rest | Configurable |
-| Events | Internal | At rest | Configurable |
+| Data Type           | Classification | Encryption        | Retention    |
+| ------------------- | -------------- | ----------------- | ------------ |
+| Canonical entities  | Confidential   | At rest + transit | Indefinite   |
+| Relationships       | Confidential   | At rest + transit | Indefinite   |
+| Artifacts (content) | Confidential   | At rest + transit | Indefinite   |
+| Search indexes      | Internal       | At rest           | Rebuildable  |
+| Embeddings          | Internal       | At rest           | Rebuildable  |
+| Caches              | Internal       | In transit        | Ephemeral    |
+| Logs                | Internal       | At rest           | Configurable |
+| Events              | Internal       | At rest           | Configurable |
 
 ---
 

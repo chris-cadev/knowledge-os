@@ -10,28 +10,28 @@ Entity types define the categories of knowledge the system recognizes. Every ent
 
 ### Core Entity Types
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `Concept` | An abstract idea, principle, or theory | Monads, Machine Learning, Supply and Demand |
-| `Person` | A human individual | Ada Lovelace, Geoffrey Hinton |
-| `Organization` | A company, institution, or group | Google, MIT, Apache Foundation |
-| `Project` | A named effort with a goal | Knowledge OS, Linux, Wikipedia |
-| `Book` | A published book | Designing Data-Intensive Applications |
-| `Paper` | A research paper or article | Attention Is All You Need |
-| `Video` | A video recording | A conference talk, a tutorial |
-| `Article` | A written piece (blog post, essay) | A technical blog post |
-| `Tool` | A software tool or utility | LLVM, ripgrep, PostgreSQL |
-| `Technology` | A technology or framework | Rust, Kubernetes, GraphQL |
-| `Question` | A question that seeks an answer | "How does backpropagation work?" |
-| `Idea` | An unvalidated concept or hypothesis | "Knowledge graphs could replace databases" |
-| `Event` | A temporal occurrence | A conference, a release, a decision point |
-| `Skill` | A competency or capability | Rust programming, systems design |
-| `Location` | A geographic or virtual place | San Francisco, a GitHub repository |
-| `Dataset` | A structured collection of data | ImageNet, MNIST |
-| `Collection` | A curated group of entities | "Papers to read," "AI tools" |
-| `Workspace` | A bounded context for collaboration | A team's knowledge space |
-| `Decision` | An architectural or product decision | "Use event sourcing for the pipeline" |
-| `Note` | A user-created annotation | A thought, a reminder, a comment |
+| Type           | Description                            | Example                                     |
+| -------------- | -------------------------------------- | ------------------------------------------- |
+| `Concept`      | An abstract idea, principle, or theory | Monads, Machine Learning, Supply and Demand |
+| `Person`       | A human individual                     | Ada Lovelace, Geoffrey Hinton               |
+| `Organization` | A company, institution, or group       | Google, MIT, Apache Foundation              |
+| `Project`      | A named effort with a goal             | Knowledge OS, Linux, Wikipedia              |
+| `Book`         | A published book                       | Designing Data-Intensive Applications       |
+| `Paper`        | A research paper or article            | Attention Is All You Need                   |
+| `Video`        | A video recording                      | A conference talk, a tutorial               |
+| `Article`      | A written piece (blog post, essay)     | A technical blog post                       |
+| `Tool`         | A software tool or utility             | LLVM, ripgrep, PostgreSQL                   |
+| `Technology`   | A technology or framework              | Rust, Kubernetes, GraphQL                   |
+| `Question`     | A question that seeks an answer        | "How does backpropagation work?"            |
+| `Idea`         | An unvalidated concept or hypothesis   | "Knowledge graphs could replace databases"  |
+| `Event`        | A temporal occurrence                  | A conference, a release, a decision point   |
+| `Skill`        | A competency or capability             | Rust programming, systems design            |
+| `Location`     | A geographic or virtual place          | San Francisco, a GitHub repository          |
+| `Dataset`      | A structured collection of data        | ImageNet, MNIST                             |
+| `Collection`   | A curated group of entities            | "Papers to read," "AI tools"                |
+| `Workspace`    | A bounded context for collaboration    | A team's knowledge space                    |
+| `Decision`     | An architectural or product decision   | "Use event sourcing for the pipeline"       |
+| `Note`         | A user-created annotation              | A thought, a reminder, a comment            |
 
 ### Entity Type Rules
 
@@ -48,49 +48,49 @@ Relationship types define the semantic nature of connections between entities. E
 
 ### Structural Relationships
 
-| Type | Source | Target | Description |
-|------|--------|--------|-------------|
-| `contains` | Collection, Workspace | Any entity | The source contains the target |
-| `belongs_to` | Any entity | Collection, Workspace | The target contains the source |
-| `part_of` | Any entity | Any entity | The target is a larger whole |
-| `has_part` | Any entity | Any entity | The source is a larger whole |
+| Type         | Source                | Target                | Description                    |
+| ------------ | --------------------- | --------------------- | ------------------------------ |
+| `contains`   | Collection, Workspace | Any entity            | The source contains the target |
+| `belongs_to` | Any entity            | Collection, Workspace | The target contains the source |
+| `part_of`    | Any entity            | Any entity            | The target is a larger whole   |
+| `has_part`   | Any entity            | Any entity            | The source is a larger whole   |
 
 ### Provenance Relationships
 
-| Type | Source | Target | Description |
-|------|--------|--------|-------------|
-| `created_by` | Any entity | Person, Organization | The target created the source |
-| `authored_by` | Paper, Article, Book | Person | The target authored the source |
-| `imported_from` | Any entity | External system | The source was imported from the target |
-| `derived_from` | Any entity | Any entity | The source was derived from the target |
+| Type            | Source               | Target               | Description                             |
+| --------------- | -------------------- | -------------------- | --------------------------------------- |
+| `created_by`    | Any entity           | Person, Organization | The target created the source           |
+| `authored_by`   | Paper, Article, Book | Person               | The target authored the source          |
+| `imported_from` | Any entity           | External system      | The source was imported from the target |
+| `derived_from`  | Any entity           | Any entity           | The source was derived from the target  |
 
 ### Semantic Relationships
 
-| Type | Source | Target | Description |
-|------|--------|--------|-------------|
-| `references` | Any entity | Any entity | The source explicitly references the target |
-| `related_to` | Any entity | Any entity | The source is semantically related to the target |
-| `inspired_by` | Any entity | Any entity | The source was inspired by the target |
-| `contradicts` | Any entity | Any entity | The source contradicts the target |
-| `supports` | Any entity | Any entity | The source provides evidence for the target |
+| Type          | Source     | Target     | Description                                      |
+| ------------- | ---------- | ---------- | ------------------------------------------------ |
+| `references`  | Any entity | Any entity | The source explicitly references the target      |
+| `related_to`  | Any entity | Any entity | The source is semantically related to the target |
+| `inspired_by` | Any entity | Any entity | The source was inspired by the target            |
+| `contradicts` | Any entity | Any entity | The source contradicts the target                |
+| `supports`    | Any entity | Any entity | The source provides evidence for the target      |
 
 ### Dependency Relationships
 
-| Type | Source | Target | Description |
-|------|--------|--------|-------------|
-| `depends_on` | Any entity | Any entity | The source requires the target |
-| `implements` | Tool, Technology | Concept | The source implements the target |
-| `requires` | Any entity | Any entity | The source needs the target to function |
-| `extends` | Any entity | Any entity | The source builds upon the target |
+| Type         | Source           | Target     | Description                             |
+| ------------ | ---------------- | ---------- | --------------------------------------- |
+| `depends_on` | Any entity       | Any entity | The source requires the target          |
+| `implements` | Tool, Technology | Concept    | The source implements the target        |
+| `requires`   | Any entity       | Any entity | The source needs the target to function |
+| `extends`    | Any entity       | Any entity | The source builds upon the target       |
 
 ### Knowledge Relationships
 
-| Type | Source | Target | Description |
-|------|--------|--------|-------------|
-| `teaches` | Paper, Book, Video, Article | Concept, Skill | The source teaches the target |
-| `learned_from` | Person | Paper, Book, Course | The person learned from the source |
-| `applies` | Tool, Technology | Concept | The source applies the target concept |
-| `measures` | Dataset, Tool | Concept | The source measures the target |
+| Type           | Source                      | Target              | Description                           |
+| -------------- | --------------------------- | ------------------- | ------------------------------------- |
+| `teaches`      | Paper, Book, Video, Article | Concept, Skill      | The source teaches the target         |
+| `learned_from` | Person                      | Paper, Book, Course | The person learned from the source    |
+| `applies`      | Tool, Technology            | Concept             | The source applies the target concept |
+| `measures`     | Dataset, Tool               | Concept             | The source measures the target        |
 
 ### Relationship Type Rules
 
@@ -107,43 +107,43 @@ Component types define the aspects of entities. Every component belongs to exact
 
 ### Core Components
 
-| Type | Payload | Description |
-|------|---------|-------------|
-| `Title` | `{ name: string }` | Human-readable name |
-| `Description` | `{ text: string }` | Summary, biography, or abstract |
-| `Content` | `{ markdown: string }` | Full text body in Markdown |
-| `BinaryContent` | `{ reference: string, mime_type: string, size: u64 }` | Reference to binary data in object storage |
-| `Tags` | `{ values: string[] }` | Categorical labels |
-| `Timeline` | `{ created_at: DateTime, modified_at: DateTime, ... }` | Temporal metadata |
-| `Language` | `{ code: string }` | Natural language (ISO 639-1) |
-| `Rating` | `{ score: f64, scale: f64 }` | Quality or relevance score |
+| Type            | Payload                                                | Description                                |
+| --------------- | ------------------------------------------------------ | ------------------------------------------ |
+| `Title`         | `{ name: string }`                                     | Human-readable name                        |
+| `Description`   | `{ text: string }`                                     | Summary, biography, or abstract            |
+| `Content`       | `{ markdown: string }`                                 | Full text body in Markdown                 |
+| `BinaryContent` | `{ reference: string, mime_type: string, size: u64 }`  | Reference to binary data in object storage |
+| `Tags`          | `{ values: string[] }`                                 | Categorical labels                         |
+| `Timeline`      | `{ created_at: DateTime, modified_at: DateTime, ... }` | Temporal metadata                          |
+| `Language`      | `{ code: string }`                                     | Natural language (ISO 639-1)               |
+| `Rating`        | `{ score: f64, scale: f64 }`                           | Quality or relevance score                 |
 
 ### Identity Components
 
-| Type | Payload | Description |
-|------|---------|-------------|
-| `Author` | `{ people: EntityRef[], organizations: EntityRef[] }` | Attribution to people or organizations |
-| `Thumbnail` | `{ reference: string }` | Visual preview reference |
-| `Location` | `{ name: string, lat: f64, lon: f64 }` | Geographic or spatial data |
-| `ExternalIdentifier` | `{ system: string, id: string }` | Identifiers from external systems (DOI, ISBN, URL) |
+| Type                 | Payload                                               | Description                                        |
+| -------------------- | ----------------------------------------------------- | -------------------------------------------------- |
+| `Author`             | `{ people: EntityRef[], organizations: EntityRef[] }` | Attribution to people or organizations             |
+| `Thumbnail`          | `{ reference: string }`                               | Visual preview reference                           |
+| `Location`           | `{ name: string, lat: f64, lon: f64 }`                | Geographic or spatial data                         |
+| `ExternalIdentifier` | `{ system: string, id: string }`                      | Identifiers from external systems (DOI, ISBN, URL) |
 
 ### Knowledge Components
 
-| Type | Payload | Description |
-|------|---------|-------------|
-| `Embedding` | `{ vector: f64[], model: string }` | Vector representation for semantic search |
-| `Summary` | `{ text: string, generated_by: string }` | Condensed representation |
-| `Classification` | `{ taxonomy: string, labels: string[] }` | Categorical classification |
-| `Confidence` | `{ score: f64, source: string }` | Confidence in the entity's correctness |
+| Type             | Payload                                  | Description                               |
+| ---------------- | ---------------------------------------- | ----------------------------------------- |
+| `Embedding`      | `{ vector: f64[], model: string }`       | Vector representation for semantic search |
+| `Summary`        | `{ text: string, generated_by: string }` | Condensed representation                  |
+| `Classification` | `{ taxonomy: string, labels: string[] }` | Categorical classification                |
+| `Confidence`     | `{ score: f64, source: string }`         | Confidence in the entity's correctness    |
 
 ### System Components
 
-| Type | Payload | Description |
-|------|---------|-------------|
-| `VersionHistory` | `{ versions: Version[] }` | Change tracking and audit trail |
-| `Permissions` | `{ rules: PermissionRule[] }` | Access control rules |
-| `Provenance` | `{ source: string, imported_at: DateTime, importer: string }` | Source attribution and import history |
-| `WorkspaceMembership` | `{ workspace: EntityRef, role: string }` | Workspace association |
+| Type                  | Payload                                                       | Description                           |
+| --------------------- | ------------------------------------------------------------- | ------------------------------------- |
+| `VersionHistory`      | `{ versions: Version[] }`                                     | Change tracking and audit trail       |
+| `Permissions`         | `{ rules: PermissionRule[] }`                                 | Access control rules                  |
+| `Provenance`          | `{ source: string, imported_at: DateTime, importer: string }` | Source attribution and import history |
+| `WorkspaceMembership` | `{ workspace: EntityRef, role: string }`                      | Workspace association                 |
 
 ### Component Type Rules
 

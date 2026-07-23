@@ -291,14 +291,14 @@ Every AI output in Knowledge OS is explainable. The system demands transparency 
 
 AI is integrated at specific points in the pipeline:
 
-| Pipeline Stage | AI Operation | Output |
-|---------------|--------------|--------|
-| **Import** | Content extraction, format detection | Parsed content |
-| **Normalization** | Entity resolution, duplicate detection | Canonical entities |
-| **Knowledge Model** | Classification, tagging | Entity metadata |
-| **Relationship Engine** | Relationship extraction, inference | Relationships |
-| **Derivation** | Embedding generation, summarization | Derived artifacts |
-| **Presentation** | Query understanding, response generation | Rendered responses |
+| Pipeline Stage          | AI Operation                             | Output             |
+| ----------------------- | ---------------------------------------- | ------------------ |
+| **Import**              | Content extraction, format detection     | Parsed content     |
+| **Normalization**       | Entity resolution, duplicate detection   | Canonical entities |
+| **Knowledge Model**     | Classification, tagging                  | Entity metadata    |
+| **Relationship Engine** | Relationship extraction, inference       | Relationships      |
+| **Derivation**          | Embedding generation, summarization      | Derived artifacts  |
+| **Presentation**        | Query understanding, response generation | Rendered responses |
 
 At each stage, AI operates as a component within the pipeline. AI does not bypass the pipeline. AI does not access storage directly. AI produces derived data that flows through the same event-driven mechanisms as all other derived data.
 

@@ -271,76 +271,76 @@ Every feature must answer these questions before implementation:
 9. Does the feature introduce implementation leakage?
 10. Does the feature preserve the canonical model?
 
-**Reference:** [Engineering Principles](philosophy/engineering-principles.md), [CONTRIBUTING.md](../CONTRIBUTING.md)
+**Reference:** [Engineering Principles](philosophy/engineering-principles.md), [Architectural Principles](architecture/architectural-principles.md), [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ### D.2 The Compiler Analogy
 
-| Compiler Stage | Knowledge OS Stage |
-|---------------|-------------------|
-| Source code | External resources (documents, APIs, media) |
-| Lexical analysis | Import layer (format detection, extraction) |
-| Parsing | Parsing layer (structural analysis) |
-| Semantic analysis | Normalization layer (entity resolution, identity) |
-| Intermediate representation | Canonical entity model |
-| Optimization | Derivation layer (index generation, embedding) |
-| Code generation | Presentation layer (view rendering) |
-| Executable | Rendered knowledge projection |
+| Compiler Stage              | Knowledge OS Stage                                |
+| --------------------------- | ------------------------------------------------- |
+| Source code                 | External resources (documents, APIs, media)       |
+| Lexical analysis            | Import layer (format detection, extraction)       |
+| Parsing                     | Parsing layer (structural analysis)               |
+| Semantic analysis           | Normalization layer (entity resolution, identity) |
+| Intermediate representation | Canonical entity model                            |
+| Optimization                | Derivation layer (index generation, embedding)    |
+| Code generation             | Presentation layer (view rendering)               |
+| Executable                  | Rendered knowledge projection                     |
 
 **Reference:** [Compilation](architecture/compilation.md), [ADR-0005](architecture/adrs/adr-0005.md)
 
 ### D.3 The ECS Comparison
 
-| Game Engine ECS | Knowledge OS ECS |
-|----------------|-------------------|
-| Entity = game object | Entity = knowledge concept |
-| Component = behavior data | Component = entity aspect |
-| System = game logic | System = pipeline stage |
-| Frame-based updates | Event-driven updates |
-| Spatial components | Semantic components |
+| Game Engine ECS           | Knowledge OS ECS           |
+| ------------------------- | -------------------------- |
+| Entity = game object      | Entity = knowledge concept |
+| Component = behavior data | Component = entity aspect  |
+| System = game logic       | System = pipeline stage    |
+| Frame-based updates       | Event-driven updates       |
+| Spatial components        | Semantic components        |
 
 **Reference:** [Composition](architecture/composition.md), [ADR-0003](architecture/adrs/adr-0003.md)
 
 ### D.4 Canonical vs Derived Decision Table
 
-| Question | Canonical | Derived |
-|----------|-----------|---------|
-| Can it be regenerated from other data? | No | Yes |
-| Does it represent user knowledge? | Yes | No |
-| Does it require durability? | Yes | No |
-| Is it versioned? | Yes | Optional |
-| Is it auditable? | Yes | Optional |
-| Is it the source of truth? | Yes | Never |
-| May it be discarded without data loss? | No | Yes |
+| Question                               | Canonical | Derived  |
+| -------------------------------------- | --------- | -------- |
+| Can it be regenerated from other data? | No        | Yes      |
+| Does it represent user knowledge?      | Yes       | No       |
+| Does it require durability?            | Yes       | No       |
+| Is it versioned?                       | Yes       | Optional |
+| Is it auditable?                       | Yes       | Optional |
+| Is it the source of truth?             | Yes       | Never    |
+| May it be discarded without data loss? | No        | Yes      |
 
 **Reference:** [Data Model](architecture/data-model.md)
 
 ### D.5 Mental Model Shifts
 
-| Old Model | New Model |
-|-----------|-----------|
-| Files | Entities |
-| Folders | Relationships |
-| File type | Component assembly |
-| Directory tree | Knowledge graph |
-| Search query | Graph traversal + projection query |
-| Save | Import + normalize + persist |
-| Open | Render projection |
-| Copy | Reference (same entity, multiple views) |
-| Delete | Archive (soft delete, preserve history) |
-| Backup | Export canonical data |
+| Old Model      | New Model                               |
+| -------------- | --------------------------------------- |
+| Files          | Entities                                |
+| Folders        | Relationships                           |
+| File type      | Component assembly                      |
+| Directory tree | Knowledge graph                         |
+| Search query   | Graph traversal + projection query      |
+| Save           | Import + normalize + persist            |
+| Open           | Render projection                       |
+| Copy           | Reference (same entity, multiple views) |
+| Delete         | Archive (soft delete, preserve history) |
+| Backup         | Export canonical data                   |
 
 **Reference:** [Mental Model](architecture/mental-model.md)
 
 ### D.6 Storage Engine Decision Matrix
 
-| Access Pattern | Recommended Engine | Alternative |
-|---------------|-------------------|-------------|
-| Structured metadata | SQLite (local) / PostgreSQL (production) | DuckDB |
-| Full-text search | Tantivy (local) / Elasticsearch (production) | Meilisearch |
-| Semantic similarity | Qdrant | Milvus, pgvector |
-| Relationship traversal | Graph extension on relational | Neo4j, Memgraph |
-| Binary artifacts | Local filesystem (local) / S3 (production) | MinIO |
-| Caching | In-process (local) / Redis (production) | Memory-mapped files |
+| Access Pattern         | Recommended Engine                           | Alternative         |
+| ---------------------- | -------------------------------------------- | ------------------- |
+| Structured metadata    | SQLite (local) / PostgreSQL (production)     | DuckDB              |
+| Full-text search       | Tantivy (local) / Elasticsearch (production) | Meilisearch         |
+| Semantic similarity    | Qdrant                                       | Milvus, pgvector    |
+| Relationship traversal | Graph extension on relational                | Neo4j, Memgraph     |
+| Binary artifacts       | Local filesystem (local) / S3 (production)   | MinIO               |
+| Caching                | In-process (local) / Redis (production)      | Memory-mapped files |
 
 **Reference:** [Storage](architecture/storage.md)
 
@@ -350,13 +350,13 @@ Every feature must answer these questions before implementation:
 
 Architecture Decision Records (ADRs) capture significant architectural decisions along with their context and consequences. ADRs are immutable once accepted.
 
-| ADR | Title | Status | Date |
-|-----|-------|--------|------|
-| [ADR-0001](architecture/adrs/adr-0001.md) | Knowledge Model as Canonical Source of Truth | Accepted | 2026-07-21 |
-| [ADR-0002](architecture/adrs/adr-0002.md) | Storage Independence via Adapter Pattern | Accepted | 2026-07-21 |
+| ADR                                       | Title                                         | Status   | Date       |
+| ----------------------------------------- | --------------------------------------------- | -------- | ---------- |
+| [ADR-0001](architecture/adrs/adr-0001.md) | Knowledge Model as Canonical Source of Truth  | Accepted | 2026-07-21 |
+| [ADR-0002](architecture/adrs/adr-0002.md) | Storage Independence via Adapter Pattern      | Accepted | 2026-07-21 |
 | [ADR-0003](architecture/adrs/adr-0003.md) | Entity Component Model for Knowledge Entities | Accepted | 2026-07-21 |
-| [ADR-0004](architecture/adrs/adr-0004.md) | Event-Driven Derivation Pipeline | Accepted | 2026-07-21 |
-| [ADR-0005](architecture/adrs/adr-0005.md) | Compiler-Inspired Architecture | Accepted | 2026-07-21 |
+| [ADR-0004](architecture/adrs/adr-0004.md) | Event-Driven Derivation Pipeline              | Accepted | 2026-07-21 |
+| [ADR-0005](architecture/adrs/adr-0005.md) | Compiler-Inspired Architecture                | Accepted | 2026-07-21 |
 
 **See also:** [ADR Index](architecture/adrs/README.md)
 

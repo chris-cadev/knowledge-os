@@ -156,7 +156,7 @@ These values guide how software is developed.
 
 **Architecture before implementation.** The complete architectural foundation is written before any code is written. Architecture is not an afterthought. Architecture is the foundation. Every implementation decision references the architecture. This is not bureaucracy. It is rigor. Architecture-first development prevents the accumulation of technical debt that destroys long-lived systems.
 
-**Features answer questions.** Every feature must answer ten engineering questions before implementation begins. See [CONTRIBUTING.md](../../CONTRIBUTING.md) for the complete list. Features that fail these questions are redesigned. This is not a barrier to contribution. It is a quality gate that ensures every feature is architecturally sound.
+**Features answer questions.** Every feature must answer ten engineering questions before implementation begins. See [Engineering Principles](engineering-principles.md) for the complete list with explanations. Features that fail these questions are redesigned. This is not a barrier to contribution. It is a quality gate that ensures every feature is architecturally sound.
 
 **Derived data is reproducible.** If a derived artifact cannot be regenerated, it is not derived -- it is canonical, and must be treated accordingly. The system enforces this distinction at every layer. This is not pedantry. It is the principle that prevents data loss and enables system recovery.
 

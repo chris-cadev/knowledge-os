@@ -153,11 +153,11 @@ The indexing subsystem builds and maintains full-text search indexes from canoni
 
 **Index types:**
 
-| Index | Source Fields | Purpose |
-|-------|--------------|---------|
-| Content index | `Content.markdown`, `Title.name` | Full-text search across entity content |
-| Metadata index | `Tags.values`, `Language.code`, entity type | Faceted filtering |
-| Structural index | Component types, relationship types | Schema-aware queries |
+| Index            | Source Fields                               | Purpose                                |
+| ---------------- | ------------------------------------------- | -------------------------------------- |
+| Content index    | `Content.markdown`, `Title.name`            | Full-text search across entity content |
+| Metadata index   | `Tags.values`, `Language.code`, entity type | Faceted filtering                      |
+| Structural index | Component types, relationship types         | Schema-aware queries                   |
 
 **Rules:**
 
@@ -216,11 +216,11 @@ graph TD
 
 **Search modes:**
 
-| Mode | Engine | Best For |
-|------|--------|----------|
-| Keyword | Search index | Exact matches, specific terms, structured queries |
+| Mode     | Engine       | Best For                                                    |
+| -------- | ------------ | ----------------------------------------------------------- |
+| Keyword  | Search index | Exact matches, specific terms, structured queries           |
 | Semantic | Vector store | Conceptual queries, fuzzy matching, meaning-based retrieval |
-| Hybrid | Both | Combined relevance, broad coverage |
+| Hybrid   | Both         | Combined relevance, broad coverage                          |
 
 **Rules:**
 

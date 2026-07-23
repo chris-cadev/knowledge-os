@@ -192,13 +192,13 @@ A feature is deprecated when:
 
 ### Warning Periods
 
-| Feature Type | Warning Period |
-|-------------|----------------|
-| Plugin API | 2 minor versions |
-| Entity types | 3 minor versions |
-| Relationship types | 3 minor versions |
-| Component types | 3 minor versions |
-| CLI commands | 2 minor versions |
+| Feature Type          | Warning Period   |
+| --------------------- | ---------------- |
+| Plugin API            | 2 minor versions |
+| Entity types          | 3 minor versions |
+| Relationship types    | 3 minor versions |
+| Component types       | 3 minor versions |
+| CLI commands          | 2 minor versions |
 | Configuration options | 2 minor versions |
 
 ### Migration Support
@@ -215,11 +215,11 @@ When a feature is deprecated, the system provides:
 
 ### Change Categories
 
-| Category | Impact | Process |
-|----------|--------|---------|
-| **Patch** | Bug fixes, no data model changes | Code review, no RFC |
+| Category  | Impact                            | Process                           |
+| --------- | --------------------------------- | --------------------------------- |
+| **Patch** | Bug fixes, no data model changes  | Code review, no RFC               |
 | **Minor** | New features, backward-compatible | Code review, RFC if architectural |
-| **Major** | Breaking changes | RFC required, deprecation period |
+| **Major** | Breaking changes                  | RFC required, deprecation period  |
 
 ### Breaking Changes
 

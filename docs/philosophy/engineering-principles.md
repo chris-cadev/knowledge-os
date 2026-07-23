@@ -142,12 +142,12 @@ Documentation follows the [Diataxis framework](https://diataxis.fr/): four types
 
 ### Documentation Types
 
-| Type | Purpose | Audience |
-|------|---------|----------|
-| **Explanation** | Understanding and context | Anyone learning the system |
-| **Reference** | Factual specifications | Engineers building on the system |
-| **How-to** | Task-oriented guides | Engineers performing specific tasks |
-| **Tutorial** | Learning experiences | New contributors |
+| Type            | Purpose                   | Audience                            |
+| --------------- | ------------------------- | ----------------------------------- |
+| **Explanation** | Understanding and context | Anyone learning the system          |
+| **Reference**   | Factual specifications    | Engineers building on the system    |
+| **How-to**      | Task-oriented guides      | Engineers performing specific tasks |
+| **Tutorial**    | Learning experiences      | New contributors                    |
 
 ### File Conventions
 
@@ -247,12 +247,12 @@ The system preserves backward compatibility across versions.
 
 ### Version Compatibility Matrix
 
-| Component | Policy |
-|-----------|--------|
-| Canonical data | Forward-compatible (old readers can read new data) |
-| Events | Forward-compatible (old consumers can process new events) |
-| Plugin API | Backward-compatible (new plugins work with old APIs) |
-| Derived data | Disposable (rebuilt on version change) |
+| Component      | Policy                                                    |
+| -------------- | --------------------------------------------------------- |
+| Canonical data | Forward-compatible (old readers can read new data)        |
+| Events         | Forward-compatible (old consumers can process new events) |
+| Plugin API     | Backward-compatible (new plugins work with old APIs)      |
+| Derived data   | Disposable (rebuilt on version change)                    |
 
 ---
 

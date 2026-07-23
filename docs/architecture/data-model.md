@@ -72,13 +72,13 @@ Knowledge OS avoids this by making the distinction explicit. Canonical data is n
 
 This distinction mirrors the relationship between source code and compiled artifacts in compiler architecture:
 
-| Compiler Concept | Knowledge OS Equivalent |
-|------------------|------------------------|
-| Source code | Canonical entities, relationships, components |
-| Intermediate representation | Normalized knowledge model |
-| Compiled artifacts | Search indexes, embeddings, graphs |
-| Executable | Rendered views |
-| Object files | Cached projections |
+| Compiler Concept            | Knowledge OS Equivalent                       |
+| --------------------------- | --------------------------------------------- |
+| Source code                 | Canonical entities, relationships, components |
+| Intermediate representation | Normalized knowledge model                    |
+| Compiled artifacts          | Search indexes, embeddings, graphs            |
+| Executable                  | Rendered views                                |
+| Object files                | Cached projections                            |
 
 Source code is the source of truth. Object files are derived. If you lose the object files, you recompile. If you lose the search index, you rebuild it. The canonical model is the source code of knowledge.
 
@@ -108,16 +108,16 @@ Regeneration may be triggered by:
 
 Canonical and derived data map to different storage strategies:
 
-| Data Category | Storage Type | Persistence | Rebuildable |
-|---------------|-------------|-------------|-------------|
-| Entities | Relational | Durable | No |
-| Components | Relational + Object | Durable | No |
-| Relationships | Graph + Relational | Durable | Partially |
-| Artifacts | Object storage | Durable | No |
-| Search indexes | Search engine | Volatile | Yes |
-| Embeddings | Vector store | Volatile | Yes |
-| Similarity graphs | Graph store | Volatile | Yes |
-| Caches | Cache store | Volatile | Yes |
+| Data Category     | Storage Type        | Persistence | Rebuildable |
+| ----------------- | ------------------- | ----------- | ----------- |
+| Entities          | Relational          | Durable     | No          |
+| Components        | Relational + Object | Durable     | No          |
+| Relationships     | Graph + Relational  | Durable     | Partially   |
+| Artifacts         | Object storage      | Durable     | No          |
+| Search indexes    | Search engine       | Volatile    | Yes         |
+| Embeddings        | Vector store        | Volatile    | Yes         |
+| Similarity graphs | Graph store         | Volatile    | Yes         |
+| Caches            | Cache store         | Volatile    | Yes         |
 
 ---
 

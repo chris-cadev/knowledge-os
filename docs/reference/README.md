@@ -8,8 +8,8 @@ Definitive specifications and glossary. These documents are consulted, not read 
 
 ## Documents
 
-| Document | Purpose |
-|----------|---------|
+| Document                   | Purpose                                                                                                                                |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | [glossary.md](glossary.md) | Canonical vocabulary -- every project term defined once, organized by conceptual category with properties, rules, and cross-references |
 
 ---

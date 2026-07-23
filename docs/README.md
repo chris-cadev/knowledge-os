@@ -118,12 +118,12 @@ For **learners**, start with:
 
 Following [Diataxis](https://diataxis.fr/):
 
-| Type | Purpose | Locations |
-|------|---------|-----------|
-| **Explanation** | Understanding and context | `philosophy/`, `architecture/`, `engineering/deployment.md`, `engineering/testing-strategy.md` |
-| **Reference** | Factual specifications | `reference/`, `engineering/security.md`, `engineering/product-requirements.md`, `engineering/ui-design-system.md`, `engineering/api-specification.md`, `engineering/infrastructure-handbook.md`, `engineering/testing-strategy.md` |
-| **How-to** | Task-oriented guides | `guides/`, `engineering/operational-runbooks.md`, `engineering/engineering-handbook.md` |
-| **Tutorial** | Learning experiences | `guides/tutorials/` |
-| **Research** | Landscape analysis and evidence | `research/` |
+| Type            | Purpose                         | Locations                                                                                                                                                                                                                          |
+| --------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Explanation** | Understanding and context       | `philosophy/`, `architecture/`, `engineering/deployment.md`, `engineering/testing-strategy.md`                                                                                                                                     |
+| **Reference**   | Factual specifications          | `reference/`, `engineering/security.md`, `engineering/product-requirements.md`, `engineering/ui-design-system.md`, `engineering/api-specification.md`, `engineering/infrastructure-handbook.md`, `engineering/testing-strategy.md` |
+| **How-to**      | Task-oriented guides            | `guides/`, `engineering/operational-runbooks.md`, `engineering/engineering-handbook.md`                                                                                                                                            |
+| **Tutorial**    | Learning experiences            | `guides/tutorials/`                                                                                                                                                                                                                |
+| **Research**    | Landscape analysis and evidence | `research/`                                                                                                                                                                                                                        |
 
 > **Note:** The `engineering/` directory contains mixed Diataxis types. Each file's type is determined by its content, not its location.

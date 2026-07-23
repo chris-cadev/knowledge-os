@@ -135,16 +135,16 @@ The domain model, the pipeline, and all business logic remain unchanged.
 
 ## Canonical vs Derived Storage
 
-| Data Category | Storage | Canonical? | Rebuildable? |
-|---------------|---------|------------|--------------|
-| Entities | Relational | Yes | No |
-| Components | Relational + Object | Yes | No |
-| Relationships | Graph + Relational | Yes | Partially |
-| Artifacts | Object | Yes | No |
-| Search indexes | Search engine | No | Yes |
-| Embeddings | Vector store | No | Yes |
-| Similarity graphs | Graph store | No | Yes |
-| Caches | Cache store | No | Yes |
+| Data Category     | Storage             | Canonical? | Rebuildable? |
+| ----------------- | ------------------- | ---------- | ------------ |
+| Entities          | Relational          | Yes        | No           |
+| Components        | Relational + Object | Yes        | No           |
+| Relationships     | Graph + Relational  | Yes        | Partially    |
+| Artifacts         | Object              | Yes        | No           |
+| Search indexes    | Search engine       | No         | Yes          |
+| Embeddings        | Vector store        | No         | Yes          |
+| Similarity graphs | Graph store         | No         | Yes          |
+| Caches            | Cache store         | No         | Yes          |
 
 ---
 
@@ -178,15 +178,15 @@ If a storage engine fails:
 
 Given the project's likely Rust implementation:
 
-| Engine | Type | Rust Binding |
-|--------|------|-------------|
-| SQLite | Relational | `rusqlite` |
-| PostgreSQL | Relational | `sqlx`, `tokio-postgres` |
-| DuckDB | Relational (analytical) | `duckdb-rs` |
-| Tantivy | Search | `tantivy` (native Rust) |
-| Qdrant | Vector | `qdrant-client` |
-| Redis | Cache | `redis-rs` |
-| S3/MinIO | Object | `aws-sdk-s3` |
+| Engine     | Type                    | Rust Binding             |
+| ---------- | ----------------------- | ------------------------ |
+| SQLite     | Relational              | `rusqlite`               |
+| PostgreSQL | Relational              | `sqlx`, `tokio-postgres` |
+| DuckDB     | Relational (analytical) | `duckdb-rs`              |
+| Tantivy    | Search                  | `tantivy` (native Rust)  |
+| Qdrant     | Vector                  | `qdrant-client`          |
+| Redis      | Cache                   | `redis-rs`               |
+| S3/MinIO   | Object                  | `aws-sdk-s3`             |
 
 ---
 

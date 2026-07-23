@@ -80,28 +80,28 @@ Components are composable, reusable data structures. Each component has a single
 
 **Core components:**
 
-| Component | Purpose |
-|-----------|---------|
-| `Title` | Human-readable name |
-| `Description` | Summary or biography |
-| `Content` | Markdown or rich text body |
-| `BinaryContent` | File, image, or media reference |
-| `Author` | Attribution to people or organizations |
-| `Tags` | Categorical labels |
-| `Timeline` | Temporal metadata (created, modified, etc.) |
-| `Location` | Geographic or spatial data |
-| `Language` | Natural language detection |
-| `Rating` | Quality or relevance score |
+| Component       | Purpose                                     |
+| --------------- | ------------------------------------------- |
+| `Title`         | Human-readable name                         |
+| `Description`   | Summary or biography                        |
+| `Content`       | Markdown or rich text body                  |
+| `BinaryContent` | File, image, or media reference             |
+| `Author`        | Attribution to people or organizations      |
+| `Tags`          | Categorical labels                          |
+| `Timeline`      | Temporal metadata (created, modified, etc.) |
+| `Location`      | Geographic or spatial data                  |
+| `Language`      | Natural language detection                  |
+| `Rating`        | Quality or relevance score                  |
 
 **Advanced components:**
 
-| Component | Purpose |
-|-----------|---------|
-| `Embedding` | Vector representation for semantic search |
-| `VersionHistory` | Change tracking and audit trail |
-| `Permissions` | Access control rules |
-| `Provenance` | Source attribution and import history |
-| `Thumbnail` | Visual preview |
+| Component        | Purpose                                   |
+| ---------------- | ----------------------------------------- |
+| `Embedding`      | Vector representation for semantic search |
+| `VersionHistory` | Change tracking and audit trail           |
+| `Permissions`    | Access control rules                      |
+| `Provenance`     | Source attribution and import history     |
+| `Thumbnail`      | Visual preview                            |
 
 ---
 
@@ -152,13 +152,13 @@ Adding a new component type does not require schema migrations in all storage en
 
 ## Comparison with ECS in Game Engines
 
-| Game Engine ECS | Knowledge OS ECS |
-|----------------|-------------------|
-| Entity = game object | Entity = knowledge concept |
-| Component = behavior data | Component = entity aspect |
-| System = game logic | System = pipeline stage |
-| Frame-based updates | Event-driven updates |
-| Spatial components | Semantic components |
+| Game Engine ECS           | Knowledge OS ECS           |
+| ------------------------- | -------------------------- |
+| Entity = game object      | Entity = knowledge concept |
+| Component = behavior data | Component = entity aspect  |
+| System = game logic       | System = pipeline stage    |
+| Frame-based updates       | Event-driven updates       |
+| Spatial components        | Semantic components        |
 
 The pattern is identical. The domain is different.
 

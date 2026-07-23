@@ -217,12 +217,12 @@ The knowledge graph is the primary query structure. Search indexes, vector store
 
 ## Canonical Concepts Summary
 
-| Concept | Definition | Properties |
-|---------|-----------|------------|
-| **Entity** | A first-class knowledge object | Identifier, type, components, version, provenance |
-| **Component** | A typed data structure describing an aspect of an entity | Type, data, no identity |
-| **Relationship** | A typed, directed edge connecting two entities | Source, target, type, attributes, version |
-| **Projection** | A derived view of canonical data | Derived, disposable, synchronized, independent |
+| Concept             | Definition                                               | Properties                                                |
+| ------------------- | -------------------------------------------------------- | --------------------------------------------------------- |
+| **Entity**          | A first-class knowledge object                           | Identifier, type, components, version, provenance         |
+| **Component**       | A typed data structure describing an aspect of an entity | Type, data, no identity                                   |
+| **Relationship**    | A typed, directed edge connecting two entities           | Source, target, type, attributes, version                 |
+| **Projection**      | A derived view of canonical data                         | Derived, disposable, synchronized, independent            |
 | **Knowledge Graph** | The emergent structure of all entities and relationships | Heterogeneous, attributed, versioned, evolving, queryable |
 
 ---
@@ -231,18 +231,18 @@ The knowledge graph is the primary query structure. Search indexes, vector store
 
 To think in Knowledge OS, abandon these旧 mental models:
 
-| Old Model | New Model |
-|-----------|-----------|
-| Files | Entities |
-| Folders | Relationships |
-| File type | Component assembly |
-| Directory tree | Knowledge graph |
-| Search query | Graph traversal + projection query |
-| Save | Import + normalize + persist |
-| Open | Render projection |
-| Copy | Reference (same entity, multiple views) |
-| Delete | Archive (soft delete, preserve history) |
-| Backup | Export canonical data |
+| Old Model      | New Model                               |
+| -------------- | --------------------------------------- |
+| Files          | Entities                                |
+| Folders        | Relationships                           |
+| File type      | Component assembly                      |
+| Directory tree | Knowledge graph                         |
+| Search query   | Graph traversal + projection query      |
+| Save           | Import + normalize + persist            |
+| Open           | Render projection                       |
+| Copy           | Reference (same entity, multiple views) |
+| Delete         | Archive (soft delete, preserve history) |
+| Backup         | Export canonical data                   |
 
 ---
 

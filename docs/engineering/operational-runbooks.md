@@ -421,20 +421,20 @@ Events:
 
 ### Status Meanings
 
-| Status | Meaning |
-|--------|---------|
-| `healthy` | Component is operating within normal parameters |
-| `degraded` | Component is operational but outside normal parameters. Investigate. |
-| `unhealthy` | Component has failed. Immediate attention required. |
+| Status      | Meaning                                                              |
+| ----------- | -------------------------------------------------------------------- |
+| `healthy`   | Component is operating within normal parameters                      |
+| `degraded`  | Component is operational but outside normal parameters. Investigate. |
+| `unhealthy` | Component has failed. Immediate attention required.                  |
 
 ### Common Issues
 
-| Issue | Likely Cause | Resolution |
-|-------|-------------|------------|
-| Vector latency high | Qdrant overloaded | Scale Qdrant horizontally or reduce embedding batch size |
-| Derivation throughput low | AI provider rate limited | Check AI provider limits, implement backoff |
-| Event queue depth growing | Pipeline saturation | Add pipeline workers or optimize slow handlers |
-| Dead letter queue non-empty | Event processing failures | Run Runbook 3 (Event Processing Failure) |
+| Issue                       | Likely Cause              | Resolution                                               |
+| --------------------------- | ------------------------- | -------------------------------------------------------- |
+| Vector latency high         | Qdrant overloaded         | Scale Qdrant horizontally or reduce embedding batch size |
+| Derivation throughput low   | AI provider rate limited  | Check AI provider limits, implement backoff              |
+| Event queue depth growing   | Pipeline saturation       | Add pipeline workers or optimize slow handlers           |
+| Dead letter queue non-empty | Event processing failures | Run Runbook 3 (Event Processing Failure)                 |
 
 ---
 

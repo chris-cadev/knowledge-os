@@ -38,16 +38,16 @@ type(scope): description
 
 **Types:**
 
-| Type | When to Use |
-|------|-------------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
-| `docs` | Documentation only |
-| `chore` | Maintenance, dependencies, CI |
+| Type       | When to Use                                |
+| ---------- | ------------------------------------------ |
+| `feat`     | New feature or capability                  |
+| `fix`      | Bug fix                                    |
+| `docs`     | Documentation only                         |
+| `chore`    | Maintenance, dependencies, CI              |
 | `refactor` | Code restructuring without behavior change |
-| `test` | Adding or updating tests |
-| `perf` | Performance improvement |
-| `style` | Formatting, whitespace (no logic change) |
+| `test`     | Adding or updating tests                   |
+| `perf`     | Performance improvement                    |
+| `style`    | Formatting, whitespace (no logic change)   |
 
 **Scope:** The affected module, crate, or component. Examples: `pipeline`, `storage-sqlite`, `plugin-api`, `domain-model`.
 
@@ -212,13 +212,13 @@ graph TD
 
 The system uses structured JSON logging. Log levels:
 
-| Level | When to Use |
-|-------|-------------|
-| `error` | System failure. Requires immediate attention. |
-| `warn` | Degraded operation. System continues but may need attention. |
-| `info` | Significant event. Import completed, entity created, derivation finished. |
-| `debug` | Detailed tracing. Useful for debugging specific issues. |
-| `trace` | Very detailed tracing. Useful for understanding internal state. |
+| Level   | When to Use                                                               |
+| ------- | ------------------------------------------------------------------------- |
+| `error` | System failure. Requires immediate attention.                             |
+| `warn`  | Degraded operation. System continues but may need attention.              |
+| `info`  | Significant event. Import completed, entity created, derivation finished. |
+| `debug` | Detailed tracing. Useful for debugging specific issues.                   |
+| `trace` | Very detailed tracing. Useful for understanding internal state.           |
 
 ### Debugging Pipeline Issues
 
@@ -265,13 +265,13 @@ The system uses structured JSON logging. Log levels:
 
 ### Performance Targets
 
-| Operation | Target | Acceptable |
-|-----------|--------|-----------|
-| Import (Markdown) | 100 docs/sec | 50 docs/sec |
-| Search query | < 50ms | < 200ms |
-| Embedding generation | 100 vectors/sec | 50 vectors/sec |
-| Graph traversal (2 hops) | < 100ms | < 500ms |
-| Entity creation | < 10ms | < 50ms |
+| Operation                | Target          | Acceptable     |
+| ------------------------ | --------------- | -------------- |
+| Import (Markdown)        | 100 docs/sec    | 50 docs/sec    |
+| Search query             | < 50ms          | < 200ms        |
+| Embedding generation     | 100 vectors/sec | 50 vectors/sec |
+| Graph traversal (2 hops) | < 100ms         | < 500ms        |
+| Entity creation          | < 10ms          | < 50ms         |
 
 ---
 
@@ -296,12 +296,12 @@ The system uses structured JSON logging. Log levels:
 
 Following [Diataxis](https://diataxis.fr/):
 
-| Type | Purpose | Location |
-|------|---------|----------|
+| Type            | Purpose                   | Location                       |
+| --------------- | ------------------------- | ------------------------------ |
 | **Explanation** | Understanding and context | `philosophy/`, `architecture/` |
-| **Reference** | Factual specifications | `reference/`, `architecture/` |
-| **How-to** | Task-oriented guides | `guides/`, `engineering/` |
-| **Tutorial** | Learning experiences | `guides/tutorials/` |
+| **Reference**   | Factual specifications    | `reference/`, `architecture/`  |
+| **How-to**      | Task-oriented guides      | `guides/`, `engineering/`      |
+| **Tutorial**    | Learning experiences      | `guides/tutorials/`            |
 
 ---
 

@@ -20,106 +20,106 @@ Design tokens are the atomic values that define the visual language. They ensure
 
 **Primary palette:**
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--color-primary` | `#2563EB` | Primary actions, links, focus indicators |
-| `--color-primary-hover` | `#1D4ED8` | Hover state for primary elements |
-| `--color-primary-active` | `#1E40AF` | Active/pressed state |
+| Token                    | Value     | Usage                                    |
+| ------------------------ | --------- | ---------------------------------------- |
+| `--color-primary`        | `#2563EB` | Primary actions, links, focus indicators |
+| `--color-primary-hover`  | `#1D4ED8` | Hover state for primary elements         |
+| `--color-primary-active` | `#1E40AF` | Active/pressed state                     |
 | `--color-primary-subtle` | `#DBEAFE` | Subtle backgrounds, selection highlights |
 
 **Neutral palette:**
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--color-bg` | `#FFFFFF` | Page background |
-| `--color-bg-secondary` | `#F8FAFC` | Card backgrounds, alternating rows |
-| `--color-bg-tertiary` | `#F1F5F9` | Input backgrounds, disabled states |
-| `--color-border` | `#E2E8F0` | Borders, dividers |
-| `--color-border-strong` | `#CBD5E1` | Emphasized borders |
-| `--color-text` | `#0F172A` | Primary text |
-| `--color-text-secondary` | `#475569` | Secondary text, labels |
-| `--color-text-tertiary` | `#94A3B8` | Placeholder text, captions |
+| Token                    | Value     | Usage                              |
+| ------------------------ | --------- | ---------------------------------- |
+| `--color-bg`             | `#FFFFFF` | Page background                    |
+| `--color-bg-secondary`   | `#F8FAFC` | Card backgrounds, alternating rows |
+| `--color-bg-tertiary`    | `#F1F5F9` | Input backgrounds, disabled states |
+| `--color-border`         | `#E2E8F0` | Borders, dividers                  |
+| `--color-border-strong`  | `#CBD5E1` | Emphasized borders                 |
+| `--color-text`           | `#0F172A` | Primary text                       |
+| `--color-text-secondary` | `#475569` | Secondary text, labels             |
+| `--color-text-tertiary`  | `#94A3B8` | Placeholder text, captions         |
 
 **Semantic palette:**
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--color-success` | `#16A34A` | Success states, positive indicators |
-| `--color-warning` | `#D97706` | Warning states, caution indicators |
-| `--color-error` | `#DC2626` | Error states, destructive actions |
-| `--color-info` | `#2563EB` | Informational states, neutral indicators |
+| Token             | Value     | Usage                                    |
+| ----------------- | --------- | ---------------------------------------- |
+| `--color-success` | `#16A34A` | Success states, positive indicators      |
+| `--color-warning` | `#D97706` | Warning states, caution indicators       |
+| `--color-error`   | `#DC2626` | Error states, destructive actions        |
+| `--color-info`    | `#2563EB` | Informational states, neutral indicators |
 
 **Entity type colors:**
 
-| Entity Type | Color | Token |
-|------------|-------|-------|
-| Concept | `#8B5CF6` | `--color-entity-concept` |
-| Person | `#EC4899` | `--color-entity-person` |
+| Entity Type  | Color     | Token                         |
+| ------------ | --------- | ----------------------------- |
+| Concept      | `#8B5CF6` | `--color-entity-concept`      |
+| Person       | `#EC4899` | `--color-entity-person`       |
 | Organization | `#F59E0B` | `--color-entity-organization` |
-| Paper | `#3B82F6` | `--color-entity-paper` |
-| Tool | `#10B981` | `--color-entity-tool` |
-| Technology | `#6366F1` | `--color-entity-technology` |
-| Decision | `#EF4444` | `--color-entity-decision` |
-| Event | `#F97316` | `--color-entity-event` |
-| Collection | `#14B8A6` | `--color-entity-collection` |
-| Default | `#64748B` | `--color-entity-default` |
+| Paper        | `#3B82F6` | `--color-entity-paper`        |
+| Tool         | `#10B981` | `--color-entity-tool`         |
+| Technology   | `#6366F1` | `--color-entity-technology`   |
+| Decision     | `#EF4444` | `--color-entity-decision`     |
+| Event        | `#F97316` | `--color-entity-event`        |
+| Collection   | `#14B8A6` | `--color-entity-collection`   |
+| Default      | `#64748B` | `--color-entity-default`      |
 
 ### Typography
 
 **Font family:**
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--font-sans` | `Inter, system-ui, sans-serif` | Body text, UI elements |
-| `--font-mono` | `JetBrains Mono, monospace` | Code, technical content |
+| Token         | Value                          | Usage                   |
+| ------------- | ------------------------------ | ----------------------- |
+| `--font-sans` | `Inter, system-ui, sans-serif` | Body text, UI elements  |
+| `--font-mono` | `JetBrains Mono, monospace`    | Code, technical content |
 
 **Font sizes:**
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--text-xs` | `0.75rem` (12px) | Captions, metadata |
-| `--text-sm` | `0.875rem` (14px) | Labels, secondary text |
-| `--text-base` | `1rem` (16px) | Body text |
-| `--text-lg` | `1.125rem` (18px) | Subheadings |
-| `--text-xl` | `1.25rem` (20px) | Section headings |
-| `--text-2xl` | `1.5rem` (24px) | Page titles |
+| Token         | Value             | Usage                  |
+| ------------- | ----------------- | ---------------------- |
+| `--text-xs`   | `0.75rem` (12px)  | Captions, metadata     |
+| `--text-sm`   | `0.875rem` (14px) | Labels, secondary text |
+| `--text-base` | `1rem` (16px)     | Body text              |
+| `--text-lg`   | `1.125rem` (18px) | Subheadings            |
+| `--text-xl`   | `1.25rem` (20px)  | Section headings       |
+| `--text-2xl`  | `1.5rem` (24px)   | Page titles            |
 
 **Font weights:**
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--font-normal` | `400` | Body text |
-| `--font-medium` | `500` | Labels, emphasis |
-| `--font-semibold` | `600` | Headings |
-| `--font-bold` | `700` | Page titles |
+| Token             | Value | Usage            |
+| ----------------- | ----- | ---------------- |
+| `--font-normal`   | `400` | Body text        |
+| `--font-medium`   | `500` | Labels, emphasis |
+| `--font-semibold` | `600` | Headings         |
+| `--font-bold`     | `700` | Page titles      |
 
 ### Spacing
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-1` | `0.25rem` (4px) | Tight spacing |
-| `--space-2` | `0.5rem` (8px) | Default spacing |
+| Token       | Value            | Usage               |
+| ----------- | ---------------- | ------------------- |
+| `--space-1` | `0.25rem` (4px)  | Tight spacing       |
+| `--space-2` | `0.5rem` (8px)   | Default spacing     |
 | `--space-3` | `0.75rem` (12px) | Comfortable spacing |
-| `--space-4` | `1rem` (16px) | Loose spacing |
-| `--space-6` | `1.5rem` (24px) | Section spacing |
-| `--space-8` | `2rem` (32px) | Page spacing |
+| `--space-4` | `1rem` (16px)    | Loose spacing       |
+| `--space-6` | `1.5rem` (24px)  | Section spacing     |
+| `--space-8` | `2rem` (32px)    | Page spacing        |
 
 ### Border Radius
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--radius-sm` | `0.25rem` (4px) | Buttons, inputs |
-| `--radius-md` | `0.375rem` (6px) | Cards, containers |
-| `--radius-lg` | `0.5rem` (8px) | Modals, panels |
-| `--radius-full` | `9999px` | Pills, badges |
+| Token           | Value            | Usage             |
+| --------------- | ---------------- | ----------------- |
+| `--radius-sm`   | `0.25rem` (4px)  | Buttons, inputs   |
+| `--radius-md`   | `0.375rem` (6px) | Cards, containers |
+| `--radius-lg`   | `0.5rem` (8px)   | Modals, panels    |
+| `--radius-full` | `9999px`         | Pills, badges     |
 
 ### Shadows
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle elevation |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Card elevation |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modal elevation |
+| Token         | Value                         | Usage            |
+| ------------- | ----------------------------- | ---------------- |
+| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)`  | Subtle elevation |
+| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)`   | Card elevation   |
+| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modal elevation  |
 
 ---
 
@@ -131,11 +131,11 @@ The entity card is the primary component for displaying an entity in any project
 
 **Properties:**
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `entity` | Entity | Yes | The entity to display |
-| `variant` | `compact` / `default` / `expanded` | No | Display variant (default: `default`) |
-| `actions` | Action[] | No | Available actions (view, add to collection, etc.) |
+| Property  | Type                               | Required | Description                                       |
+| --------- | ---------------------------------- | -------- | ------------------------------------------------- |
+| `entity`  | Entity                             | Yes      | The entity to display                             |
+| `variant` | `compact` / `default` / `expanded` | No       | Display variant (default: `default`)              |
+| `actions` | Action[]                           | No       | Available actions (view, add to collection, etc.) |
 
 **Compact variant:**
 
@@ -193,12 +193,12 @@ The entity list displays multiple entities in a scrollable list.
 
 **Properties:**
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `entities` | Entity[] | Yes | Entities to display |
-| `variant` | `compact` / `default` / `expanded` | No | Card variant |
-| `sort` | SortConfig | No | Sort configuration |
-| `filter` | FilterConfig | No | Filter configuration |
+| Property   | Type                               | Required | Description          |
+| ---------- | ---------------------------------- | -------- | -------------------- |
+| `entities` | Entity[]                           | Yes      | Entities to display  |
+| `variant`  | `compact` / `default` / `expanded` | No       | Card variant         |
+| `sort`     | SortConfig                         | No       | Sort configuration   |
+| `filter`   | FilterConfig                       | No       | Filter configuration |
 
 **Behavior:**
 
@@ -210,11 +210,11 @@ The entity list displays multiple entities in a scrollable list.
 
 **Properties:**
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `placeholder` | string | No | Placeholder text |
-| `onSearch` | (query: string) => void | Yes | Search callback |
-| `filters` | FilterConfig[] | No | Available filters |
+| Property      | Type                    | Required | Description       |
+| ------------- | ----------------------- | -------- | ----------------- |
+| `placeholder` | string                  | No       | Placeholder text  |
+| `onSearch`    | (query: string) => void | Yes      | Search callback   |
+| `filters`     | FilterConfig[]          | No       | Available filters |
 
 **Capabilities:**
 
@@ -228,12 +228,12 @@ The entity list displays multiple entities in a scrollable list.
 
 **Properties:**
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `entities` | Entity[] | Yes | Entities to render as nodes |
-| `relationships` | Relationship[] | Yes | Relationships to render as edges |
-| `focus` | EntityId | No | Initial focus entity |
-| `depth` | number | No | Traversal depth (default: 2) |
+| Property        | Type           | Required | Description                      |
+| --------------- | -------------- | -------- | -------------------------------- |
+| `entities`      | Entity[]       | Yes      | Entities to render as nodes      |
+| `relationships` | Relationship[] | Yes      | Relationships to render as edges |
+| `focus`         | EntityId       | No       | Initial focus entity             |
+| `depth`         | number         | No       | Traversal depth (default: 2)     |
 
 **Node rendering:**
 
@@ -292,18 +292,18 @@ All interfaces must meet WCAG 2.1 AA standards:
 
 ### Keyboard Navigation
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Move to next interactive element |
-| `Shift+Tab` | Move to previous interactive element |
+| Key          | Action                                    |
+| ------------ | ----------------------------------------- |
+| `Tab`        | Move to next interactive element          |
+| `Shift+Tab`  | Move to previous interactive element      |
 | `Arrow keys` | Navigate between items in a list or graph |
-| `Enter` | Open selected entity or activate button |
-| `Escape` | Close modal, return to previous view |
-| `/` | Open search |
-| `?` | Show keyboard shortcuts |
-| `Ctrl+A` | Select all (in multi-select contexts) |
-| `Ctrl+C` | Copy selected entity |
-| `Ctrl+V` | Paste into collection |
+| `Enter`      | Open selected entity or activate button   |
+| `Escape`     | Close modal, return to previous view      |
+| `/`          | Open search                               |
+| `?`          | Show keyboard shortcuts                   |
+| `Ctrl+A`     | Select all (in multi-select contexts)     |
+| `Ctrl+C`     | Copy selected entity                      |
+| `Ctrl+V`     | Paste into collection                     |
 
 ### Screen Reader Support
 
@@ -322,11 +322,11 @@ All interfaces must meet WCAG 2.1 AA standards:
 
 ### Responsive Design
 
-| Breakpoint | Width | Layout |
-|-----------|-------|--------|
-| Mobile | < 640px | Single column, stacked panels |
-| Tablet | 640px - 1024px | Two columns, collapsible sidebar |
-| Desktop | > 1024px | Three columns, persistent sidebar |
+| Breakpoint | Width          | Layout                            |
+| ---------- | -------------- | --------------------------------- |
+| Mobile     | < 640px        | Single column, stacked panels     |
+| Tablet     | 640px - 1024px | Two columns, collapsible sidebar  |
+| Desktop    | > 1024px       | Three columns, persistent sidebar |
 
 ---
 
@@ -334,29 +334,29 @@ All interfaces must meet WCAG 2.1 AA standards:
 
 ### Graph View
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--graph-node-min-size` | `20px` | Minimum node diameter |
-| `--graph-node-max-size` | `60px` | Maximum node diameter |
-| `--graph-edge-width` | `1.5px` | Default edge width |
-| `--graph-edge-hover-width` | `3px` | Edge width on hover |
-| `--graph-label-font-size` | `11px` | Node label font size |
+| Token                      | Value   | Usage                 |
+| -------------------------- | ------- | --------------------- |
+| `--graph-node-min-size`    | `20px`  | Minimum node diameter |
+| `--graph-node-max-size`    | `60px`  | Maximum node diameter |
+| `--graph-edge-width`       | `1.5px` | Default edge width    |
+| `--graph-edge-hover-width` | `3px`   | Edge width on hover   |
+| `--graph-label-font-size`  | `11px`  | Node label font size  |
 
 ### Table View
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--table-row-height` | `40px` | Default row height |
-| `--table-header-height` | `48px` | Header row height |
-| `--table-cell-padding` | `8px 12px` | Cell padding |
-| `--table-border-color` | `--color-border` | Cell borders |
+| Token                   | Value            | Usage              |
+| ----------------------- | ---------------- | ------------------ |
+| `--table-row-height`    | `40px`           | Default row height |
+| `--table-header-height` | `48px`           | Header row height  |
+| `--table-cell-padding`  | `8px 12px`       | Cell padding       |
+| `--table-border-color`  | `--color-border` | Cell borders       |
 
 ### Timeline View
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--timeline-line-width` | `2px` | Timeline line width |
-| `--timeline-node-size` | `12px` | Timeline node diameter |
+| Token                        | Value  | Usage                    |
+| ---------------------------- | ------ | ------------------------ |
+| `--timeline-line-width`      | `2px`  | Timeline line width      |
+| `--timeline-node-size`       | `12px` | Timeline node diameter   |
 | `--timeline-label-font-size` | `12px` | Timeline label font size |
 
 ---

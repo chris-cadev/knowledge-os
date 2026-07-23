@@ -74,14 +74,14 @@ Proposed --> Accepted --> [Deprecated | Superseded]
 
 ## ADR Index
 
-| ADR | Title | Status | Date |
-|-----|-------|--------|------|
-| ADR-0001 | [Knowledge Model as Canonical Source of Truth](adr-0001.md) | Accepted | 2026-07-21 |
-| ADR-0002 | [Storage Independence via Adapter Pattern](adr-0002.md) | Accepted | 2026-07-21 |
+| ADR      | Title                                                        | Status   | Date       |
+| -------- | ------------------------------------------------------------ | -------- | ---------- |
+| ADR-0001 | [Knowledge Model as Canonical Source of Truth](adr-0001.md)  | Accepted | 2026-07-21 |
+| ADR-0002 | [Storage Independence via Adapter Pattern](adr-0002.md)      | Accepted | 2026-07-21 |
 | ADR-0003 | [Entity Component Model for Knowledge Entities](adr-0003.md) | Accepted | 2026-07-21 |
-| ADR-0004 | [Event-Driven Derivation Pipeline](adr-0004.md) | Accepted | 2026-07-21 |
-| ADR-0005 | [Compiler-Inspired Architecture](adr-0005.md) | Accepted | 2026-07-21 |
-| ADR-0006 | [Entity Resolution as Critical Layer](adr-0006.md) | Accepted | 2026-07-22 |
+| ADR-0004 | [Event-Driven Derivation Pipeline](adr-0004.md)              | Accepted | 2026-07-21 |
+| ADR-0005 | [Compiler-Inspired Architecture](adr-0005.md)                | Accepted | 2026-07-21 |
+| ADR-0006 | [Entity Resolution as Critical Layer](adr-0006.md)           | Accepted | 2026-07-22 |
 
 ---
 

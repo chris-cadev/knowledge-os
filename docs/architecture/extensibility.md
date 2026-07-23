@@ -51,19 +51,19 @@ Capabilities declare what a plugin provides. The system queries capabilities to 
 
 ### Capability Types
 
-| Capability | Purpose | Interface |
-|-----------|---------|-----------|
-| `importer` | Import from external formats | `ImportAdapter` |
-| `exporter` | Export to external formats | `ExportAdapter` |
-| `renderer` | Render canonical data to output | `RenderAdapter` |
-| `storage` | Persist data to a storage engine | `StorageAdapter` |
-| `search` | Index and retrieve text | `SearchAdapter` |
-| `vector` | Store and query embeddings | `VectorAdapter` |
-| `graph` | Store and traverse relationships | `GraphAdapter` |
-| `cache` | Cache derived data | `CacheAdapter` |
-| `ai` | Provide AI operations | `AiAdapter` |
-| `automation` | Automate knowledge operations | `AutomationAdapter` |
-| `view` | Render a view projection | `ViewAdapter` |
+| Capability   | Purpose                          | Interface           |
+| ------------ | -------------------------------- | ------------------- |
+| `importer`   | Import from external formats     | `ImportAdapter`     |
+| `exporter`   | Export to external formats       | `ExportAdapter`     |
+| `renderer`   | Render canonical data to output  | `RenderAdapter`     |
+| `storage`    | Persist data to a storage engine | `StorageAdapter`    |
+| `search`     | Index and retrieve text          | `SearchAdapter`     |
+| `vector`     | Store and query embeddings       | `VectorAdapter`     |
+| `graph`      | Store and traverse relationships | `GraphAdapter`      |
+| `cache`      | Cache derived data               | `CacheAdapter`      |
+| `ai`         | Provide AI operations            | `AiAdapter`         |
+| `automation` | Automate knowledge operations    | `AutomationAdapter` |
+| `view`       | Render a view projection         | `ViewAdapter`       |
 
 ### Capability Negotiation
 
@@ -157,12 +157,12 @@ trait ImportAdapter {
 
 ### Built-in Importers
 
-| Importer | Source | Output |
-|----------|--------|--------|
-| Markdown | `.md` files | Entity with Content component |
-| PDF | `.pdf` files | Entity with Content + BinaryContent components |
-| HTML | URLs, `.html` files | Entity with Content component |
-| Git | Git repositories | Project entity with relationship to commits |
+| Importer | Source              | Output                                         |
+| -------- | ------------------- | ---------------------------------------------- |
+| Markdown | `.md` files         | Entity with Content component                  |
+| PDF      | `.pdf` files        | Entity with Content + BinaryContent components |
+| HTML     | URLs, `.html` files | Entity with Content component                  |
+| Git      | Git repositories    | Project entity with relationship to commits    |
 
 ### Custom Importers
 
@@ -192,11 +192,11 @@ trait ExportAdapter {
 
 ### Built-in Exporters
 
-| Exporter | Format | Output |
-|----------|--------|--------|
-| Markdown | `.md` | Markdown files |
-| JSON | `.json` | Structured entity data |
-| GraphML | `.graphml` | Graph structure |
+| Exporter | Format     | Output                 |
+| -------- | ---------- | ---------------------- |
+| Markdown | `.md`      | Markdown files         |
+| JSON     | `.json`    | Structured entity data |
+| GraphML  | `.graphml` | Graph structure        |
 
 ---
 
@@ -218,11 +218,11 @@ trait RenderAdapter {
 
 ### Built-in Renderers
 
-| Renderer | Format | Purpose |
-|----------|--------|---------|
-| HTML | `.html` | Web pages |
-| JSON API | `application/json` | API responses |
-| MCP | MCP protocol | AI agent communication |
+| Renderer | Format             | Purpose                |
+| -------- | ------------------ | ---------------------- |
+| HTML     | `.html`            | Web pages              |
+| JSON API | `application/json` | API responses          |
+| MCP      | MCP protocol       | AI agent communication |
 
 ---
 
@@ -250,14 +250,14 @@ trait StorageAdapter {
 
 ### Built-in Storage Adapters
 
-| Adapter | Engine | Purpose |
-|---------|--------|---------|
-| SQLite | SQLite | Local relational storage |
+| Adapter    | Engine     | Purpose                       |
+| ---------- | ---------- | ----------------------------- |
+| SQLite     | SQLite     | Local relational storage      |
 | PostgreSQL | PostgreSQL | Production relational storage |
-| Tantivy | Tantivy | Full-text search |
-| Qdrant | Qdrant | Vector storage |
-| Redis | Redis | Cache storage |
-| S3 | S3/MinIO | Object storage |
+| Tantivy    | Tantivy    | Full-text search              |
+| Qdrant     | Qdrant     | Vector storage                |
+| Redis      | Redis      | Cache storage                 |
+| S3         | S3/MinIO   | Object storage                |
 
 ### Storage Adapter Selection
 

@@ -20,15 +20,15 @@ The seven-layer pipeline scales horizontally. Each layer processes work independ
 
 ### Layer-Level Scaling
 
-| Layer | Scaling Strategy | Parallelism |
-|-------|-----------------|-------------|
-| Import | Multiple importers run concurrently | Per-source parallelism |
-| Parsing | Parsers run concurrently per document | Per-document parallelism |
-| Normalization | Normalizers run concurrently per entity | Per-entity parallelism |
-| Knowledge Model | Entity operations are independent | Per-entity parallelism |
-| Relationship Engine | Relationship extraction runs concurrently | Per-source parallelism |
-| Derivation | Each derivation type runs independently | Per-derivation-type parallelism |
-| Presentation | Each view renders independently | Per-view parallelism |
+| Layer               | Scaling Strategy                          | Parallelism                     |
+| ------------------- | ----------------------------------------- | ------------------------------- |
+| Import              | Multiple importers run concurrently       | Per-source parallelism          |
+| Parsing             | Parsers run concurrently per document     | Per-document parallelism        |
+| Normalization       | Normalizers run concurrently per entity   | Per-entity parallelism          |
+| Knowledge Model     | Entity operations are independent         | Per-entity parallelism          |
+| Relationship Engine | Relationship extraction runs concurrently | Per-source parallelism          |
+| Derivation          | Each derivation type runs independently   | Per-derivation-type parallelism |
+| Presentation        | Each view renders independently           | Per-view parallelism            |
 
 ### Event-Driven Scaling
 
@@ -116,20 +116,20 @@ Storage engines manage concurrency through their own mechanisms:
 
 ### Entity Volume
 
-| Scale | Entities | Storage Estimate |
-|-------|----------|-----------------|
-| Small | 1K - 10K | < 1 GB |
-| Medium | 10K - 100K | 1 - 10 GB |
-| Large | 100K - 1M | 10 - 100 GB |
-| Enterprise | 1M - 10M | 100 GB - 1 TB |
+| Scale      | Entities   | Storage Estimate |
+| ---------- | ---------- | ---------------- |
+| Small      | 1K - 10K   | < 1 GB           |
+| Medium     | 10K - 100K | 1 - 10 GB        |
+| Large      | 100K - 1M  | 10 - 100 GB      |
+| Enterprise | 1M - 10M   | 100 GB - 1 TB    |
 
 ### Throughput
 
-| Operation | Single-Node Capacity |
-|-----------|---------------------|
-| Import | 100-500 documents/minute |
-| Search | 1000-5000 queries/second |
-| Embedding | 100-500 vectors/second |
+| Operation       | Single-Node Capacity         |
+| --------------- | ---------------------------- |
+| Import          | 100-500 documents/minute     |
+| Search          | 1000-5000 queries/second     |
+| Embedding       | 100-500 vectors/second       |
 | Graph traversal | 1000-10000 traversals/second |
 
 ### Bottlenecks

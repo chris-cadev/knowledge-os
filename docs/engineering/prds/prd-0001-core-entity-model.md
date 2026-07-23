@@ -48,7 +48,7 @@ The first implementation must prove this thesis: a Markdown file enters the syst
 
 ## Engineering Questions
 
-Every feature proposed for the system must answer these 10 questions per `CONTRIBUTING.md`:
+Every feature proposed for the system must answer these 10 questions per [Engineering Principles](../../philosophy/engineering-principles.md):
 
 ### 1. Which canonical entities are introduced?
 
@@ -223,14 +223,14 @@ This ensures quality is maintained by construction, not corrected after the fact
 
 ### F5: Search and Retrieval
 
-| ID   | Requirement               | Priority | Acceptance Criteria                                                 |
-| ---- | ------------------------- | -------- | ------------------------------------------------------------------- |
-| F5.1 | Full-text search          | P0       | Query matches against indexed text fields via `SearchIndex` trait   |
-| F5.2 | Entity type filtering     | P0       | Search results can be filtered by entity type                       |
-| F5.3 | Tag filtering             | P1       | Search results can be filtered by tags                              |
-| F5.4 | Search result ranking     | P0       | Results are ranked by relevance                                     |
-| F5.5 | Search index rebuild      | P0       | Index can be dropped and rebuilt from canonical entities             |
-| F5.6 | Pluggable search backend  | P0       | Search implementation is swappable via trait interface               |
+| ID   | Requirement              | Priority | Acceptance Criteria                                               |
+| ---- | ------------------------ | -------- | ----------------------------------------------------------------- |
+| F5.1 | Full-text search         | P0       | Query matches against indexed text fields via `SearchIndex` trait |
+| F5.2 | Entity type filtering    | P0       | Search results can be filtered by entity type                     |
+| F5.3 | Tag filtering            | P1       | Search results can be filtered by tags                            |
+| F5.4 | Search result ranking    | P0       | Results are ranked by relevance                                   |
+| F5.5 | Search index rebuild     | P0       | Index can be dropped and rebuilt from canonical entities          |
+| F5.6 | Pluggable search backend | P0       | Search implementation is swappable via trait interface            |
 
 ---
 
@@ -589,18 +589,46 @@ Sample Markdown files with varying complexity:
 
 ## Current State
 
-The project has initial scaffolding in place:
+The project has the core entity model and import pipeline implemented:
 
-| Crate               | Status                                                                  |
-| ------------------- | ----------------------------------------------------------------------- |
-| `knowledge-core`    | Basic entity/relationship/component types (incomplete), ports defined   |
-| `knowledge-storage` | SQLite adapter for entities only (no components, relationships, events) |
-| `knowledge-import`  | Stub importer (creates empty Note entity)                               |
-| `knowledge-derive`  | Stub search index (no-op)                                               |
-| `knowledge-api`     | REST API with basic CRUD (not PRD-0001 scope)                           |
-| `knowledge-cli`     | Does not exist yet                                                      |
+| Crate               | Status                                                                                                                                              |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `knowledge-core`    | Complete domain model: Entity, Component, Relationship types; ports with SearchIndex + EventLog traits                                              |
+| `knowledge-storage` | Full SQLite adapter: CRUD for entities, components, relationships; FTS5 search with BM25 ranking; event log; SearchIndex + EventLog implementations |
+| `knowledge-import`  | Markdown importer with YAML frontmatter, cross-ref extraction, Timeline + Language components                                                       |
+| `knowledge-derive`  | Stub (not PRD-0001 scope)                                                                                                                           |
+| `knowledge-api`     | REST API with basic CRUD (not PRD-0001 scope)                                                                                                       |
+| `knowledge-cli`     | `kos` binary: import, search (with BM25 ranking), get, list, archive, restore, rebuild-index                                                        |
 
-The PRD implementation builds on this scaffolding, completing the domain model, adding missing adapters, and building the full import pipeline.
+### Implemented Features
+
+- Entity CRUD (create, read, update, archive, restore)
+- Component lifecycle with version tracking and `update_data()`
+- Relationship storage with 1-hop traversal and type filtering
+- Markdown import with YAML frontmatter extraction
+- Title extraction: frontmatter → H1 → filename fallback
+- Tags extraction from YAML frontmatter
+- Timeline component (file mod date + import time)
+- Language component (frontmatter `language` field, defaults to `en`)
+- Provenance component (source path + import timestamp)
+- Cross-reference extraction from Markdown links
+- Cross-reference relationship creation (file path matching)
+- Idempotent reimport (exact match: title + entity type)
+- Full-text search via pluggable `SearchIndex` trait
+- FTS5 BM25 ranking
+- Search filtering by entity type and tags
+- Search index rebuild from canonical data
+- Durable event log (EntityCreated, EntityUpdated, EntityArchived, etc.)
+- Event emission on all canonical changes
+- CLI: `kos import`, `kos search`, `kos get`, `kos list`, `kos archive`, `kos restore`, `kos rebuild-index`
+
+### Not Yet Implemented
+
+- Fuzzy entity resolution (P1, deferred)
+- Confidence scoring for resolution (P1, deferred)
+- Batch import progress reporting (P1, deferred)
+- Search result snippets (P1, deferred)
+- Version history table (P1, deferred)
 
 ---
 

@@ -107,19 +107,19 @@ When an import produces an entity that conflicts with an existing entity:
 
 ## Synchronization Events
 
-| Event | Trigger | Handler | Derived Update |
-|-------|---------|---------|---------------|
-| `EntityCreated` | New entity stored | SearchIndexHandler | Add to search index |
-| `EntityCreated` | New entity stored | EmbeddingHandler | Generate embedding |
-| `EntityCreated` | New entity stored | GraphProjectionHandler | Add to graph |
-| `EntityUpdated` | Entity modified | SearchIndexHandler | Update search index |
-| `EntityUpdated` | Entity modified | EmbeddingHandler | Recompute embedding |
-| `EntityUpdated` | Entity modified | CacheHandler | Invalidate cache |
-| `RelationshipCreated` | New relationship | GraphProjectionHandler | Add edge to graph |
+| Event                 | Trigger               | Handler                | Derived Update       |
+| --------------------- | --------------------- | ---------------------- | -------------------- |
+| `EntityCreated`       | New entity stored     | SearchIndexHandler     | Add to search index  |
+| `EntityCreated`       | New entity stored     | EmbeddingHandler       | Generate embedding   |
+| `EntityCreated`       | New entity stored     | GraphProjectionHandler | Add to graph         |
+| `EntityUpdated`       | Entity modified       | SearchIndexHandler     | Update search index  |
+| `EntityUpdated`       | Entity modified       | EmbeddingHandler       | Recompute embedding  |
+| `EntityUpdated`       | Entity modified       | CacheHandler           | Invalidate cache     |
+| `RelationshipCreated` | New relationship      | GraphProjectionHandler | Add edge to graph    |
 | `RelationshipUpdated` | Relationship modified | GraphProjectionHandler | Update edge in graph |
-| `ComponentAdded` | New component | SearchIndexHandler | Index new content |
-| `ComponentUpdated` | Component modified | SearchIndexHandler | Reindex content |
-| `ComponentRemoved` | Component removed | SearchIndexHandler | Remove from index |
+| `ComponentAdded`      | New component         | SearchIndexHandler     | Index new content    |
+| `ComponentUpdated`    | Component modified    | SearchIndexHandler     | Reindex content      |
+| `ComponentRemoved`    | Component removed     | SearchIndexHandler     | Remove from index    |
 
 ---
 
@@ -154,22 +154,22 @@ Recovery is possible because derived data is disposable. The system can rebuild 
 
 ### Latency
 
-| Path | Expected Latency |
-|------|-----------------|
-| Canonical change to event published | < 10ms |
-| Event published to derived update | 100ms - 5s |
-| Derived update to view refresh | 100ms - 1s |
-| Full search index rebuild (100K entities) | 5 - 15 minutes |
-| Full embedding recomputation (100K entities) | 10 - 30 minutes |
+| Path                                         | Expected Latency |
+| -------------------------------------------- | ---------------- |
+| Canonical change to event published          | < 10ms           |
+| Event published to derived update            | 100ms - 5s       |
+| Derived update to view refresh               | 100ms - 1s       |
+| Full search index rebuild (100K entities)    | 5 - 15 minutes   |
+| Full embedding recomputation (100K entities) | 10 - 30 minutes  |
 
 ### Throughput
 
-| Operation | Throughput |
-|-----------|-----------|
-| Event publishing | 10,000+ events/second |
-| Search index update | 1,000+ entities/second |
-| Embedding computation | 100-500 entities/second |
-| Cache invalidation | 10,000+ invalidations/second |
+| Operation             | Throughput                   |
+| --------------------- | ---------------------------- |
+| Event publishing      | 10,000+ events/second        |
+| Search index update   | 1,000+ entities/second       |
+| Embedding computation | 100-500 entities/second      |
+| Cache invalidation    | 10,000+ invalidations/second |
 
 ---
 

@@ -39,13 +39,13 @@ Local deployments require no provisioning beyond the host machine.
 
 **Storage:**
 
-| Engine | Provisioning | Notes |
-|--------|-------------|-------|
-| PostgreSQL | Managed or self-hosted | Primary relational store |
-| Tantivy / Elasticsearch | Self-hosted or managed | Full-text search |
-| Qdrant | Self-hosted or managed | Vector storage |
-| Redis | Managed or self-hosted | Cache layer |
-| S3 / MinIO | Managed or self-hosted | Object storage for binaries |
+| Engine                  | Provisioning           | Notes                       |
+| ----------------------- | ---------------------- | --------------------------- |
+| PostgreSQL              | Managed or self-hosted | Primary relational store    |
+| Tantivy / Elasticsearch | Self-hosted or managed | Full-text search            |
+| Qdrant                  | Self-hosted or managed | Vector storage              |
+| Redis                   | Managed or self-hosted | Cache layer                 |
+| S3 / MinIO              | Managed or self-hosted | Object storage for binaries |
 
 **Networking:**
 
@@ -99,12 +99,12 @@ Knowledge OS scales horizontally for API serving and pipeline processing.
 
 **Scaling triggers:**
 
-| Metric | Threshold | Action |
-|--------|-----------|--------|
-| API request latency (p95) | > 200ms | Add API server instance |
-| Event queue depth | > 10,000 | Add pipeline worker |
-| CPU utilization | > 70% sustained | Add instance of affected component |
-| Memory utilization | > 80% sustained | Add instance or increase instance size |
+| Metric                    | Threshold       | Action                                 |
+| ------------------------- | --------------- | -------------------------------------- |
+| API request latency (p95) | > 200ms         | Add API server instance                |
+| Event queue depth         | > 10,000        | Add pipeline worker                    |
+| CPU utilization           | > 70% sustained | Add instance of affected component     |
+| Memory utilization        | > 80% sustained | Add instance or increase instance size |
 
 ### Vertical Scaling
 
@@ -128,13 +128,13 @@ Storage engines benefit from vertical scaling.
 
 ### Storage Scaling
 
-| Engine | Scaling Strategy | Limit |
-|--------|-----------------|-------|
-| PostgreSQL | Read replicas, connection pooling | Single-write, multi-read |
-| Search engine | Sharding, index partitioning | Linear with shards |
-| Vector store | Collection partitioning | Linear with nodes |
-| Cache | Cluster mode (Redis Cluster) | Linear with nodes |
-| Object storage | Native scaling (S3) | Effectively unlimited |
+| Engine         | Scaling Strategy                  | Limit                    |
+| -------------- | --------------------------------- | ------------------------ |
+| PostgreSQL     | Read replicas, connection pooling | Single-write, multi-read |
+| Search engine  | Sharding, index partitioning      | Linear with shards       |
+| Vector store   | Collection partitioning           | Linear with nodes        |
+| Cache          | Cluster mode (Redis Cluster)      | Linear with nodes        |
+| Object storage | Native scaling (S3)               | Effectively unlimited    |
 
 ---
 
@@ -158,11 +158,11 @@ Every storage engine and service exposes a health check endpoint.
 
 **Health status values:**
 
-| Status | Meaning | Action |
-|--------|---------|--------|
-| `healthy` | Operational | None |
-| `degraded` | Partially operational | Investigate, no immediate action |
-| `unhealthy` | Not operational | Trigger incident response |
+| Status      | Meaning               | Action                           |
+| ----------- | --------------------- | -------------------------------- |
+| `healthy`   | Operational           | None                             |
+| `degraded`  | Partially operational | Investigate, no immediate action |
+| `unhealthy` | Not operational       | Trigger incident response        |
 
 ### Metrics
 
@@ -170,32 +170,32 @@ Knowledge OS exposes Prometheus-compatible metrics at `/metrics`.
 
 **Pipeline metrics:**
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `pipeline_events_published_total` | counter | Total events published |
-| `pipeline_events_processed_total` | counter | Total events processed |
-| `pipeline_events_failed_total` | counter | Total events failed |
-| `pipeline_event_processing_duration_seconds` | histogram | Event processing latency |
-| `pipeline_derived_artifacts_built_total` | counter | Derived artifacts generated |
-| `pipeline_derived_artifacts_rebuilt_total` | counter | Derived artifacts rebuilt |
+| Metric                                       | Type      | Description                 |
+| -------------------------------------------- | --------- | --------------------------- |
+| `pipeline_events_published_total`            | counter   | Total events published      |
+| `pipeline_events_processed_total`            | counter   | Total events processed      |
+| `pipeline_events_failed_total`               | counter   | Total events failed         |
+| `pipeline_event_processing_duration_seconds` | histogram | Event processing latency    |
+| `pipeline_derived_artifacts_built_total`     | counter   | Derived artifacts generated |
+| `pipeline_derived_artifacts_rebuilt_total`   | counter   | Derived artifacts rebuilt   |
 
 **Storage metrics:**
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `storage_operation_duration_seconds` | histogram | Storage operation latency |
-| `storage_operation_errors_total` | counter | Storage operation failures |
-| `storage_connection_pool_active` | gauge | Active connections |
-| `storage_connection_pool_idle` | gauge | Idle connections |
+| Metric                               | Type      | Description                |
+| ------------------------------------ | --------- | -------------------------- |
+| `storage_operation_duration_seconds` | histogram | Storage operation latency  |
+| `storage_operation_errors_total`     | counter   | Storage operation failures |
+| `storage_connection_pool_active`     | gauge     | Active connections         |
+| `storage_connection_pool_idle`       | gauge     | Idle connections           |
 
 **API metrics:**
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `http_requests_total` | counter | Total HTTP requests |
-| `http_request_duration_seconds` | histogram | Request latency |
-| `http_request_size_bytes` | histogram | Request body size |
-| `http_response_size_bytes` | histogram | Response body size |
+| Metric                          | Type      | Description         |
+| ------------------------------- | --------- | ------------------- |
+| `http_requests_total`           | counter   | Total HTTP requests |
+| `http_request_duration_seconds` | histogram | Request latency     |
+| `http_request_size_bytes`       | histogram | Request body size   |
+| `http_response_size_bytes`      | histogram | Response body size  |
 
 ### Dashboards
 
@@ -210,20 +210,20 @@ Pre-configured dashboards for Grafana or compatible:
 
 **Critical alerts:**
 
-| Alert | Condition | Action |
-|-------|-----------|--------|
-| `storage_unhealthy` | Health check returns `unhealthy` | Trigger incident runbook |
-| `event_processing停滞` | Queue depth > 50,000 for > 5 minutes | Scale pipeline workers |
-| `api_error_rate_high` | 5xx rate > 1% for > 5 minutes | Investigate API servers |
-| `disk_usage_critical` | Disk > 90% | Expand or archive |
+| Alert                  | Condition                            | Action                   |
+| ---------------------- | ------------------------------------ | ------------------------ |
+| `storage_unhealthy`    | Health check returns `unhealthy`     | Trigger incident runbook |
+| `event_processing停滞` | Queue depth > 50,000 for > 5 minutes | Scale pipeline workers   |
+| `api_error_rate_high`  | 5xx rate > 1% for > 5 minutes        | Investigate API servers  |
+| `disk_usage_critical`  | Disk > 90%                           | Expand or archive        |
 
 **Warning alerts:**
 
-| Alert | Condition | Action |
-|-------|-----------|--------|
-| `storage_degraded` | Health check returns `degraded` | Investigate |
-| `pipeline_latency_high` | p95 > 5s for > 10 minutes | Review pipeline load |
-| `derived_data_stale` | Derived data age > 1 hour | Check derivation pipeline |
+| Alert                   | Condition                       | Action                    |
+| ----------------------- | ------------------------------- | ------------------------- |
+| `storage_degraded`      | Health check returns `degraded` | Investigate               |
+| `pipeline_latency_high` | p95 > 5s for > 10 minutes       | Review pipeline load      |
+| `derived_data_stale`    | Derived data age > 1 hour       | Check derivation pipeline |
 
 ---
 
@@ -233,19 +233,19 @@ Pre-configured dashboards for Grafana or compatible:
 
 **Canonical data (highest priority):**
 
-| Data | Backup Method | Frequency | Retention |
-|------|--------------|-----------|-----------|
-| PostgreSQL | `pg_dump` + WAL archiving | Continuous (WAL), daily (full) | 30 days |
-| Object storage | Versioning + cross-region replication | Continuous | 90 days |
-| SQLite | File-level copy | Daily | 30 days |
+| Data           | Backup Method                         | Frequency                      | Retention |
+| -------------- | ------------------------------------- | ------------------------------ | --------- |
+| PostgreSQL     | `pg_dump` + WAL archiving             | Continuous (WAL), daily (full) | 30 days   |
+| Object storage | Versioning + cross-region replication | Continuous                     | 90 days   |
+| SQLite         | File-level copy                       | Daily                          | 30 days   |
 
 **Configuration and infrastructure:**
 
-| Data | Backup Method | Frequency | Retention |
-|------|--------------|-----------|-----------|
-| Configuration files | Git + object storage | On change | Indefinite |
-| Plugin binaries | Object storage | On deploy | 90 days |
-| TLS certificates | Vault / cert-manager | On renewal | 90 days |
+| Data                | Backup Method        | Frequency  | Retention  |
+| ------------------- | -------------------- | ---------- | ---------- |
+| Configuration files | Git + object storage | On change  | Indefinite |
+| Plugin binaries     | Object storage       | On deploy  | 90 days    |
+| TLS certificates    | Vault / cert-manager | On renewal | 90 days    |
 
 **Derived data (no backup required):**
 
@@ -253,12 +253,12 @@ Derived data is disposable. It is rebuilt from canonical data. Backup is unneces
 
 ### Recovery Time Objectives
 
-| Scenario | RTO | RPO |
-|----------|-----|-----|
-| Single storage engine failure | < 5 minutes (failover) | 0 (no data loss) |
-| Full database restore | < 30 minutes | < 1 hour (WAL lag) |
-| Derived data rebuild | < 30 minutes (100K entities) | N/A (rebuilt from canonical) |
-| Full system recovery | < 1 hour | < 1 hour |
+| Scenario                      | RTO                          | RPO                          |
+| ----------------------------- | ---------------------------- | ---------------------------- |
+| Single storage engine failure | < 5 minutes (failover)       | 0 (no data loss)             |
+| Full database restore         | < 30 minutes                 | < 1 hour (WAL lag)           |
+| Derived data rebuild          | < 30 minutes (100K entities) | N/A (rebuilt from canonical) |
+| Full system recovery          | < 1 hour                     | < 1 hour                     |
 
 ### Disaster Recovery Process
 
@@ -387,13 +387,13 @@ Local development
 
 ### Secret Inventory
 
-| Secret | Storage | Rotation |
-|--------|---------|----------|
-| Database credentials | Secrets manager | 90 days |
-| API keys | Secrets manager | 90 days |
-| TLS certificates | cert-manager / Vault | 30 days |
-| AI provider keys | Secrets manager | 90 days |
-| Object storage credentials | Secrets manager | 90 days |
+| Secret                     | Storage              | Rotation |
+| -------------------------- | -------------------- | -------- |
+| Database credentials       | Secrets manager      | 90 days  |
+| API keys                   | Secrets manager      | 90 days  |
+| TLS certificates           | cert-manager / Vault | 30 days  |
+| AI provider keys           | Secrets manager      | 90 days  |
+| Object storage credentials | Secrets manager      | 90 days  |
 
 ---
 
@@ -460,12 +460,12 @@ graph TD
 
 ### Scaling Decisions
 
-| Scale When | Scale How | Cost Impact |
-|------------|-----------|-------------|
-| API latency p95 > 200ms | Add API server | +1 instance cost |
-| Event queue depth > 10K | Add pipeline worker | +1 instance cost |
-| Storage IOPS > provisioned | Vertical scale storage | +instance size |
-| Storage capacity > 80% | Add storage capacity | +storage cost |
+| Scale When                 | Scale How              | Cost Impact      |
+| -------------------------- | ---------------------- | ---------------- |
+| API latency p95 > 200ms    | Add API server         | +1 instance cost |
+| Event queue depth > 10K    | Add pipeline worker    | +1 instance cost |
+| Storage IOPS > provisioned | Vertical scale storage | +instance size   |
+| Storage capacity > 80%     | Add storage capacity   | +storage cost    |
 
 ---
 

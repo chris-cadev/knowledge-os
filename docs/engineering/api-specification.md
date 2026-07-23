@@ -94,11 +94,11 @@ GET /v1/entities/{id}?components=true&relationships=true
 
 **Query Parameters:**
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `components` | bool | `true` | Include component data |
-| `relationships` | bool | `true` | Include relationship data |
-| `version` | int | latest | Retrieve a specific version |
+| Parameter       | Type | Default | Description                 |
+| --------------- | ---- | ------- | --------------------------- |
+| `components`    | bool | `true`  | Include component data      |
+| `relationships` | bool | `true`  | Include relationship data   |
+| `version`       | int  | latest  | Retrieve a specific version |
 
 **Response:**
 
@@ -159,13 +159,13 @@ GET /v1/entities?type=Article&tag=knowledge&archived=false&limit=50&offset=0
 
 **Query Parameters:**
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `type` | string | all | Filter by entity type |
-| `tag` | string | all | Filter by tag value |
-| `archived` | bool | `false` | Include archived entities |
-| `limit` | int | 50 | Maximum results per page |
-| `offset` | int | 0 | Pagination offset |
+| Parameter  | Type   | Default | Description               |
+| ---------- | ------ | ------- | ------------------------- |
+| `type`     | string | all     | Filter by entity type     |
+| `tag`      | string | all     | Filter by tag value       |
+| `archived` | bool   | `false` | Include archived entities |
+| `limit`    | int    | 50      | Maximum results per page  |
+| `offset`   | int    | 0       | Pagination offset         |
 
 **Response:**
 
@@ -303,11 +303,11 @@ GET /v1/relationships?source_id={id}&type=references&direction=outgoing
 
 **Query Parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `source_id` | uuid | Filter by source entity |
-| `target_id` | uuid | Filter by target entity |
-| `type` | string | Filter by relationship type |
+| Parameter   | Type   | Description                       |
+| ----------- | ------ | --------------------------------- |
+| `source_id` | uuid   | Filter by source entity           |
+| `target_id` | uuid   | Filter by target entity           |
+| `type`      | string | Filter by relationship type       |
 | `direction` | string | `outgoing`, `incoming`, or `both` |
 
 ---
@@ -322,12 +322,12 @@ GET /v1/search?q=machine+learning&type=Article&limit=20
 
 **Query Parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `q` | string | Search query |
-| `type` | string | Filter by entity type |
-| `tag` | string | Filter by tag |
-| `limit` | int | Maximum results |
+| Parameter | Type   | Description           |
+| --------- | ------ | --------------------- |
+| `q`       | string | Search query          |
+| `type`    | string | Filter by entity type |
+| `tag`     | string | Filter by tag         |
+| `limit`   | int    | Maximum results       |
 
 **Response:**
 
@@ -395,11 +395,11 @@ GET /v1/graph/traverse/{entity_id}?depth=2&types=references,depends_on
 
 **Query Parameters:**
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `depth` | int | 1 | Maximum traversal depth |
-| `types` | string | all | Comma-separated relationship types |
-| `direction` | string | `both` | `outgoing`, `incoming`, or `both` |
+| Parameter   | Type   | Default | Description                        |
+| ----------- | ------ | ------- | ---------------------------------- |
+| `depth`     | int    | 1       | Maximum traversal depth            |
+| `types`     | string | all     | Comma-separated relationship types |
+| `direction` | string | `both`  | `outgoing`, `incoming`, or `both`  |
 
 **Response:**
 
@@ -752,17 +752,17 @@ All errors follow a consistent structure:
 
 ### Error Codes
 
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `NOT_FOUND` | 404 | Entity, relationship, or resource not found |
-| `CONFLICT` | 409 | Version mismatch or duplicate component type |
-| `VALIDATION_ERROR` | 400 | Invalid request payload |
-| `UNAUTHORIZED` | 401 | Missing or invalid authentication |
-| `FORBIDDEN` | 403 | Insufficient permissions |
-| `UNSUPPORTED_FORMAT` | 400 | Import format not supported by any importer |
-| `PLUGIN_ERROR` | 500 | Plugin execution failure |
-| `STORAGE_ERROR` | 502 | Storage engine unreachable |
-| `RATE_LIMITED` | 429 | Too many requests |
+| Code                 | HTTP Status | Description                                  |
+| -------------------- | ----------- | -------------------------------------------- |
+| `NOT_FOUND`          | 404         | Entity, relationship, or resource not found  |
+| `CONFLICT`           | 409         | Version mismatch or duplicate component type |
+| `VALIDATION_ERROR`   | 400         | Invalid request payload                      |
+| `UNAUTHORIZED`       | 401         | Missing or invalid authentication            |
+| `FORBIDDEN`          | 403         | Insufficient permissions                     |
+| `UNSUPPORTED_FORMAT` | 400         | Import format not supported by any importer  |
+| `PLUGIN_ERROR`       | 500         | Plugin execution failure                     |
+| `STORAGE_ERROR`      | 502         | Storage engine unreachable                   |
+| `RATE_LIMITED`       | 429         | Too many requests                            |
 
 ---
 
@@ -772,22 +772,22 @@ The MCP (Model Context Protocol) interface exposes the same operations through a
 
 ### MCP Resources
 
-| Resource | Description |
-|----------|-------------|
-| `entity://{id}` | Access a specific entity |
-| `search://{query}` | Search for entities |
-| `graph://{id}` | Access entity relationships |
-| `context://{id}` | Build AI context for an entity |
+| Resource           | Description                    |
+| ------------------ | ------------------------------ |
+| `entity://{id}`    | Access a specific entity       |
+| `search://{query}` | Search for entities            |
+| `graph://{id}`     | Access entity relationships    |
+| `context://{id}`   | Build AI context for an entity |
 
 ### MCP Tools
 
-| Tool | Description |
-|------|-------------|
-| `create_entity` | Create a new entity |
-| `update_entity` | Update entity components |
+| Tool              | Description                 |
+| ----------------- | --------------------------- |
+| `create_entity`   | Create a new entity         |
+| `update_entity`   | Update entity components    |
 | `search_entities` | Search by text or semantics |
-| `traverse_graph` | Walk entity relationships |
-| `build_context` | Assemble AI context |
+| `traverse_graph`  | Walk entity relationships   |
+| `build_context`   | Assemble AI context         |
 | `import_document` | Import from external source |
 | `answer_question` | Ask a question with context |
 
@@ -795,13 +795,13 @@ The MCP (Model Context Protocol) interface exposes the same operations through a
 
 ## Rate Limits
 
-| Endpoint | Limit | Window |
-|----------|-------|--------|
-| Entity CRUD | 1000 req/min | Rolling |
-| Search | 200 req/min | Rolling |
-| Import | 10 req/min | Rolling |
-| AI operations | 30 req/min | Rolling |
-| Plugin operations | 20 req/min | Rolling |
+| Endpoint          | Limit        | Window  |
+| ----------------- | ------------ | ------- |
+| Entity CRUD       | 1000 req/min | Rolling |
+| Search            | 200 req/min  | Rolling |
+| Import            | 10 req/min   | Rolling |
+| AI operations     | 30 req/min   | Rolling |
+| Plugin operations | 20 req/min   | Rolling |
 
 Rate limit headers are included in every response:
 
