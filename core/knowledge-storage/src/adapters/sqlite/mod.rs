@@ -4,7 +4,7 @@ use knowledge_core::features::entity::Entity;
 use knowledge_core::features::relationship::Relationship;
 use knowledge_core::ports::{
     ComponentRepository, EntityRepository, EntityResolver, EntityVersion, Event, EventLog,
-    ResolutionCandidate, RelationshipRepository, SearchIndex, SearchQuery, SearchResult,
+    MergeAuditEntry, ResolutionCandidate, RelationshipRepository, SearchIndex, SearchQuery, SearchResult,
     StorageError, TransactionalWrite,
 };
 use rusqlite::{params, Connection, OptionalExtension};
@@ -74,6 +74,31 @@ impl SqliteStore {
                 created_at TEXT NOT NULL,
                 PRIMARY KEY (entity_id, version),
                 FOREIGN KEY (entity_id) REFERENCES entities(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS resolution_log (
+                id TEXT PRIMARY KEY,
+                source_id TEXT NOT NULL,
+                source_title TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                target_title TEXT NOT NULL,
+                strategy TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                timestamp TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                snapshot TEXT,  -- JSON snapshot of pre-merge state for undo
+                FOREIGN KEY (target_id) REFERENCES entities(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS resolution_candidates (
+                id TEXT PRIMARY KEY,
+                source_entity_id TEXT NOT NULL,
+                candidate_entity_id TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                strategy TEXT NOT NULL,
+                evaluated_at TEXT NOT NULL,
+                FOREIGN KEY (source_entity_id) REFERENCES entities(id),
+                FOREIGN KEY (candidate_entity_id) REFERENCES entities(id)
             );",
         )
         .map_err(|e| StorageError::Internal(e.to_string()))?;
@@ -806,17 +831,16 @@ impl TransactionalWrite for SqliteStore {
 
 #[async_trait]
 impl EntityResolver for SqliteStore {
-    async fn find_candidates(&self, entity: &Entity, title: &str) -> Result<Vec<ResolutionCandidate>, StorageError> {
+    async fn find_candidates(&self, entity: &Entity, title: &str, content: Option<&str>) -> Result<Vec<ResolutionCandidate>, StorageError> {
         let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        let title_json = serde_json::to_string(&title).unwrap();
+        // Get all active entities of the same type
         let entity_type_json = serde_json::to_string(&entity.entity_type).unwrap();
 
         let mut stmt = conn
             .prepare(&format!(
                 "SELECT {cols} FROM entities e
-                 JOIN components c ON c.entity_id = e.id
-                 WHERE c.component_type = ?1 AND c.data = ?2 AND e.entity_type = ?3 AND e.is_active = 1 AND e.id != ?4",
+                 WHERE e.entity_type = ?1 AND e.is_active = 1 AND e.id != ?2",
                 cols = ENTITY_COLS
                     .replacen("id,", "e.id,", 1)
                     .replacen("entity_type,", "e.entity_type,", 1)
@@ -827,24 +851,53 @@ impl EntityResolver for SqliteStore {
             ))
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        let rows = stmt.query_map(
-            params![
-                Self::component_type_str(&ComponentType::Title),
-                title_json,
-                entity_type_json,
-                entity.id.to_string()
-            ],
+        let entities: Vec<Entity> = stmt.query_map(
+            params![entity_type_json, entity.id.to_string()],
             Self::parse_entity,
-        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
 
-        let candidates: Vec<ResolutionCandidate> = rows
-            .filter_map(|r| r.ok())
-            .map(|e| ResolutionCandidate {
-                entity_id: e.id,
-                confidence: 1.0,
-                reason: "Exact match: title + entity type".to_string(),
-            })
-            .collect();
+        // Get titles for each entity
+        let mut title_stmt = conn
+            .prepare("SELECT c.data FROM components c WHERE c.entity_id = ?1 AND c.component_type = ?2")
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        // Get content for each entity (for ContentMatch strategy)
+        let mut content_stmt = conn
+            .prepare("SELECT c.data FROM components c WHERE c.entity_id = ?1 AND c.component_type = ?2")
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        let title_ct = Self::component_type_str(&ComponentType::Title);
+        let content_ct = Self::component_type_str(&ComponentType::Content);
+
+        let mut entity_data: Vec<(Entity, String, Option<String>)> = Vec::new();
+        for e in &entities {
+            let title_json: Result<String, _> = title_stmt.query_row(
+                params![e.id.to_string(), title_ct],
+                |row| row.get(0),
+            );
+
+            if let Ok(title_json) = title_json {
+                if let Ok(t) = serde_json::from_str::<String>(&title_json) {
+                    // Also fetch content for this entity
+                    let content_json: Result<String, _> = content_stmt.query_row(
+                        params![e.id.to_string(), content_ct],
+                        |row| row.get(0),
+                    );
+                    let c = content_json
+                        .ok()
+                        .and_then(|json| serde_json::from_str::<String>(&json).ok());
+
+                    entity_data.push((e.clone(), t, c));
+                }
+            }
+        }
+
+        // Use fuzzy resolver for candidate matching
+        let resolver = crate::fuzzy::FuzzyEntityResolver::new();
+        let candidates = resolver.find_candidates(entity, title, content, &entity_data);
 
         Ok(candidates)
     }
@@ -912,6 +965,230 @@ impl EntityResolver for SqliteStore {
             }
         }
     }
+
+    async fn log_merge(&self, entry: &MergeAuditEntry) -> Result<(), StorageError> {
+        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        conn.execute(
+            "INSERT INTO resolution_log (id, source_id, source_title, target_id, target_title, strategy, confidence, timestamp, reason, snapshot)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                entry.id.to_string(),
+                entry.source_id.to_string(),
+                entry.source_title,
+                entry.target_id.to_string(),
+                entry.target_title,
+                entry.strategy,
+                entry.confidence,
+                entry.timestamp.to_rfc3339(),
+                entry.reason,
+                entry.snapshot,
+            ],
+        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn undo_merge(&self, merge_id: Uuid) -> Result<(), StorageError> {
+        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        // Get the merge entry with snapshot
+        let entry = conn.query_row(
+            "SELECT source_id, target_id, snapshot FROM resolution_log WHERE id = ?1",
+            params![merge_id.to_string()],
+            |row| {
+                let source_id: String = row.get(0)?;
+                let target_id: String = row.get(1)?;
+                let snapshot: Option<String> = row.get(2)?;
+                Ok((
+                    Uuid::parse_str(&source_id).unwrap(),
+                    Uuid::parse_str(&target_id).unwrap(),
+                    snapshot,
+                ))
+            },
+        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        let (source_id, target_id, snapshot) = entry;
+
+        let snapshot_data: serde_json::Value = if let Some(snap) = &snapshot {
+            serde_json::from_str(snap).map_err(|e| StorageError::Internal(format!("Invalid snapshot: {}", e)))?
+        } else {
+            return Err(StorageError::Internal("No snapshot available for undo".to_string()));
+        };
+
+        conn.execute_batch("BEGIN IMMEDIATE")
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        let result = (|| -> Result<(), StorageError> {
+            // 1. Remove target's transferred components (they now point to source after merge)
+            conn.execute(
+                "DELETE FROM components WHERE entity_id = ?1",
+                params![target_id.to_string()],
+            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+
+            // 2. Restore target's original components from snapshot
+            if let Some(target_comps) = snapshot_data["target"]["components"].as_array() {
+                for comp in target_comps {
+                    let comp_id = comp["id"].as_str().unwrap_or("");
+                    let comp_type = comp["component_type"].as_str().unwrap_or("");
+                    let data = comp["data"].to_string();
+                    let created_at = comp["created_at"].as_str().unwrap_or("");
+                    let version = comp["version"].as_i64().unwrap_or(1);
+
+                    conn.execute(
+                        "INSERT OR REPLACE INTO components (id, entity_id, component_type, data, created_at, version) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                        params![comp_id, target_id.to_string(), comp_type, data, created_at, version],
+                    ).map_err(|e| StorageError::Internal(e.to_string()))?;
+                }
+            }
+
+            // 3. Restore target's original relationships from snapshot
+            // First remove any relationships pointing to/from target (from merge reassignment)
+            conn.execute(
+                "DELETE FROM relationships WHERE source_id = ?1 OR target_id = ?1",
+                params![target_id.to_string()],
+            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+
+            if let Some(target_rels) = snapshot_data["target"]["relationships"].as_array() {
+                for rel in target_rels {
+                    let rel_id = rel["id"].as_str().unwrap_or("");
+                    let target_ref = rel["target_id"].as_str().unwrap_or("");
+                    let rel_type = rel["relationship_type"].as_str().unwrap_or("");
+                    let is_active = rel["is_active"].as_bool().unwrap_or(true);
+                    let created_at = rel["created_at"].as_str().unwrap_or("");
+
+                    conn.execute(
+                        "INSERT OR REPLACE INTO relationships (id, source_id, target_id, relationship_type, is_active, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                        params![rel_id, target_id.to_string(), target_ref, rel_type, is_active as i32, created_at],
+                    ).map_err(|e| StorageError::Internal(e.to_string()))?;
+                }
+            }
+
+            // 4. Recreate source entity row from snapshot
+            let source = &snapshot_data["source"];
+            let entity_type = source["entity_type"].as_str().unwrap_or("Article");
+            let is_active = source["is_active"].as_bool().unwrap_or(true);
+            let created_at = source["created_at"].as_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+            let updated_at = source["updated_at"].as_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+            let version = source["version"].as_i64().unwrap_or(1);
+
+            conn.execute(
+                "INSERT OR REPLACE INTO entities (id, entity_type, is_active, created_at, updated_at, version) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![source_id.to_string(), entity_type, is_active as i32, created_at, updated_at, version],
+            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+
+            // 5. Recreate source components from snapshot
+            if let Some(source_comps) = source["components"].as_array() {
+                for comp in source_comps {
+                    let comp_id = comp["id"].as_str().unwrap_or("");
+                    let comp_type = comp["component_type"].as_str().unwrap_or("");
+                    let data = comp["data"].to_string();
+                    let created_at = comp["created_at"].as_str().unwrap_or("");
+                    let version = comp["version"].as_i64().unwrap_or(1);
+
+                    conn.execute(
+                        "INSERT OR REPLACE INTO components (id, entity_id, component_type, data, created_at, version) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                        params![comp_id, source_id.to_string(), comp_type, data, created_at, version],
+                    ).map_err(|e| StorageError::Internal(e.to_string()))?;
+                }
+            }
+
+            // 6. Remove the merge entry
+            conn.execute(
+                "DELETE FROM resolution_log WHERE id = ?1",
+                params![merge_id.to_string()],
+            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                conn.execute_batch("COMMIT")
+                    .map_err(|e| StorageError::Internal(e.to_string()))?;
+                Ok(())
+            }
+            Err(e) => {
+                conn.execute_batch("ROLLBACK")
+                    .map_err(|_| StorageError::Internal("rollback failed".to_string()))?;
+                Err(e)
+            }
+        }
+    }
+
+    async fn get_merge_history(&self, entity_id: Uuid) -> Result<Vec<MergeAuditEntry>, StorageError> {
+        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, source_id, source_title, target_id, target_title, strategy, confidence, timestamp, reason, snapshot
+                 FROM resolution_log WHERE source_id = ?1 OR target_id = ?1 ORDER BY timestamp DESC"
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        let entries = stmt.query_map(params![entity_id.to_string()], |row| {
+            Ok(MergeAuditEntry {
+                id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
+                source_id: Uuid::parse_str(&row.get::<_, String>(1)?).unwrap(),
+                source_title: row.get(2)?,
+                target_id: Uuid::parse_str(&row.get::<_, String>(3)?).unwrap(),
+                target_title: row.get(4)?,
+                strategy: row.get(5)?,
+                confidence: row.get(6)?,
+                timestamp: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(7)?)
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                reason: row.get(8)?,
+                snapshot: row.get(9)?,
+            })
+        })
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        let entries: Vec<MergeAuditEntry> = entries
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(entries)
+    }
+
+    async fn get_all_merge_history(&self) -> Result<Vec<MergeAuditEntry>, StorageError> {
+        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, source_id, source_title, target_id, target_title, strategy, confidence, timestamp, reason, snapshot
+                 FROM resolution_log ORDER BY timestamp DESC"
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        let entries = stmt.query_map([], |row| {
+            Ok(MergeAuditEntry {
+                id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
+                source_id: Uuid::parse_str(&row.get::<_, String>(1)?).unwrap(),
+                source_title: row.get(2)?,
+                target_id: Uuid::parse_str(&row.get::<_, String>(3)?).unwrap(),
+                target_title: row.get(4)?,
+                strategy: row.get(5)?,
+                confidence: row.get(6)?,
+                timestamp: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(7)?)
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                reason: row.get(8)?,
+                snapshot: row.get(9)?,
+            })
+        })
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        let entries: Vec<MergeAuditEntry> = entries
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(entries)
+    }
 }
 
 #[cfg(test)]
@@ -929,12 +1206,12 @@ mod tests {
     #[tokio::test]
     async fn test_entity_crud() {
         let store = test_store();
-        let mut entity = Entity::new(EntityType::Article);
+        let mut entity = Entity::new(EntityType::new("Article"));
 
         EntityRepository::save(&store, &entity).await.unwrap();
         let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
         assert_eq!(loaded.id, entity.id);
-        assert_eq!(loaded.entity_type, EntityType::Article);
+        assert_eq!(loaded.entity_type, EntityType::new("Article"));
         assert!(loaded.is_active);
 
         entity.touch();
@@ -956,7 +1233,7 @@ mod tests {
     #[tokio::test]
     async fn test_component_crud() {
         let store = test_store();
-        let entity = Entity::new(EntityType::Note);
+        let entity = Entity::new(EntityType::new("Note"));
         EntityRepository::save(&store, &entity).await.unwrap();
 
         let component = Component::new(entity.id, ComponentType::Title, serde_json::json!("Test Title"));
@@ -982,8 +1259,8 @@ mod tests {
     #[tokio::test]
     async fn test_relationship_crud() {
         let store = test_store();
-        let entity1 = Entity::new(EntityType::Article);
-        let entity2 = Entity::new(EntityType::Concept);
+        let entity1 = Entity::new(EntityType::new("Article"));
+        let entity2 = Entity::new(EntityType::new("Concept"));
         EntityRepository::save(&store, &entity1).await.unwrap();
         EntityRepository::save(&store, &entity2).await.unwrap();
 
@@ -1010,7 +1287,7 @@ mod tests {
     #[tokio::test]
     async fn test_search_index() {
         let store = test_store();
-        let entity = Entity::new(EntityType::Article);
+        let entity = Entity::new(EntityType::new("Article"));
         let entity_id = entity.id;
 
         let components = vec![
@@ -1048,7 +1325,7 @@ mod tests {
     #[tokio::test]
     async fn test_search_rebuild() {
         let store = test_store();
-        let entity = Entity::new(EntityType::Article);
+        let entity = Entity::new(EntityType::new("Article"));
 
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!("Test Title")),
@@ -1077,7 +1354,7 @@ mod tests {
     #[tokio::test]
     async fn test_event_log() {
         let store = test_store();
-        let entity = Entity::new(EntityType::Article);
+        let entity = Entity::new(EntityType::new("Article"));
 
         let event = Event {
             id: Uuid::new_v4(),
@@ -1097,7 +1374,7 @@ mod tests {
     #[tokio::test]
     async fn test_increment_version() {
         let store = test_store();
-        let entity = Entity::new(EntityType::Article);
+        let entity = Entity::new(EntityType::new("Article"));
         EntityRepository::save(&store, &entity).await.unwrap();
 
         EntityRepository::increment_version(&store, entity.id).await.unwrap();
@@ -1117,7 +1394,7 @@ mod tests {
     #[tokio::test]
     async fn test_find_by_component_type() {
         let store = test_store();
-        let entity = Entity::new(EntityType::Article);
+        let entity = Entity::new(EntityType::new("Article"));
         EntityRepository::save(&store, &entity).await.unwrap();
 
         let comp = Component::new(entity.id, ComponentType::Timeline, serde_json::json!({"created_at": "2026-01-01"}));
@@ -1134,7 +1411,7 @@ mod tests {
     #[tokio::test]
     async fn test_find_by_tag() {
         let store = test_store();
-        let entity = Entity::new(EntityType::Article);
+        let entity = Entity::new(EntityType::new("Article"));
         EntityRepository::save(&store, &entity).await.unwrap();
 
         let comp = Component::new(entity.id, ComponentType::Tags, serde_json::json!(["rust", "testing"]));
@@ -1150,8 +1427,8 @@ mod tests {
     #[tokio::test]
     async fn test_relationship_update() {
         let store = test_store();
-        let entity1 = Entity::new(EntityType::Article);
-        let entity2 = Entity::new(EntityType::Concept);
+        let entity1 = Entity::new(EntityType::new("Article"));
+        let entity2 = Entity::new(EntityType::new("Concept"));
         EntityRepository::save(&store, &entity1).await.unwrap();
         EntityRepository::save(&store, &entity2).await.unwrap();
 
@@ -1168,7 +1445,7 @@ mod tests {
     #[tokio::test]
     async fn test_transactional_write() {
         let store = test_store();
-        let entity = Entity::new(EntityType::Article);
+        let entity = Entity::new(EntityType::new("Article"));
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!("Transactional Test")),
             Component::new(entity.id, ComponentType::Content, serde_json::json!("Body")),

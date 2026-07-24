@@ -3,6 +3,7 @@ use knowledge_core::features::entity::{Entity, EntityType};
 use knowledge_core::features::relationship::{Relationship, RelationshipType};
 use knowledge_core::ports::*;
 use knowledge_storage::adapters::sqlite::SqliteStore;
+use uuid::Uuid;
 
 fn test_store() -> SqliteStore {
     SqliteStore::new(":memory:").unwrap()
@@ -13,7 +14,7 @@ async fn test_entity_full_lifecycle() {
     let store = test_store();
 
     // Create
-    let mut entity = Entity::new(EntityType::Article);
+    let mut entity = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &entity).await.unwrap();
 
     // Read
@@ -53,7 +54,7 @@ async fn test_entity_full_lifecycle() {
 #[tokio::test]
 async fn test_component_lifecycle_with_version_tracking() {
     let store = test_store();
-    let entity = Entity::new(EntityType::Note);
+    let entity = Entity::new(EntityType::new("Note"));
     EntityRepository::save(&store, &entity).await.unwrap();
 
     // Create component
@@ -81,9 +82,9 @@ async fn test_component_lifecycle_with_version_tracking() {
 #[tokio::test]
 async fn test_relationship_1hop_traversal() {
     let store = test_store();
-    let a = Entity::new(EntityType::Article);
-    let b = Entity::new(EntityType::Concept);
-    let c = Entity::new(EntityType::Person);
+    let a = Entity::new(EntityType::new("Article"));
+    let b = Entity::new(EntityType::new("Concept"));
+    let c = Entity::new(EntityType::new("Person"));
     EntityRepository::save(&store, &a).await.unwrap();
     EntityRepository::save(&store, &b).await.unwrap();
     EntityRepository::save(&store, &c).await.unwrap();
@@ -114,8 +115,8 @@ async fn test_relationship_1hop_traversal() {
 #[tokio::test]
 async fn test_search_with_type_and_tag_filtering() {
     let store = test_store();
-    let article = Entity::new(EntityType::Article);
-    let concept = Entity::new(EntityType::Concept);
+    let article = Entity::new(EntityType::new("Article"));
+    let concept = Entity::new(EntityType::new("Concept"));
 
     let article_comps = vec![
         Component::new(article.id, ComponentType::Title, serde_json::json!("Rust Programming")),
@@ -161,7 +162,7 @@ async fn test_search_with_type_and_tag_filtering() {
 #[tokio::test]
 async fn test_search_snippets() {
     let store = test_store();
-    let entity = Entity::new(EntityType::Article);
+    let entity = Entity::new(EntityType::new("Article"));
     let comps = vec![
         Component::new(entity.id, ComponentType::Title, serde_json::json!("Transformer Architecture")),
         Component::new(entity.id, ComponentType::Content, serde_json::json!("The transformer model uses self-attention mechanisms for sequence processing")),
@@ -183,7 +184,7 @@ async fn test_search_snippets() {
 #[tokio::test]
 async fn test_search_rebuild() {
     let store = test_store();
-    let entity = Entity::new(EntityType::Article);
+    let entity = Entity::new(EntityType::new("Article"));
     let comps = vec![
         Component::new(entity.id, ComponentType::Title, serde_json::json!("Test")),
         Component::new(entity.id, ComponentType::Content, serde_json::json!("Content")),
@@ -213,7 +214,7 @@ async fn test_search_rebuild() {
 #[tokio::test]
 async fn test_event_log_full() {
     let store = test_store();
-    let entity = Entity::new(EntityType::Article);
+    let entity = Entity::new(EntityType::new("Article"));
 
     let e1 = Event {
         id: uuid::Uuid::new_v4(),
@@ -242,7 +243,7 @@ async fn test_event_log_full() {
 #[tokio::test]
 async fn test_version_history_tracking() {
     let store = test_store();
-    let entity = Entity::new(EntityType::Article);
+    let entity = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &entity).await.unwrap();
 
     EntityRepository::increment_version(&store, entity.id).await.unwrap();
@@ -257,7 +258,7 @@ async fn test_version_history_tracking() {
 #[tokio::test]
 async fn test_transactional_write_entity_and_components() {
     let store = test_store();
-    let entity = Entity::new(EntityType::Article);
+    let entity = Entity::new(EntityType::new("Article"));
     let components = vec![
         Component::new(entity.id, ComponentType::Title, serde_json::json!("Title")),
         Component::new(entity.id, ComponentType::Content, serde_json::json!("Body")),
@@ -286,7 +287,7 @@ async fn test_transactional_write_entity_and_components() {
 #[tokio::test]
 async fn test_update_entity_with_components_replaces_all() {
     let store = test_store();
-    let entity = Entity::new(EntityType::Article);
+    let entity = Entity::new(EntityType::new("Article"));
     let components = vec![
         Component::new(entity.id, ComponentType::Title, serde_json::json!("Original Title")),
         Component::new(entity.id, ComponentType::Content, serde_json::json!("Original Body")),
@@ -336,13 +337,13 @@ async fn test_update_entity_with_components_replaces_all() {
 async fn test_entity_resolver_exact_match() {
     let store = test_store();
 
-    let existing = Entity::new(EntityType::Article);
+    let existing = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &existing).await.unwrap();
     let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Test Document"));
     ComponentRepository::save(&store, &title_comp).await.unwrap();
 
-    let candidate = Entity::new(EntityType::Article);
-    let candidates = EntityResolver::find_candidates(&store, &candidate, "Test Document").await.unwrap();
+    let candidate = Entity::new(EntityType::new("Article"));
+    let candidates = EntityResolver::find_candidates(&store, &candidate, "Test Document", None).await.unwrap();
     assert_eq!(candidates.len(), 1);
     assert_eq!(candidates[0].entity_id, existing.id);
     assert_eq!(candidates[0].confidence, 1.0);
@@ -352,13 +353,13 @@ async fn test_entity_resolver_exact_match() {
 async fn test_entity_resolver_no_match_different_type() {
     let store = test_store();
 
-    let existing = Entity::new(EntityType::Article);
+    let existing = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &existing).await.unwrap();
     let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Test Document"));
     ComponentRepository::save(&store, &title_comp).await.unwrap();
 
-    let candidate = Entity::new(EntityType::Concept);
-    let candidates = EntityResolver::find_candidates(&store, &candidate, "Test Document").await.unwrap();
+    let candidate = Entity::new(EntityType::new("Concept"));
+    let candidates = EntityResolver::find_candidates(&store, &candidate, "Test Document", None).await.unwrap();
     assert!(candidates.is_empty());
 }
 
@@ -366,13 +367,13 @@ async fn test_entity_resolver_no_match_different_type() {
 async fn test_entity_resolver_no_match_different_title() {
     let store = test_store();
 
-    let existing = Entity::new(EntityType::Article);
+    let existing = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &existing).await.unwrap();
     let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Existing Document"));
     ComponentRepository::save(&store, &title_comp).await.unwrap();
 
-    let candidate = Entity::new(EntityType::Article);
-    let candidates = EntityResolver::find_candidates(&store, &candidate, "Different Title").await.unwrap();
+    let candidate = Entity::new(EntityType::new("Article"));
+    let candidates = EntityResolver::find_candidates(&store, &candidate, "Different Title", None).await.unwrap();
     assert!(candidates.is_empty());
 }
 
@@ -380,8 +381,8 @@ async fn test_entity_resolver_no_match_different_title() {
 async fn test_entity_resolver_merge() {
     let store = test_store();
 
-    let canonical = Entity::new(EntityType::Article);
-    let duplicate = Entity::new(EntityType::Article);
+    let canonical = Entity::new(EntityType::new("Article"));
+    let duplicate = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &canonical).await.unwrap();
     EntityRepository::save(&store, &duplicate).await.unwrap();
 
@@ -406,7 +407,7 @@ async fn test_entity_resolver_merge() {
 #[tokio::test]
 async fn test_find_by_component_data() {
     let store = test_store();
-    let entity = Entity::new(EntityType::Article);
+    let entity = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &entity).await.unwrap();
 
     let prov = Component::new(
@@ -425,9 +426,46 @@ async fn test_find_by_component_data() {
 }
 
 #[tokio::test]
+async fn test_entity_resolver_normalized_match() {
+    let store = test_store();
+
+    // Store with title "Hello World"
+    let existing = Entity::new(EntityType::new("Article"));
+    EntityRepository::save(&store, &existing).await.unwrap();
+    let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Hello World"));
+    ComponentRepository::save(&store, &title_comp).await.unwrap();
+
+    // Query with lowercase version - should match via normalized strategy
+    let candidate = Entity::new(EntityType::new("Article"));
+    let candidates = EntityResolver::find_candidates(&store, &candidate, "hello world", None).await.unwrap();
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(candidates[0].entity_id, existing.id);
+    assert_eq!(candidates[0].confidence, 0.95);
+}
+
+#[tokio::test]
+async fn test_entity_resolver_fuzzy_match() {
+    let store = test_store();
+
+    // Store "Attention Is All You Need"
+    let existing = Entity::new(EntityType::new("Article"));
+    EntityRepository::save(&store, &existing).await.unwrap();
+    let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Attention Is All You Need"));
+    ComponentRepository::save(&store, &title_comp).await.unwrap();
+
+    // Query with variant that differs slightly - should match via fuzzy strategy
+    let candidate = Entity::new(EntityType::new("Article"));
+    let candidates = EntityResolver::find_candidates(&store, &candidate, "Attention Is All You Need (2017)", None).await.unwrap();
+
+    assert!(!candidates.is_empty());
+    assert!(candidates[0].confidence > 0.95);
+    assert!(candidates[0].confidence < 1.0);
+}
+
+#[tokio::test]
 async fn test_delete_by_entity() {
     let store = test_store();
-    let entity = Entity::new(EntityType::Article);
+    let entity = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &entity).await.unwrap();
 
     ComponentRepository::save(&store, &Component::new(entity.id, ComponentType::Title, serde_json::json!("t"))).await.unwrap();
@@ -440,4 +478,116 @@ async fn test_delete_by_entity() {
 
     let comps = ComponentRepository::get(&store, entity.id).await.unwrap();
     assert!(comps.is_empty());
+}
+
+#[tokio::test]
+async fn test_merge_audit_log_and_undo() {
+    let store = test_store();
+
+    // Create two entities
+    let canonical = Entity::new(EntityType::new("Article"));
+    let duplicate = Entity::new(EntityType::new("Article"));
+    EntityRepository::save(&store, &canonical).await.unwrap();
+    EntityRepository::save(&store, &duplicate).await.unwrap();
+
+    // Add components to duplicate
+    let comp = Component::new(duplicate.id, ComponentType::Content, serde_json::json!("data"));
+    ComponentRepository::save(&store, &comp).await.unwrap();
+
+    // Log the merge
+    let entry = MergeAuditEntry {
+        id: Uuid::new_v4(),
+        source_id: duplicate.id,
+        source_title: "Duplicate Doc".to_string(),
+        target_id: canonical.id,
+        target_title: "Canonical Doc".to_string(),
+        strategy: "fuzzy".to_string(),
+        confidence: 0.92,
+        timestamp: chrono::Utc::now(),
+        reason: "Jaro-Winkler similarity >= 0.85".to_string(),
+        snapshot: Some(serde_json::json!({
+            "entity_type": duplicate.entity_type.as_str(),
+            "is_active": duplicate.is_active,
+            "created_at": duplicate.created_at.to_rfc3339(),
+            "updated_at": duplicate.updated_at.to_rfc3339(),
+            "version": duplicate.version,
+        }).to_string()),
+    };
+    EntityResolver::log_merge(&store, &entry).await.unwrap();
+
+    // Verify merge history
+    let history = EntityResolver::get_merge_history(&store, canonical.id).await.unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].id, entry.id);
+    assert_eq!(history[0].confidence, 0.92);
+
+    // Undo the merge
+    EntityResolver::undo_merge(&store, entry.id).await.unwrap();
+
+    // Verify merge entry removed
+    let history = EntityResolver::get_merge_history(&store, canonical.id).await.unwrap();
+    assert!(history.is_empty());
+}
+
+#[tokio::test]
+async fn test_merge_history_by_source_and_target() {
+    let store = test_store();
+
+    let entity_a = Entity::new(EntityType::new("Article"));
+    let entity_b = Entity::new(EntityType::new("Article"));
+    let entity_c = Entity::new(EntityType::new("Article"));
+    EntityRepository::save(&store, &entity_a).await.unwrap();
+    EntityRepository::save(&store, &entity_b).await.unwrap();
+    EntityRepository::save(&store, &entity_c).await.unwrap();
+
+    // A merged into B
+    let entry1 = MergeAuditEntry {
+        id: Uuid::new_v4(),
+        source_id: entity_a.id,
+        source_title: "A".to_string(),
+        target_id: entity_b.id,
+        target_title: "B".to_string(),
+        strategy: "exact".to_string(),
+        confidence: 1.0,
+        timestamp: chrono::Utc::now(),
+        reason: "Exact match".to_string(),
+        snapshot: Some(serde_json::json!({
+            "entity_type": entity_a.entity_type.as_str(),
+            "is_active": entity_a.is_active,
+            "created_at": entity_a.created_at.to_rfc3339(),
+            "updated_at": entity_a.updated_at.to_rfc3339(),
+            "version": entity_a.version,
+        }).to_string()),
+    };
+    EntityResolver::log_merge(&store, &entry1).await.unwrap();
+
+    // C merged into B
+    let entry2 = MergeAuditEntry {
+        id: Uuid::new_v4(),
+        source_id: entity_c.id,
+        source_title: "C".to_string(),
+        target_id: entity_b.id,
+        target_title: "B".to_string(),
+        strategy: "normalized".to_string(),
+        confidence: 0.95,
+        timestamp: chrono::Utc::now(),
+        reason: "Normalized match".to_string(),
+        snapshot: Some(serde_json::json!({
+            "entity_type": entity_c.entity_type.as_str(),
+            "is_active": entity_c.is_active,
+            "created_at": entity_c.created_at.to_rfc3339(),
+            "updated_at": entity_c.updated_at.to_rfc3339(),
+            "version": entity_c.version,
+        }).to_string()),
+    };
+    EntityResolver::log_merge(&store, &entry2).await.unwrap();
+
+    // Query by target (B) should find both
+    let history = EntityResolver::get_merge_history(&store, entity_b.id).await.unwrap();
+    assert_eq!(history.len(), 2);
+
+    // Query by source (A) should find one
+    let history = EntityResolver::get_merge_history(&store, entity_a.id).await.unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].source_id, entity_a.id);
 }

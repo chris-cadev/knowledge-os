@@ -13,6 +13,7 @@ thiserror = "2"
 async-trait = "0.1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+strsim = "0.11"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }

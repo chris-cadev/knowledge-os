@@ -7,6 +7,7 @@ pub enum ComponentType {
     Title,
     Description,
     Content,
+    BinaryContent,
     Tags,
     Author,
     Embedding,

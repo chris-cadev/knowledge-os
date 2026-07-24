@@ -1,6 +1,6 @@
 use knowledge_core::features::component::ComponentType;
 use knowledge_core::features::entity::EntityType;
-use knowledge_import::features::importer::Importer;
+use knowledge_import::features::importer::MarkdownImporter;
 use std::path::Path;
 
 #[test]
@@ -18,10 +18,10 @@ language: "en"
 
 This paper explores transformer architectures."#;
 
-    let importer = Importer::new();
+    let importer = MarkdownImporter::new();
     let result = importer.import_content(content, Path::new("paper.md")).unwrap();
 
-    assert_eq!(result.entity.entity_type, EntityType::Article);
+    assert_eq!(result.entity.entity_type, EntityType::new("Article"));
 
     let title = result.components.iter()
         .find(|c| c.component_type == ComponentType::Title)
@@ -58,7 +58,7 @@ fn test_import_without_frontmatter_uses_h1() {
 
 Some body content here."#;
 
-    let importer = Importer::new();
+    let importer = MarkdownImporter::new();
     let result = importer.import_content(content, Path::new("test.md")).unwrap();
 
     let title = result.components.iter()
@@ -81,7 +81,7 @@ Some body content here."#;
 fn test_import_without_frontmatter_or_heading_uses_filename() {
     let content = "Just some plain content.";
 
-    let importer = Importer::new();
+    let importer = MarkdownImporter::new();
     let result = importer.import_content(content, Path::new("my-article.md")).unwrap();
 
     let title = result.components.iter()
@@ -96,25 +96,37 @@ fn test_cross_references_extracted_from_markdown() {
 
 See [other file](other.md) and [another](docs/another.md)."#;
 
-    let importer = Importer::new();
+    let importer = MarkdownImporter::new();
     let result = importer.import_content(content, Path::new("test.md")).unwrap();
 
     assert_eq!(result.cross_references.len(), 2);
-    assert!(result.cross_references[0].target_path.to_string_lossy().contains("other.md"));
-    assert!(result.cross_references[1].target_path.to_string_lossy().contains("another.md"));
+    assert!(result.cross_references[0]
+        .as_file_ref()
+        .unwrap()
+        .0
+        .to_string_lossy()
+        .contains("other.md"));
+    assert!(result.cross_references[1]
+        .as_file_ref()
+        .unwrap()
+        .0
+        .to_string_lossy()
+        .contains("another.md"));
 }
 
 #[test]
-fn test_cross_references_only_extract_md_links() {
+fn test_cross_references_extract_md_and_url_links() {
     let content = r#"# Document
 
 See [website](https://example.com) and [file](other.md)."#;
 
-    let importer = Importer::new();
+    let importer = MarkdownImporter::new();
     let result = importer.import_content(content, Path::new("test.md")).unwrap();
 
-    assert_eq!(result.cross_references.len(), 1);
-    assert!(result.cross_references[0].target_path.to_string_lossy().contains("other.md"));
+    // Should extract both URL reference and .md file reference
+    assert_eq!(result.cross_references.len(), 2);
+    assert!(result.cross_references[0].as_url_ref().is_some());
+    assert!(result.cross_references[1].as_file_ref().is_some());
 }
 
 #[test]
@@ -134,7 +146,7 @@ Some **bold** and *italic* text.
 fn main() {}
 ```"#;
 
-    let importer = Importer::new();
+    let importer = MarkdownImporter::new();
     let result = importer.import_content(content, Path::new("test.md")).unwrap();
 
     let content_comp = result.components.iter()
@@ -159,7 +171,7 @@ language: "fr"
 
 Body content."#;
 
-    let importer = Importer::new();
+    let importer = MarkdownImporter::new();
     let result = importer.import_content(content, Path::new("test.md")).unwrap();
 
     let expected_types = vec![

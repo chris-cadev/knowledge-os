@@ -39,7 +39,7 @@ async fn create_entity(
     State(state): State<AppState>,
     Json(_payload): Json<serde_json::Value>,
 ) -> Json<Entity> {
-    let entity = Entity::new(EntityType::Note);
+    let entity = Entity::new(EntityType::new("Note"));
     state.store.save(&entity).await.unwrap();
     Json(entity)
 }

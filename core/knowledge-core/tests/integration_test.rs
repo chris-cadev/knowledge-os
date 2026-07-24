@@ -6,26 +6,26 @@ use knowledge_core::ports::*;
 #[test]
 fn test_entity_types_cover_all_variants() {
     let types = vec![
-        EntityType::Concept,
-        EntityType::Person,
-        EntityType::Organization,
-        EntityType::Project,
-        EntityType::Book,
-        EntityType::Paper,
-        EntityType::Video,
-        EntityType::Article,
-        EntityType::Tool,
-        EntityType::Technology,
-        EntityType::Question,
-        EntityType::Idea,
-        EntityType::Event,
-        EntityType::Skill,
-        EntityType::Location,
-        EntityType::Dataset,
-        EntityType::Collection,
-        EntityType::Workspace,
-        EntityType::Decision,
-        EntityType::Note,
+        EntityType::new("Concept"),
+        EntityType::new("Person"),
+        EntityType::new("Organization"),
+        EntityType::new("Project"),
+        EntityType::new("Book"),
+        EntityType::new("Paper"),
+        EntityType::new("Video"),
+        EntityType::new("Article"),
+        EntityType::new("Tool"),
+        EntityType::new("Technology"),
+        EntityType::new("Question"),
+        EntityType::new("Idea"),
+        EntityType::new("Event"),
+        EntityType::new("Skill"),
+        EntityType::new("Location"),
+        EntityType::new("Dataset"),
+        EntityType::new("Collection"),
+        EntityType::new("Workspace"),
+        EntityType::new("Decision"),
+        EntityType::new("Note"),
     ];
     assert_eq!(types.len(), 20);
 }
@@ -49,7 +49,7 @@ fn test_component_types_cover_all_variants() {
 
 #[test]
 fn test_entity_serialization_roundtrip() {
-    let entity = Entity::new(EntityType::Article);
+    let entity = Entity::new(EntityType::new("Article"));
     let json = serde_json::to_string(&entity).unwrap();
     let deserialized: Entity = serde_json::from_str(&json).unwrap();
     assert_eq!(entity.id, deserialized.id);

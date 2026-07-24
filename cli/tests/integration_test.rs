@@ -74,7 +74,7 @@ fn test_idempotent_reimport_updates_version() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stdout.contains("Updated: 1"), "Expected 'Updated: 1', got stdout: {}", stdout);
+    assert!(stdout.contains("Duplicates resolved: 1"), "Expected 'Duplicates resolved: 1', got stdout: {}", stdout);
     assert!(!stderr.contains("ERROR"), "Expected no errors, got stderr: {}", stderr);
 }
 
