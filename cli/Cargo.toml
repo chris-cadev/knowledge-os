@@ -18,6 +18,12 @@ serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 indicatif = "0.17"
 
+[[test]]
+name = "cucumber"
+harness = false
+
 [dev-dependencies]
 assert_cmd = "2"
 tempfile = "3"
+cucumber = "0.23"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

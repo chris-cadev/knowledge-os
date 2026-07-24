@@ -16,6 +16,10 @@ run = "cargo build"
 description = "Run all Rust tests"
 run = "cargo test"
 
+[tasks.test-bdd]
+description = "Run BDD cucumber tests for the kos CLI"
+run = "cargo test --test cucumber -p knowledge-cli"
+
 [tasks.lint]
 description = "Lint all Rust code (clippy + fmt check)"
 run = "cargo clippy -- -D warnings && cargo fmt --check"
