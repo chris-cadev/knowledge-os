@@ -187,6 +187,12 @@ impl Agent for MyCustomAgent {
 
 ### Agent Testing
 
+Agent behavior is verified through three test layers:
+
+1. **Unit tests** validate agent logic in isolation.
+2. **BDD tests** exercise the CLI end-to-end, verifying that agent-related commands produce expected output. Run with `cargo test --test cucumber -p knowledge-cli`.
+3. **Integration tests** verify agent interactions with the knowledge graph.
+
 ```rust
 #[tokio::test]
 async fn test_my_agent() {

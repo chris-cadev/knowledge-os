@@ -12,6 +12,7 @@ How-to guides, tutorials, and AI agent workflows. These documents are task-orien
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | [plugin-development.md](plugin-development.md)   | How to build plugins -- plugin types, manifest format, development workflow, testing, and distribution |
 | [ai-agent-guidelines.md](ai-agent-guidelines.md) | How AI agents work -- agent principles, agent types, context construction rules, and safety boundaries |
+| [bdd-testing.md](bdd-testing.md)                 | How to write and maintain BDD tests -- step definitions, feature file conventions, debugging failures  |
 
 ## Tutorials
 
@@ -26,4 +27,4 @@ Step-by-step learning experiences. Each tutorial walks through a complete workfl
 
 ## Reading Order
 
-New plugin developers should start with [plugin-development.md](plugin-development.md), then follow [tutorials/build-custom-importer.md](tutorials/build-custom-importer.md) for a hands-on walkthrough. AI integration begins with [ai-agent-guidelines.md](ai-agent-guidelines.md). The first-import tutorial is the quickest way to see the system in action.
+New plugin developers should start with [plugin-development.md](plugin-development.md), then follow [tutorials/build-custom-importer.md](tutorials/build-custom-importer.md) for a hands-on walkthrough. AI integration begins with [ai-agent-guidelines.md](ai-agent-guidelines.md). BDD testing is covered in [bdd-testing.md](bdd-testing.md). The first-import tutorial is the quickest way to see the system in action.

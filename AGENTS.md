@@ -6,10 +6,10 @@ Instructions for AI coding agents working on Knowledge OS.
 
 ## Project Overview
 
-Knowledge OS is a deterministic knowledge engine. It is documentation-first -- no source code exists yet. The entire architectural foundation is written before implementation begins.
+Knowledge OS is a deterministic knowledge engine. Architecture and documentation were written before implementation. Source code now exists and is actively developed.
 
-**Primary language:** Rust (planned, not started)
-**Current phase:** Documentation and architecture design
+**Primary language:** Rust
+**Current phase:** Implementation (CLI, core, storage, import)
 
 ---
 
@@ -62,9 +62,11 @@ docs/
     infrastructure-handbook.md Provisioning, scaling, monitoring, CI/CD
     prds/                     Product Requirements Documents
       prd-0001-core-entity-model.md Core entity model and markdown import pipeline
+      prd-0002-rich-import-and-resolution.md Rich import and resolution
   guides/                     How-to guides
     plugin-development.md     How to build plugins
     ai-agent-guidelines.md    How AI agents work
+    bdd-testing.md            How to write and maintain BDD tests
     tutorials/
       first-import.md         Step-by-step: importing your first document
       build-custom-importer.md Step-by-step: building a custom importer plugin
@@ -117,12 +119,12 @@ CHANGELOG.md           Release history
 
 ## Verification
 
-Before committing documentation changes:
+Before committing changes:
 
-1. Verify all internal links resolve (`grep -r '\](docs/' --include='*.md'`)
-2. Verify no broken cross-references
-3. Verify file naming follows `kebab-case.md`
-4. Verify no speculative or opinionated language
+1. Run all tests: `cargo test` (or `mise run test`)
+2. Run BDD tests: `cargo test --test cucumber -p knowledge-cli` (or `mise run test-bdd`)
+3. Lint: `cargo clippy -- -D warnings && cargo fmt --check` (or `mise run lint`)
+4. For documentation: verify all internal links resolve, no broken cross-references, file naming follows `kebab-case.md`, no speculative or opinionated language
 
 ---
 

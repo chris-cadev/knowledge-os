@@ -187,6 +187,8 @@ graph TD
 
 - `cargo test` -- All tests must pass.
 - `cargo test --test integration` -- Integration tests must pass.
+- `cargo test --test cucumber -p knowledge-cli` -- BDD scenarios must pass.
+- `mise run test-bdd` -- Same, via mise.
 - Coverage target: > 90% for unit tests.
 
 ### Building
