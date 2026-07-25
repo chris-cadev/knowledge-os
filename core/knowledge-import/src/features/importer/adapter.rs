@@ -18,19 +18,14 @@ pub enum CrossReference {
         link_text: String,
     },
     /// URL link: [text](https://...)
-    UrlRef {
-        url: String,
-        link_text: String,
-    },
+    UrlRef { url: String, link_text: String },
     /// Wikilink: [[name]]
     WikilinkRef {
         target_name: String,
         link_text: String,
     },
     /// @mention: @name
-    MentionRef {
-        target_name: String,
-    },
+    MentionRef { target_name: String },
     /// Section anchor: path#section
     SectionRef {
         target_path: PathBuf,
@@ -42,7 +37,10 @@ pub enum CrossReference {
 impl CrossReference {
     pub fn as_file_ref(&self) -> Option<(&PathBuf, &str)> {
         match self {
-            CrossReference::FileRef { target_path, link_text } => Some((target_path, link_text)),
+            CrossReference::FileRef {
+                target_path,
+                link_text,
+            } => Some((target_path, link_text)),
             _ => None,
         }
     }
@@ -56,7 +54,10 @@ impl CrossReference {
 
     pub fn as_wikilink_ref(&self) -> Option<(&str, &str)> {
         match self {
-            CrossReference::WikilinkRef { target_name, link_text } => Some((target_name, link_text)),
+            CrossReference::WikilinkRef {
+                target_name,
+                link_text,
+            } => Some((target_name, link_text)),
             _ => None,
         }
     }
@@ -70,9 +71,11 @@ impl CrossReference {
 
     pub fn as_section_ref(&self) -> Option<(&PathBuf, &str, &str)> {
         match self {
-            CrossReference::SectionRef { target_path, section, link_text } => {
-                Some((target_path, section, link_text))
-            }
+            CrossReference::SectionRef {
+                target_path,
+                section,
+                link_text,
+            } => Some((target_path, section, link_text)),
             _ => None,
         }
     }

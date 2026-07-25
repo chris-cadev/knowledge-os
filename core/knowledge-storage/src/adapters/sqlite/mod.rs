@@ -4,8 +4,8 @@ use knowledge_core::features::entity::Entity;
 use knowledge_core::features::relationship::Relationship;
 use knowledge_core::ports::{
     ComponentRepository, EntityRepository, EntityResolver, EntityVersion, Event, EventLog,
-    MergeAuditEntry, ResolutionCandidate, RelationshipRepository, SearchIndex, SearchQuery, SearchResult,
-    StorageError, TransactionalWrite,
+    MergeAuditEntry, RelationshipRepository, ResolutionCandidate, SearchIndex, SearchQuery,
+    SearchResult, StorageError, TransactionalWrite,
 };
 use rusqlite::{params, Connection, OptionalExtension};
 use std::sync::Mutex;
@@ -161,6 +161,62 @@ impl SqliteStore {
         })
     }
 
+    /// Fetch metadata signals (language, file_size, creation_date, page_count) for an entity
+    fn fetch_entity_signals(
+        conn: &Connection,
+        entity_id: Uuid,
+    ) -> Result<crate::fuzzy::EntitySignals, StorageError> {
+        let mut signals = crate::fuzzy::EntitySignals::default();
+        let mut stmt = conn
+            .prepare(
+                "SELECT c.data FROM components c WHERE c.entity_id = ?1 AND c.component_type = ?2",
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        // Language component
+        let language_ct = Self::component_type_str(&ComponentType::Language);
+        let language_json: Result<String, _> = stmt
+            .query_row(params![entity_id.to_string(), language_ct], |row| {
+                row.get(0)
+            });
+        if let Ok(json) = language_json {
+            if let Ok(lang) = serde_json::from_str::<String>(&json) {
+                signals.language = Some(lang);
+            }
+        }
+
+        // BinaryContent component (for file_size)
+        let binary_ct = Self::component_type_str(&ComponentType::BinaryContent);
+        let binary_json: Result<String, _> =
+            stmt.query_row(params![entity_id.to_string(), binary_ct], |row| row.get(0));
+        if let Ok(json) = binary_json {
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&json) {
+                if let Some(size) = data.get("size").and_then(|v| v.as_u64()) {
+                    signals.file_size = Some(size);
+                }
+            }
+        }
+
+        // Timeline component (for creation_date)
+        let timeline_ct = Self::component_type_str(&ComponentType::Timeline);
+        let timeline_json: Result<String, _> = stmt
+            .query_row(params![entity_id.to_string(), timeline_ct], |row| {
+                row.get(0)
+            });
+        if let Ok(json) = timeline_json {
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&json) {
+                if let Some(date) = data.get("creation_date").and_then(|v| v.as_str()) {
+                    signals.creation_date = Some(date.to_string());
+                }
+                if let Some(pages) = data.get("page_count").and_then(|v| v.as_u64()) {
+                    signals.page_count = Some(pages as u32);
+                }
+            }
+        }
+
+        Ok(signals)
+    }
+
     fn component_type_str(ct: &ComponentType) -> String {
         serde_json::to_string(ct).unwrap()
     }
@@ -173,9 +229,15 @@ impl SqliteStore {
 #[async_trait]
 impl EntityRepository for SqliteStore {
     async fn get(&self, id: Uuid) -> Result<Option<Entity>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let mut stmt = conn
-            .prepare(&format!("SELECT {} FROM entities WHERE id = ?1", ENTITY_COLS))
+            .prepare(&format!(
+                "SELECT {} FROM entities WHERE id = ?1",
+                ENTITY_COLS
+            ))
             .map_err(|e| StorageError::Internal(e.to_string()))?;
         let result = stmt
             .query_row(params![id.to_string()], Self::parse_entity)
@@ -185,7 +247,10 @@ impl EntityRepository for SqliteStore {
     }
 
     async fn save(&self, entity: &Entity) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         conn.execute(
             "INSERT OR REPLACE INTO entities (id, entity_type, is_active, created_at, updated_at, version) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
@@ -201,41 +266,75 @@ impl EntityRepository for SqliteStore {
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
-        conn.execute("DELETE FROM components WHERE entity_id = ?1", params![id.to_string()])
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        conn.execute("DELETE FROM relationships WHERE source_id = ?1 OR target_id = ?1", params![id.to_string()])
-            .map_err(|e| StorageError::Internal(e.to_string()))?;
-        conn.execute("DELETE FROM entities WHERE id = ?1", params![id.to_string()])
-            .map_err(|e| StorageError::Internal(e.to_string()))?;
-        conn.execute("DELETE FROM entities_fts WHERE entity_id = ?1", params![id.to_string()])
-            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        conn.execute(
+            "DELETE FROM components WHERE entity_id = ?1",
+            params![id.to_string()],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+        conn.execute(
+            "DELETE FROM relationships WHERE source_id = ?1 OR target_id = ?1",
+            params![id.to_string()],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+        conn.execute(
+            "DELETE FROM entities WHERE id = ?1",
+            params![id.to_string()],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+        conn.execute(
+            "DELETE FROM entities_fts WHERE entity_id = ?1",
+            params![id.to_string()],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(())
     }
 
     async fn list(&self) -> Result<Vec<Entity>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let mut stmt = conn
-            .prepare(&format!("SELECT {} FROM entities WHERE is_active = 1", ENTITY_COLS))
+            .prepare(&format!(
+                "SELECT {} FROM entities WHERE is_active = 1",
+                ENTITY_COLS
+            ))
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map([], Self::parse_entity)
+        let rows = stmt
+            .query_map([], Self::parse_entity)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
     async fn find_by_type(&self, entity_type: &str) -> Result<Vec<Entity>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let quoted_type = serde_json::to_string(&entity_type).unwrap();
         let mut stmt = conn
-            .prepare(&format!("SELECT {} FROM entities WHERE entity_type = ?1 AND is_active = 1", ENTITY_COLS))
+            .prepare(&format!(
+                "SELECT {} FROM entities WHERE entity_type = ?1 AND is_active = 1",
+                ENTITY_COLS
+            ))
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![quoted_type], Self::parse_entity)
+        let rows = stmt
+            .query_map(params![quoted_type], Self::parse_entity)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
     async fn find_by_title(&self, title: &str) -> Result<Vec<Entity>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let title_json = serde_json::to_string(&title).unwrap();
         let mut stmt = conn
             .prepare(&format!(
@@ -251,18 +350,30 @@ impl EntityRepository for SqliteStore {
                     .replacen("version", "e.version", 1)
             ))
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![Self::component_type_str(&ComponentType::Title), title_json], Self::parse_entity)
+        let rows = stmt
+            .query_map(
+                params![Self::component_type_str(&ComponentType::Title), title_json],
+                Self::parse_entity,
+            )
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
     async fn increment_version(&self, id: Uuid) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         // Snapshot current state before incrementing
         let mut stmt = conn
-            .prepare(&format!("SELECT {} FROM entities WHERE id = ?1", ENTITY_COLS))
+            .prepare(&format!(
+                "SELECT {} FROM entities WHERE id = ?1",
+                ENTITY_COLS
+            ))
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let entity = stmt.query_row(params![id.to_string()], Self::parse_entity)
+        let entity = stmt
+            .query_row(params![id.to_string()], Self::parse_entity)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         let snapshot = serde_json::json!({
@@ -280,12 +391,19 @@ impl EntityRepository for SqliteStore {
         conn.execute(
             "UPDATE entities SET version = version + 1, updated_at = ?1 WHERE id = ?2",
             params![chrono::Utc::now().to_rfc3339(), id.to_string()],
-        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(())
     }
 
-    async fn find_by_component_type(&self, component_type: &str) -> Result<Vec<Entity>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+    async fn find_by_component_type(
+        &self,
+        component_type: &str,
+    ) -> Result<Vec<Entity>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let quoted_type = serde_json::to_string(&component_type).unwrap();
         let mut stmt = conn
             .prepare(&format!(
@@ -301,13 +419,18 @@ impl EntityRepository for SqliteStore {
                     .replacen("version", "e.version", 1)
             ))
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![quoted_type], Self::parse_entity)
+        let rows = stmt
+            .query_map(params![quoted_type], Self::parse_entity)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
     async fn find_by_tag(&self, tag: &str) -> Result<Vec<Entity>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         // PONYTAIL: Tag matching via FTS5 tag column string search. Ceiling: substring matching,
         // not exact tag matching. Upgrade: JSON path query or normalized tag index.
         let tag_json = serde_json::to_string(&tag).unwrap();
@@ -326,35 +449,51 @@ impl EntityRepository for SqliteStore {
                     .replacen("version", "e.version", 1)
             ))
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![Self::component_type_str(&ComponentType::Tags), like_pattern], Self::parse_entity)
+        let rows = stmt
+            .query_map(
+                params![Self::component_type_str(&ComponentType::Tags), like_pattern],
+                Self::parse_entity,
+            )
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
-    async fn get_version_history(&self, entity_id: Uuid) -> Result<Vec<EntityVersion>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+    async fn get_version_history(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<EntityVersion>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare("SELECT entity_id, version, snapshot, created_at FROM entity_versions WHERE entity_id = ?1 ORDER BY version DESC")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![entity_id.to_string()], |row| {
-            Ok(EntityVersion {
-                entity_id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
-                version: row.get(1)?,
-                snapshot: serde_json::from_str(&row.get::<_, String>(2)?).unwrap(),
-                created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(3)?)
-                    .unwrap()
-                    .with_timezone(&chrono::Utc),
+        let rows = stmt
+            .query_map(params![entity_id.to_string()], |row| {
+                Ok(EntityVersion {
+                    entity_id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
+                    version: row.get(1)?,
+                    snapshot: serde_json::from_str(&row.get::<_, String>(2)?).unwrap(),
+                    created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(3)?)
+                        .unwrap()
+                        .with_timezone(&chrono::Utc),
+                })
             })
-        })
-        .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 }
 
 #[async_trait]
 impl RelationshipRepository for SqliteStore {
     async fn get(&self, id: Uuid) -> Result<Option<Relationship>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare("SELECT id, source_id, target_id, relationship_type, is_active, created_at FROM relationships WHERE id = ?1")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
@@ -364,7 +503,10 @@ impl RelationshipRepository for SqliteStore {
     }
 
     async fn save(&self, relationship: &Relationship) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         conn.execute(
             "INSERT OR REPLACE INTO relationships (id, source_id, target_id, relationship_type, is_active, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
@@ -384,30 +526,46 @@ impl RelationshipRepository for SqliteStore {
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
-        conn.execute("DELETE FROM relationships WHERE id = ?1", params![id.to_string()])
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| StorageError::Internal(e.to_string()))?;
+        conn.execute(
+            "DELETE FROM relationships WHERE id = ?1",
+            params![id.to_string()],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(())
     }
 
     async fn by_source(&self, source_id: Uuid) -> Result<Vec<Relationship>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare("SELECT id, source_id, target_id, relationship_type, is_active, created_at FROM relationships WHERE source_id = ?1 AND is_active = 1")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![source_id.to_string()], Self::parse_relationship)
+        let rows = stmt
+            .query_map(params![source_id.to_string()], Self::parse_relationship)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
     async fn by_target(&self, target_id: Uuid) -> Result<Vec<Relationship>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare("SELECT id, source_id, target_id, relationship_type, is_active, created_at FROM relationships WHERE target_id = ?1 AND is_active = 1")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![target_id.to_string()], Self::parse_relationship)
+        let rows = stmt
+            .query_map(params![target_id.to_string()], Self::parse_relationship)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
     async fn find_by_source_and_target(
@@ -415,41 +573,63 @@ impl RelationshipRepository for SqliteStore {
         source_id: Uuid,
         target_id: Uuid,
     ) -> Result<Option<Relationship>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare("SELECT id, source_id, target_id, relationship_type, is_active, created_at FROM relationships WHERE source_id = ?1 AND target_id = ?2 AND is_active = 1")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        stmt.query_row(params![source_id.to_string(), target_id.to_string()], Self::parse_relationship)
-            .optional()
-            .map_err(|e| StorageError::Internal(e.to_string()))
+        stmt.query_row(
+            params![source_id.to_string(), target_id.to_string()],
+            Self::parse_relationship,
+        )
+        .optional()
+        .map_err(|e| StorageError::Internal(e.to_string()))
     }
 
-    async fn find_by_type(&self, relationship_type: &str) -> Result<Vec<Relationship>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+    async fn find_by_type(
+        &self,
+        relationship_type: &str,
+    ) -> Result<Vec<Relationship>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let quoted_type = serde_json::to_string(&relationship_type).unwrap();
         let mut stmt = conn
             .prepare("SELECT id, source_id, target_id, relationship_type, is_active, created_at FROM relationships WHERE relationship_type = ?1 AND is_active = 1")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![quoted_type], Self::parse_relationship)
+        let rows = stmt
+            .query_map(params![quoted_type], Self::parse_relationship)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 }
 
 #[async_trait]
 impl ComponentRepository for SqliteStore {
     async fn get(&self, entity_id: Uuid) -> Result<Vec<Component>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare("SELECT id, entity_id, component_type, data, created_at, version FROM components WHERE entity_id = ?1")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![entity_id.to_string()], Self::parse_component)
+        let rows = stmt
+            .query_map(params![entity_id.to_string()], Self::parse_component)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
     async fn save(&self, component: &Component) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         conn.execute(
             "INSERT OR REPLACE INTO components (id, entity_id, component_type, data, created_at, version) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
@@ -465,97 +645,159 @@ impl ComponentRepository for SqliteStore {
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
-        conn.execute("DELETE FROM components WHERE id = ?1", params![id.to_string()])
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| StorageError::Internal(e.to_string()))?;
+        conn.execute(
+            "DELETE FROM components WHERE id = ?1",
+            params![id.to_string()],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(())
     }
 
-    async fn find_by_type(&self, entity_id: Uuid, component_type: &str) -> Result<Vec<Component>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+    async fn find_by_type(
+        &self,
+        entity_id: Uuid,
+        component_type: &str,
+    ) -> Result<Vec<Component>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let quoted_type = serde_json::to_string(&component_type).unwrap();
         let mut stmt = conn
             .prepare("SELECT id, entity_id, component_type, data, created_at, version FROM components WHERE entity_id = ?1 AND component_type = ?2")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![entity_id.to_string(), quoted_type], Self::parse_component)
+        let rows = stmt
+            .query_map(
+                params![entity_id.to_string(), quoted_type],
+                Self::parse_component,
+            )
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
     async fn update_data(&self, id: Uuid, data: serde_json::Value) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let data_str = data.to_string();
         conn.execute(
             "UPDATE components SET data = ?1, version = version + 1 WHERE id = ?2",
             params![data_str, id.to_string()],
-        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(())
     }
 
-    async fn find_by_component_data(&self, component_type: &str, _json_path: &str, value: &str) -> Result<Vec<Component>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+    async fn find_by_component_data(
+        &self,
+        component_type: &str,
+        _json_path: &str,
+        value: &str,
+    ) -> Result<Vec<Component>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let quoted_type = serde_json::to_string(&component_type).unwrap();
         let like_pattern = format!("%{}%", value);
         let mut stmt = conn
             .prepare("SELECT id, entity_id, component_type, data, created_at, version FROM components WHERE component_type = ?1 AND data LIKE ?2")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![quoted_type, like_pattern], Self::parse_component)
+        let rows = stmt
+            .query_map(params![quoted_type, like_pattern], Self::parse_component)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 
     async fn delete_by_entity(&self, entity_id: Uuid) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
-        conn.execute("DELETE FROM components WHERE entity_id = ?1", params![entity_id.to_string()])
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| StorageError::Internal(e.to_string()))?;
+        conn.execute(
+            "DELETE FROM components WHERE entity_id = ?1",
+            params![entity_id.to_string()],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(())
     }
 }
 
 #[async_trait]
 impl SearchIndex for SqliteStore {
-    async fn index_entity(&self, entity: &Entity, components: &[Component]) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+    async fn index_entity(
+        &self,
+        entity: &Entity,
+        components: &[Component],
+    ) -> Result<(), StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        let title = components.iter()
+        let title = components
+            .iter()
             .find(|c| c.component_type == ComponentType::Title)
             .and_then(|c| c.data.as_str().map(String::from))
             .unwrap_or_default();
 
-        let content = components.iter()
+        let content = components
+            .iter()
             .find(|c| c.component_type == ComponentType::Content)
             .and_then(|c| c.data.as_str().map(String::from))
             .unwrap_or_default();
 
-        let tags = components.iter()
+        let tags = components
+            .iter()
             .find(|c| c.component_type == ComponentType::Tags)
-            .and_then(|c| c.data.as_array().map(|a| {
-                a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ")
-            }))
+            .and_then(|c| {
+                c.data.as_array().map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
+            })
             .unwrap_or_default();
 
         conn.execute(
             "DELETE FROM entities_fts WHERE entity_id = ?1",
             params![entity.id.to_string()],
-        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
         conn.execute(
             "INSERT INTO entities_fts (entity_id, title, content, tags) VALUES (?1, ?2, ?3, ?4)",
             params![entity.id.to_string(), title, content, tags],
-        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(())
     }
 
     async fn remove_entity(&self, entity_id: Uuid) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         conn.execute(
             "DELETE FROM entities_fts WHERE entity_id = ?1",
             params![entity_id.to_string()],
-        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(())
     }
 
     async fn search(&self, query: &SearchQuery) -> Result<Vec<SearchResult>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         let fts_query = format!("{} OR {}", query.query, query.query);
 
@@ -563,12 +805,17 @@ impl SearchIndex for SqliteStore {
             let mut stmt = conn.prepare(
                 "SELECT entity_id, bm25(entities_fts) as rank, snippet(entities_fts, 2, '<b>', '</b>', '...', 32) as snip FROM entities_fts WHERE entities_fts MATCH ?1 ORDER BY rank"
             ).map_err(|e| StorageError::Internal(e.to_string()))?;
-            let results: Vec<_> = stmt.query_map(params![fts_query], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?, row.get::<_, String>(2)?))
-            })
-            .map_err(|e| StorageError::Internal(e.to_string()))?
-            .filter_map(|r| r.ok())
-            .collect();
+            let results: Vec<_> = stmt
+                .query_map(params![fts_query], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, f64>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                })
+                .map_err(|e| StorageError::Internal(e.to_string()))?
+                .filter_map(|r| r.ok())
+                .collect();
             results
         };
 
@@ -578,14 +825,19 @@ impl SearchIndex for SqliteStore {
                 let mut pass = true;
 
                 if let Some(ref t) = query.entity_type {
-                    let mut estmt = conn.prepare(
-                        &format!("SELECT {} FROM entities WHERE id = ?1 AND is_active = 1", ENTITY_COLS)
-                    ).map_err(|e| StorageError::Internal(e.to_string()))?;
+                    let mut estmt = conn
+                        .prepare(&format!(
+                            "SELECT {} FROM entities WHERE id = ?1 AND is_active = 1",
+                            ENTITY_COLS
+                        ))
+                        .map_err(|e| StorageError::Internal(e.to_string()))?;
                     match estmt.query_row(params![id_str], Self::parse_entity) {
                         Ok(entity) => {
                             let quoted = serde_json::to_value(t).unwrap();
                             let stored = serde_json::to_value(&entity.entity_type).unwrap();
-                            if quoted != stored { pass = false; }
+                            if quoted != stored {
+                                pass = false;
+                            }
                         }
                         Err(_) => pass = false,
                     }
@@ -593,18 +845,28 @@ impl SearchIndex for SqliteStore {
 
                 if pass {
                     if let Some(ref tag_val) = query.tag {
-                        let mut tag_stmt = conn.prepare(
-                            "SELECT tags FROM entities_fts WHERE entity_id = ?1"
-                        ).map_err(|e| StorageError::Internal(e.to_string()))?;
-                        if let Ok(ftags) = tag_stmt.query_row(params![id_str], |row| row.get::<_, String>(0)) {
+                        let mut tag_stmt = conn
+                            .prepare("SELECT tags FROM entities_fts WHERE entity_id = ?1")
+                            .map_err(|e| StorageError::Internal(e.to_string()))?;
+                        if let Ok(ftags) =
+                            tag_stmt.query_row(params![id_str], |row| row.get::<_, String>(0))
+                        {
                             let tags_list: Vec<&str> = ftags.split(", ").collect();
-                            if !tags_list.contains(&tag_val.as_str()) { pass = false; }
-                        } else { pass = false; }
+                            if !tags_list.contains(&tag_val.as_str()) {
+                                pass = false;
+                            }
+                        } else {
+                            pass = false;
+                        }
                     }
                 }
 
                 if pass {
-                    let snip = if snippet.is_empty() { None } else { Some(snippet) };
+                    let snip = if snippet.is_empty() {
+                        None
+                    } else {
+                        Some(snippet)
+                    };
                     results.push(SearchResult {
                         entity_id: id,
                         score,
@@ -619,7 +881,10 @@ impl SearchIndex for SqliteStore {
     }
 
     async fn rebuild(&self, entities: &[(Entity, Vec<Component>)]) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         conn.execute_batch(
             "DROP TABLE IF EXISTS entities_fts;
@@ -628,25 +893,34 @@ impl SearchIndex for SqliteStore {
                  title,
                  content,
                  tags
-             );"
-        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+             );",
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         for (entity, components) in entities {
-            let title = components.iter()
+            let title = components
+                .iter()
                 .find(|c| c.component_type == ComponentType::Title)
                 .and_then(|c| c.data.as_str().map(String::from))
                 .unwrap_or_default();
 
-            let content = components.iter()
+            let content = components
+                .iter()
                 .find(|c| c.component_type == ComponentType::Content)
                 .and_then(|c| c.data.as_str().map(String::from))
                 .unwrap_or_default();
 
-            let tags = components.iter()
+            let tags = components
+                .iter()
                 .find(|c| c.component_type == ComponentType::Tags)
-                .and_then(|c| c.data.as_array().map(|a| {
-                    a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ")
-                }))
+                .and_then(|c| {
+                    c.data.as_array().map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    })
+                })
                 .unwrap_or_default();
 
             conn.execute(
@@ -662,7 +936,10 @@ impl SearchIndex for SqliteStore {
 #[async_trait]
 impl EventLog for SqliteStore {
     async fn append(&self, event: &Event) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         conn.execute(
             "INSERT INTO events (id, event_type, entity_id, timestamp, data) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
@@ -677,13 +954,18 @@ impl EventLog for SqliteStore {
     }
 
     async fn list_by_entity(&self, entity_id: Uuid) -> Result<Vec<Event>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare("SELECT id, event_type, entity_id, timestamp, data FROM events WHERE entity_id = ?1 ORDER BY timestamp DESC")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        let rows = stmt.query_map(params![entity_id.to_string()], Self::parse_event)
+        let rows = stmt
+            .query_map(params![entity_id.to_string()], Self::parse_event)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
-        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string()))).collect()
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
     }
 }
 
@@ -695,7 +977,10 @@ impl TransactionalWrite for SqliteStore {
         components: &[Component],
         event: &Event,
     ) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         // PONYTAIL: Manual BEGIN/COMMIT. Ceiling: no nested transactions, no savepoint support.
         // Upgrade: rusqlite Transaction type or deadpool integration.
@@ -763,7 +1048,10 @@ impl TransactionalWrite for SqliteStore {
         components: &[Component],
         event: &Event,
     ) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         conn.execute_batch("BEGIN IMMEDIATE")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
@@ -784,7 +1072,8 @@ impl TransactionalWrite for SqliteStore {
             conn.execute(
                 "DELETE FROM components WHERE entity_id = ?1",
                 params![entity.id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             for component in components {
                 conn.execute(
@@ -831,8 +1120,16 @@ impl TransactionalWrite for SqliteStore {
 
 #[async_trait]
 impl EntityResolver for SqliteStore {
-    async fn find_candidates(&self, entity: &Entity, title: &str, content: Option<&str>) -> Result<Vec<ResolutionCandidate>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+    async fn find_candidates(
+        &self,
+        entity: &Entity,
+        title: &str,
+        content: Option<&str>,
+    ) -> Result<Vec<ResolutionCandidate>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         // Get all active entities of the same type
         let entity_type_json = serde_json::to_string(&entity.entity_type).unwrap();
@@ -851,59 +1148,95 @@ impl EntityResolver for SqliteStore {
             ))
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        let entities: Vec<Entity> = stmt.query_map(
-            params![entity_type_json, entity.id.to_string()],
-            Self::parse_entity,
-        )
-        .map_err(|e| StorageError::Internal(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect();
+        let entities: Vec<Entity> = stmt
+            .query_map(
+                params![entity_type_json, entity.id.to_string()],
+                Self::parse_entity,
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
 
         // Get titles for each entity
         let mut title_stmt = conn
-            .prepare("SELECT c.data FROM components c WHERE c.entity_id = ?1 AND c.component_type = ?2")
+            .prepare(
+                "SELECT c.data FROM components c WHERE c.entity_id = ?1 AND c.component_type = ?2",
+            )
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         // Get content for each entity (for ContentMatch strategy)
         let mut content_stmt = conn
-            .prepare("SELECT c.data FROM components c WHERE c.entity_id = ?1 AND c.component_type = ?2")
+            .prepare(
+                "SELECT c.data FROM components c WHERE c.entity_id = ?1 AND c.component_type = ?2",
+            )
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         let title_ct = Self::component_type_str(&ComponentType::Title);
         let content_ct = Self::component_type_str(&ComponentType::Content);
 
-        let mut entity_data: Vec<(Entity, String, Option<String>)> = Vec::new();
+        let mut entity_data: Vec<(Entity, String, Option<String>, crate::fuzzy::EntitySignals)> =
+            Vec::new();
         for e in &entities {
-            let title_json: Result<String, _> = title_stmt.query_row(
-                params![e.id.to_string(), title_ct],
-                |row| row.get(0),
-            );
+            let title_json: Result<String, _> =
+                title_stmt.query_row(params![e.id.to_string(), title_ct], |row| row.get(0));
 
             if let Ok(title_json) = title_json {
                 if let Ok(t) = serde_json::from_str::<String>(&title_json) {
                     // Also fetch content for this entity
-                    let content_json: Result<String, _> = content_stmt.query_row(
-                        params![e.id.to_string(), content_ct],
-                        |row| row.get(0),
-                    );
+                    let content_json: Result<String, _> = content_stmt
+                        .query_row(params![e.id.to_string(), content_ct], |row| row.get(0));
                     let c = content_json
                         .ok()
                         .and_then(|json| serde_json::from_str::<String>(&json).ok());
 
-                    entity_data.push((e.clone(), t, c));
+                    // Fetch metadata components for composite scoring
+                    let signals = Self::fetch_entity_signals(&conn, e.id)?;
+
+                    entity_data.push((e.clone(), t, c, signals));
                 }
             }
         }
 
-        // Use fuzzy resolver for candidate matching
+        // Build incoming entity signals
+        let incoming_signals = Self::fetch_entity_signals(&conn, entity.id)?;
+
+        // Use composite resolver for candidate matching
         let resolver = crate::fuzzy::FuzzyEntityResolver::new();
-        let candidates = resolver.find_candidates(entity, title, content, &entity_data);
+        let composite_candidates = resolver.find_candidates_composite(
+            entity,
+            title,
+            content,
+            &incoming_signals,
+            &entity_data,
+        );
+
+        // Convert CompositeCandidate to ResolutionCandidate
+        let candidates = composite_candidates
+            .into_iter()
+            .map(|c| ResolutionCandidate {
+                entity_id: c.entity_id,
+                confidence: c.confidence,
+                reason: c.reason,
+                title_score: Some(c.title_score),
+                content_score: Some(c.content_score),
+                metadata_score: Some(c.metadata_score),
+                structural_score: Some(c.structural_score),
+            })
+            .collect();
 
         Ok(candidates)
     }
 
-    async fn merge(&self, canonical_id: Uuid, duplicate_id: Uuid, _confidence: f64) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+    async fn merge(
+        &self,
+        canonical_id: Uuid,
+        duplicate_id: Uuid,
+        _confidence: f64,
+    ) -> Result<(), StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         conn.execute_batch("BEGIN IMMEDIATE")
             .map_err(|e| StorageError::Internal(e.to_string()))?;
@@ -912,42 +1245,50 @@ impl EntityResolver for SqliteStore {
             conn.execute(
                 "UPDATE relationships SET source_id = ?1 WHERE source_id = ?2",
                 params![canonical_id.to_string(), duplicate_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             conn.execute(
                 "UPDATE relationships SET target_id = ?1 WHERE target_id = ?2",
                 params![canonical_id.to_string(), duplicate_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             conn.execute(
                 "DELETE FROM relationships WHERE source_id = ?1 AND target_id = ?1",
                 params![canonical_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             conn.execute(
                 "UPDATE components SET entity_id = ?1 WHERE entity_id = ?2",
                 params![canonical_id.to_string(), duplicate_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             conn.execute(
                 "DELETE FROM entities_fts WHERE entity_id = ?1",
                 params![duplicate_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             conn.execute(
                 "DELETE FROM entity_versions WHERE entity_id = ?1",
                 params![duplicate_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             conn.execute(
                 "DELETE FROM events WHERE entity_id = ?1",
                 params![duplicate_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             conn.execute(
                 "DELETE FROM entities WHERE id = ?1",
                 params![duplicate_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             Ok(())
         })();
@@ -967,7 +1308,10 @@ impl EntityResolver for SqliteStore {
     }
 
     async fn log_merge(&self, entry: &MergeAuditEntry) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         conn.execute(
             "INSERT INTO resolution_log (id, source_id, source_title, target_id, target_title, strategy, confidence, timestamp, reason, snapshot)
@@ -990,30 +1334,38 @@ impl EntityResolver for SqliteStore {
     }
 
     async fn undo_merge(&self, merge_id: Uuid) -> Result<(), StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         // Get the merge entry with snapshot
-        let entry = conn.query_row(
-            "SELECT source_id, target_id, snapshot FROM resolution_log WHERE id = ?1",
-            params![merge_id.to_string()],
-            |row| {
-                let source_id: String = row.get(0)?;
-                let target_id: String = row.get(1)?;
-                let snapshot: Option<String> = row.get(2)?;
-                Ok((
-                    Uuid::parse_str(&source_id).unwrap(),
-                    Uuid::parse_str(&target_id).unwrap(),
-                    snapshot,
-                ))
-            },
-        ).map_err(|e| StorageError::Internal(e.to_string()))?;
+        let entry = conn
+            .query_row(
+                "SELECT source_id, target_id, snapshot FROM resolution_log WHERE id = ?1",
+                params![merge_id.to_string()],
+                |row| {
+                    let source_id: String = row.get(0)?;
+                    let target_id: String = row.get(1)?;
+                    let snapshot: Option<String> = row.get(2)?;
+                    Ok((
+                        Uuid::parse_str(&source_id).unwrap(),
+                        Uuid::parse_str(&target_id).unwrap(),
+                        snapshot,
+                    ))
+                },
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         let (source_id, target_id, snapshot) = entry;
 
         let snapshot_data: serde_json::Value = if let Some(snap) = &snapshot {
-            serde_json::from_str(snap).map_err(|e| StorageError::Internal(format!("Invalid snapshot: {}", e)))?
+            serde_json::from_str(snap)
+                .map_err(|e| StorageError::Internal(format!("Invalid snapshot: {}", e)))?
         } else {
-            return Err(StorageError::Internal("No snapshot available for undo".to_string()));
+            return Err(StorageError::Internal(
+                "No snapshot available for undo".to_string(),
+            ));
         };
 
         conn.execute_batch("BEGIN IMMEDIATE")
@@ -1024,7 +1376,8 @@ impl EntityResolver for SqliteStore {
             conn.execute(
                 "DELETE FROM components WHERE entity_id = ?1",
                 params![target_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             // 2. Restore target's original components from snapshot
             if let Some(target_comps) = snapshot_data["target"]["components"].as_array() {
@@ -1047,7 +1400,8 @@ impl EntityResolver for SqliteStore {
             conn.execute(
                 "DELETE FROM relationships WHERE source_id = ?1 OR target_id = ?1",
                 params![target_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             if let Some(target_rels) = snapshot_data["target"]["relationships"].as_array() {
                 for rel in target_rels {
@@ -1068,10 +1422,12 @@ impl EntityResolver for SqliteStore {
             let source = &snapshot_data["source"];
             let entity_type = source["entity_type"].as_str().unwrap_or("Article");
             let is_active = source["is_active"].as_bool().unwrap_or(true);
-            let created_at = source["created_at"].as_str()
+            let created_at = source["created_at"]
+                .as_str()
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
-            let updated_at = source["updated_at"].as_str()
+            let updated_at = source["updated_at"]
+                .as_str()
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
             let version = source["version"].as_i64().unwrap_or(1);
@@ -1101,7 +1457,8 @@ impl EntityResolver for SqliteStore {
             conn.execute(
                 "DELETE FROM resolution_log WHERE id = ?1",
                 params![merge_id.to_string()],
-            ).map_err(|e| StorageError::Internal(e.to_string()))?;
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             Ok(())
         })();
@@ -1120,8 +1477,14 @@ impl EntityResolver for SqliteStore {
         }
     }
 
-    async fn get_merge_history(&self, entity_id: Uuid) -> Result<Vec<MergeAuditEntry>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+    async fn get_merge_history(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<MergeAuditEntry>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         let mut stmt = conn
             .prepare(
@@ -1130,33 +1493,35 @@ impl EntityResolver for SqliteStore {
             )
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        let entries = stmt.query_map(params![entity_id.to_string()], |row| {
-            Ok(MergeAuditEntry {
-                id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
-                source_id: Uuid::parse_str(&row.get::<_, String>(1)?).unwrap(),
-                source_title: row.get(2)?,
-                target_id: Uuid::parse_str(&row.get::<_, String>(3)?).unwrap(),
-                target_title: row.get(4)?,
-                strategy: row.get(5)?,
-                confidence: row.get(6)?,
-                timestamp: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(7)?)
-                    .unwrap()
-                    .with_timezone(&chrono::Utc),
-                reason: row.get(8)?,
-                snapshot: row.get(9)?,
+        let entries = stmt
+            .query_map(params![entity_id.to_string()], |row| {
+                Ok(MergeAuditEntry {
+                    id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
+                    source_id: Uuid::parse_str(&row.get::<_, String>(1)?).unwrap(),
+                    source_title: row.get(2)?,
+                    target_id: Uuid::parse_str(&row.get::<_, String>(3)?).unwrap(),
+                    target_title: row.get(4)?,
+                    strategy: row.get(5)?,
+                    confidence: row.get(6)?,
+                    timestamp: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(7)?)
+                        .unwrap()
+                        .with_timezone(&chrono::Utc),
+                    reason: row.get(8)?,
+                    snapshot: row.get(9)?,
+                })
             })
-        })
-        .map_err(|e| StorageError::Internal(e.to_string()))?;
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        let entries: Vec<MergeAuditEntry> = entries
-            .filter_map(|r| r.ok())
-            .collect();
+        let entries: Vec<MergeAuditEntry> = entries.filter_map(|r| r.ok()).collect();
 
         Ok(entries)
     }
 
     async fn get_all_merge_history(&self) -> Result<Vec<MergeAuditEntry>, StorageError> {
-        let conn = self.conn.lock().map_err(|e| StorageError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         let mut stmt = conn
             .prepare(
@@ -1165,27 +1530,26 @@ impl EntityResolver for SqliteStore {
             )
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        let entries = stmt.query_map([], |row| {
-            Ok(MergeAuditEntry {
-                id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
-                source_id: Uuid::parse_str(&row.get::<_, String>(1)?).unwrap(),
-                source_title: row.get(2)?,
-                target_id: Uuid::parse_str(&row.get::<_, String>(3)?).unwrap(),
-                target_title: row.get(4)?,
-                strategy: row.get(5)?,
-                confidence: row.get(6)?,
-                timestamp: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(7)?)
-                    .unwrap()
-                    .with_timezone(&chrono::Utc),
-                reason: row.get(8)?,
-                snapshot: row.get(9)?,
+        let entries = stmt
+            .query_map([], |row| {
+                Ok(MergeAuditEntry {
+                    id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
+                    source_id: Uuid::parse_str(&row.get::<_, String>(1)?).unwrap(),
+                    source_title: row.get(2)?,
+                    target_id: Uuid::parse_str(&row.get::<_, String>(3)?).unwrap(),
+                    target_title: row.get(4)?,
+                    strategy: row.get(5)?,
+                    confidence: row.get(6)?,
+                    timestamp: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(7)?)
+                        .unwrap()
+                        .with_timezone(&chrono::Utc),
+                    reason: row.get(8)?,
+                    snapshot: row.get(9)?,
+                })
             })
-        })
-        .map_err(|e| StorageError::Internal(e.to_string()))?;
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        let entries: Vec<MergeAuditEntry> = entries
-            .filter_map(|r| r.ok())
-            .collect();
+        let entries: Vec<MergeAuditEntry> = entries.filter_map(|r| r.ok()).collect();
 
         Ok(entries)
     }
@@ -1194,10 +1558,13 @@ impl EntityResolver for SqliteStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use knowledge_core::features::entity::EntityType;
     use knowledge_core::features::component::ComponentType;
+    use knowledge_core::features::entity::EntityType;
     use knowledge_core::features::relationship::RelationshipType;
-    use knowledge_core::ports::{EntityRepository, ComponentRepository, RelationshipRepository, SearchIndex, EventLog, EventType};
+    use knowledge_core::ports::{
+        ComponentRepository, EntityRepository, EventLog, EventType, RelationshipRepository,
+        SearchIndex,
+    };
 
     fn test_store() -> SqliteStore {
         SqliteStore::new(":memory:").unwrap()
@@ -1209,20 +1576,28 @@ mod tests {
         let mut entity = Entity::new(EntityType::new("Article"));
 
         EntityRepository::save(&store, &entity).await.unwrap();
-        let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
+        let loaded = EntityRepository::get(&store, entity.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(loaded.id, entity.id);
         assert_eq!(loaded.entity_type, EntityType::new("Article"));
         assert!(loaded.is_active);
 
         entity.touch();
         EntityRepository::save(&store, &entity).await.unwrap();
-        let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
+        let loaded = EntityRepository::get(&store, entity.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(loaded.version, 2);
 
         let all = EntityRepository::list(&store).await.unwrap();
         assert_eq!(all.len(), 1);
 
-        let articles = EntityRepository::find_by_type(&store, "Article").await.unwrap();
+        let articles = EntityRepository::find_by_type(&store, "Article")
+            .await
+            .unwrap();
         assert_eq!(articles.len(), 1);
 
         EntityRepository::delete(&store, entity.id).await.unwrap();
@@ -1236,22 +1611,32 @@ mod tests {
         let entity = Entity::new(EntityType::new("Note"));
         EntityRepository::save(&store, &entity).await.unwrap();
 
-        let component = Component::new(entity.id, ComponentType::Title, serde_json::json!("Test Title"));
+        let component = Component::new(
+            entity.id,
+            ComponentType::Title,
+            serde_json::json!("Test Title"),
+        );
         ComponentRepository::save(&store, &component).await.unwrap();
 
         let components = ComponentRepository::get(&store, entity.id).await.unwrap();
         assert_eq!(components.len(), 1);
         assert_eq!(components[0].component_type, ComponentType::Title);
 
-        let found = ComponentRepository::find_by_type(&store, entity.id, "Title").await.unwrap();
+        let found = ComponentRepository::find_by_type(&store, entity.id, "Title")
+            .await
+            .unwrap();
         assert_eq!(found.len(), 1);
 
-        ComponentRepository::update_data(&store, component.id, serde_json::json!("Updated Title")).await.unwrap();
+        ComponentRepository::update_data(&store, component.id, serde_json::json!("Updated Title"))
+            .await
+            .unwrap();
         let updated = ComponentRepository::get(&store, entity.id).await.unwrap();
         assert_eq!(updated[0].data, serde_json::json!("Updated Title"));
         assert_eq!(updated[0].version, 2);
 
-        ComponentRepository::delete(&store, component.id).await.unwrap();
+        ComponentRepository::delete(&store, component.id)
+            .await
+            .unwrap();
         let components = ComponentRepository::get(&store, entity.id).await.unwrap();
         assert!(components.is_empty());
     }
@@ -1267,20 +1652,33 @@ mod tests {
         let rel = Relationship::new(entity1.id, entity2.id, RelationshipType::References);
         RelationshipRepository::save(&store, &rel).await.unwrap();
 
-        let rels = RelationshipRepository::by_source(&store, entity1.id).await.unwrap();
+        let rels = RelationshipRepository::by_source(&store, entity1.id)
+            .await
+            .unwrap();
         assert_eq!(rels.len(), 1);
 
-        let rels = RelationshipRepository::by_target(&store, entity2.id).await.unwrap();
+        let rels = RelationshipRepository::by_target(&store, entity2.id)
+            .await
+            .unwrap();
         assert_eq!(rels.len(), 1);
 
-        let found = RelationshipRepository::find_by_source_and_target(&store, entity1.id, entity2.id).await.unwrap();
+        let found =
+            RelationshipRepository::find_by_source_and_target(&store, entity1.id, entity2.id)
+                .await
+                .unwrap();
         assert!(found.is_some());
 
-        let refs = RelationshipRepository::find_by_type(&store, "References").await.unwrap();
+        let refs = RelationshipRepository::find_by_type(&store, "References")
+            .await
+            .unwrap();
         assert_eq!(refs.len(), 1);
 
-        RelationshipRepository::delete(&store, rel.id).await.unwrap();
-        let rels = RelationshipRepository::by_source(&store, entity1.id).await.unwrap();
+        RelationshipRepository::delete(&store, rel.id)
+            .await
+            .unwrap();
+        let rels = RelationshipRepository::by_source(&store, entity1.id)
+            .await
+            .unwrap();
         assert!(rels.is_empty());
     }
 
@@ -1291,34 +1689,55 @@ mod tests {
         let entity_id = entity.id;
 
         let components = vec![
-            Component::new(entity_id, ComponentType::Title, serde_json::json!("Test Title")),
-            Component::new(entity_id, ComponentType::Content, serde_json::json!("Some content here")),
-            Component::new(entity_id, ComponentType::Tags, serde_json::json!(["rust", "test"])),
+            Component::new(
+                entity_id,
+                ComponentType::Title,
+                serde_json::json!("Test Title"),
+            ),
+            Component::new(
+                entity_id,
+                ComponentType::Content,
+                serde_json::json!("Some content here"),
+            ),
+            Component::new(
+                entity_id,
+                ComponentType::Tags,
+                serde_json::json!(["rust", "test"]),
+            ),
         ];
 
         store.index_entity(&entity, &components).await.unwrap();
 
-        let results = store.search(&SearchQuery {
-            query: "Test".to_string(),
-            entity_type: None,
-            tag: None,
-        }).await.unwrap();
+        let results = store
+            .search(&SearchQuery {
+                query: "Test".to_string(),
+                entity_type: None,
+                tag: None,
+            })
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].entity_id, entity_id);
         assert!(results[0].score < 0.0);
 
-        let results = store.search(&SearchQuery {
-            query: "content".to_string(),
-            entity_type: None,
-            tag: Some("rust".to_string()),
-        }).await.unwrap();
+        let results = store
+            .search(&SearchQuery {
+                query: "content".to_string(),
+                entity_type: None,
+                tag: Some("rust".to_string()),
+            })
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
 
-        let results = store.search(&SearchQuery {
-            query: "nonexistent".to_string(),
-            entity_type: None,
-            tag: None,
-        }).await.unwrap();
+        let results = store
+            .search(&SearchQuery {
+                query: "nonexistent".to_string(),
+                entity_type: None,
+                tag: None,
+            })
+            .await
+            .unwrap();
         assert!(results.is_empty());
     }
 
@@ -1328,26 +1747,43 @@ mod tests {
         let entity = Entity::new(EntityType::new("Article"));
 
         let components = vec![
-            Component::new(entity.id, ComponentType::Title, serde_json::json!("Test Title")),
-            Component::new(entity.id, ComponentType::Content, serde_json::json!("Some content here")),
+            Component::new(
+                entity.id,
+                ComponentType::Title,
+                serde_json::json!("Test Title"),
+            ),
+            Component::new(
+                entity.id,
+                ComponentType::Content,
+                serde_json::json!("Some content here"),
+            ),
         ];
 
         store.index_entity(&entity, &components).await.unwrap();
 
-        let results = store.search(&SearchQuery {
-            query: "Test".to_string(),
-            entity_type: None,
-            tag: None,
-        }).await.unwrap();
+        let results = store
+            .search(&SearchQuery {
+                query: "Test".to_string(),
+                entity_type: None,
+                tag: None,
+            })
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
 
-        store.rebuild(&[(entity.clone(), components.clone())]).await.unwrap();
+        store
+            .rebuild(&[(entity.clone(), components.clone())])
+            .await
+            .unwrap();
 
-        let results = store.search(&SearchQuery {
-            query: "Test".to_string(),
-            entity_type: None,
-            tag: None,
-        }).await.unwrap();
+        let results = store
+            .search(&SearchQuery {
+                query: "Test".to_string(),
+                entity_type: None,
+                tag: None,
+            })
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
     }
 
@@ -1377,15 +1813,27 @@ mod tests {
         let entity = Entity::new(EntityType::new("Article"));
         EntityRepository::save(&store, &entity).await.unwrap();
 
-        EntityRepository::increment_version(&store, entity.id).await.unwrap();
-        let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
+        EntityRepository::increment_version(&store, entity.id)
+            .await
+            .unwrap();
+        let loaded = EntityRepository::get(&store, entity.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(loaded.version, 2);
 
-        EntityRepository::increment_version(&store, entity.id).await.unwrap();
-        let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
+        EntityRepository::increment_version(&store, entity.id)
+            .await
+            .unwrap();
+        let loaded = EntityRepository::get(&store, entity.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(loaded.version, 3);
 
-        let history = EntityRepository::get_version_history(&store, entity.id).await.unwrap();
+        let history = EntityRepository::get_version_history(&store, entity.id)
+            .await
+            .unwrap();
         assert_eq!(history.len(), 2);
         assert_eq!(history[0].version, 2); // Most recent first
         assert_eq!(history[1].version, 1);
@@ -1397,14 +1845,22 @@ mod tests {
         let entity = Entity::new(EntityType::new("Article"));
         EntityRepository::save(&store, &entity).await.unwrap();
 
-        let comp = Component::new(entity.id, ComponentType::Timeline, serde_json::json!({"created_at": "2026-01-01"}));
+        let comp = Component::new(
+            entity.id,
+            ComponentType::Timeline,
+            serde_json::json!({"created_at": "2026-01-01"}),
+        );
         ComponentRepository::save(&store, &comp).await.unwrap();
 
-        let found = EntityRepository::find_by_component_type(&store, "Timeline").await.unwrap();
+        let found = EntityRepository::find_by_component_type(&store, "Timeline")
+            .await
+            .unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].id, entity.id);
 
-        let not_found = EntityRepository::find_by_component_type(&store, "Embedding").await.unwrap();
+        let not_found = EntityRepository::find_by_component_type(&store, "Embedding")
+            .await
+            .unwrap();
         assert!(not_found.is_empty());
     }
 
@@ -1414,13 +1870,19 @@ mod tests {
         let entity = Entity::new(EntityType::new("Article"));
         EntityRepository::save(&store, &entity).await.unwrap();
 
-        let comp = Component::new(entity.id, ComponentType::Tags, serde_json::json!(["rust", "testing"]));
+        let comp = Component::new(
+            entity.id,
+            ComponentType::Tags,
+            serde_json::json!(["rust", "testing"]),
+        );
         ComponentRepository::save(&store, &comp).await.unwrap();
 
         let found = EntityRepository::find_by_tag(&store, "rust").await.unwrap();
         assert_eq!(found.len(), 1);
 
-        let not_found = EntityRepository::find_by_tag(&store, "python").await.unwrap();
+        let not_found = EntityRepository::find_by_tag(&store, "python")
+            .await
+            .unwrap();
         assert!(not_found.is_empty());
     }
 
@@ -1438,7 +1900,10 @@ mod tests {
         rel.is_active = false;
         RelationshipRepository::update(&store, &rel).await.unwrap();
 
-        let updated = RelationshipRepository::get(&store, rel.id).await.unwrap().unwrap();
+        let updated = RelationshipRepository::get(&store, rel.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert!(!updated.is_active);
     }
 
@@ -1447,7 +1912,11 @@ mod tests {
         let store = test_store();
         let entity = Entity::new(EntityType::new("Article"));
         let components = vec![
-            Component::new(entity.id, ComponentType::Title, serde_json::json!("Transactional Test")),
+            Component::new(
+                entity.id,
+                ComponentType::Title,
+                serde_json::json!("Transactional Test"),
+            ),
             Component::new(entity.id, ComponentType::Content, serde_json::json!("Body")),
         ];
         let event = Event {
@@ -1458,9 +1927,15 @@ mod tests {
             data: serde_json::json!({}),
         };
 
-        store.save_entity_with_components(&entity, &components, &event).await.unwrap();
+        store
+            .save_entity_with_components(&entity, &components, &event)
+            .await
+            .unwrap();
 
-        let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
+        let loaded = EntityRepository::get(&store, entity.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(loaded.id, entity.id);
 
         let comps = ComponentRepository::get(&store, entity.id).await.unwrap();

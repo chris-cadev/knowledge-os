@@ -129,6 +129,10 @@ fn test_resolution_candidate_fields() {
         entity_id: uuid::Uuid::new_v4(),
         confidence: 1.0,
         reason: "Exact match".to_string(),
+        title_score: None,
+        content_score: None,
+        metadata_score: None,
+        structural_score: None,
     };
     assert_eq!(c.confidence, 1.0);
 }

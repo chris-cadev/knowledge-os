@@ -1,11 +1,11 @@
 use clap::{Parser, Subcommand};
-use knowledge_core::ports::{
-    ComponentRepository, EntityRepository, EntityResolver, RelationshipRepository, SearchIndex,
-    SearchQuery, EventLog, TransactionalWrite,
-};
-use knowledge_core::features::component::ComponentType;
-use knowledge_storage::adapters::sqlite::SqliteStore;
 use indicatif::{ProgressBar, ProgressStyle};
+use knowledge_core::features::component::ComponentType;
+use knowledge_core::ports::{
+    ComponentRepository, EntityRepository, EntityResolver, EventLog, RelationshipRepository,
+    SearchIndex, SearchQuery, TransactionalWrite,
+};
+use knowledge_storage::adapters::sqlite::SqliteStore;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -102,7 +102,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Restore { id } => cmd_restore(store, &id).await,
         Commands::RebuildIndex => cmd_rebuild_index(store).await,
         Commands::Resolution { action } => match action {
-            ResolutionCommands::Log { entity } => cmd_resolution_log(store, entity.as_deref()).await,
+            ResolutionCommands::Log { entity } => {
+                cmd_resolution_log(store, entity.as_deref()).await
+            }
             ResolutionCommands::Undo { merge_id } => cmd_resolution_undo(store, &merge_id).await,
         },
     }
@@ -202,13 +204,16 @@ async fn cmd_import(
                 };
 
                 if json_mode {
-                    println!("{}", serde_json::json!({
-                        "event": "import",
-                        "file": file_path.to_string_lossy(),
-                        "action": action_str,
-                        "position": i + 1,
-                        "total": total,
-                    }));
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "event": "import",
+                            "file": file_path.to_string_lossy(),
+                            "action": action_str,
+                            "position": i + 1,
+                            "total": total,
+                        })
+                    );
                 } else if let Some(ref pb) = pb {
                     pb.inc(1);
                 }
@@ -218,13 +223,16 @@ async fn cmd_import(
                 errors.push(err_msg.clone());
 
                 if json_mode {
-                    println!("{}", serde_json::json!({
-                        "event": "error",
-                        "file": file_path.to_string_lossy(),
-                        "error": err_msg,
-                        "position": i + 1,
-                        "total": total,
-                    }));
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "event": "error",
+                            "file": file_path.to_string_lossy(),
+                            "error": err_msg,
+                            "position": i + 1,
+                            "total": total,
+                        })
+                    );
                 } else {
                     eprintln!("\nERROR: {}", err_msg);
                     if let Some(ref pb) = pb {
@@ -240,13 +248,16 @@ async fn cmd_import(
     }
 
     if json_mode {
-        println!("{}", serde_json::json!({
-            "event": "summary",
-            "total": total,
-            "created": created,
-            "merged": merged,
-            "errors": errors.len(),
-        }));
+        println!(
+            "{}",
+            serde_json::json!({
+                "event": "summary",
+                "total": total,
+                "created": created,
+                "merged": merged,
+                "errors": errors.len(),
+            })
+        );
     } else {
         println!("\n--- Import Summary ---");
         println!("Total files: {}", total);
@@ -289,22 +300,39 @@ async fn import_with_adapter(
         .and_then(|c| c.data.as_str().map(String::from));
 
     // Use fuzzy resolution to find matching entities
-    let candidates = EntityResolver::find_candidates(
-        store,
-        &result.entity,
-        &title,
-        content.as_deref(),
-    )
-    .await?;
+    let candidates =
+        EntityResolver::find_candidates(store, &result.entity, &title, content.as_deref()).await?;
 
-    // Find the best candidate above threshold (default 0.95)
-    // PONYTAIL: Hard-coded threshold, no per-type override. Ceiling: 0.95 works for most types
-    // but may be too aggressive for Person (names vary) or too lax for Concept (precise terms).
-    // Upgrade: KOS_RESOLUTION_THRESHOLD env var, then kos.toml config when someone needs per-type tuning.
-    let threshold = 0.95;
+    // PONYTAIL: Three-zone decision model.
+    // >= 0.92: auto-merge, 0.78-0.92: review (skip merge, log), < 0.78: reject (create new)
+    // Exact title matches always merge (same file re-import).
+    let auto_merge_threshold = 0.92;
+    let review_threshold = 0.78;
+
     let best_candidate = candidates
         .into_iter()
-        .find(|c| c.confidence >= threshold);
+        .find(|c| c.confidence >= review_threshold)
+        .filter(|c| {
+            // Exact title match (title_score == 1.0) — always merge
+            if c.title_score.is_some_and(|s| (s - 1.0).abs() < f64::EPSILON) {
+                return true;
+            }
+            // High confidence — auto-merge
+            if c.confidence >= auto_merge_threshold {
+                return true;
+            }
+            // Review zone — log and skip
+            eprintln!(
+                "  Review needed: {} (confidence: {:.2}, title: {:.2}, content: {:.2}, meta: {:.2}, struct: {:.2})",
+                c.reason,
+                c.confidence,
+                c.title_score.unwrap_or(0.0),
+                c.content_score.unwrap_or(0.0),
+                c.metadata_score.unwrap_or(0.0),
+                c.structural_score.unwrap_or(0.0),
+            );
+            false
+        });
 
     let (entity, action) = if let Some(candidate) = best_candidate {
         // Merge into existing entity
@@ -324,13 +352,19 @@ async fn import_with_adapter(
         let existing_relationships = RelationshipRepository::by_source(store, existing.id).await?;
 
         // Snapshot source components before they're moved
-        let source_components_snapshot: Vec<_> = result.components.iter().map(|c| serde_json::json!({
-            "id": c.id.to_string(),
-            "component_type": serde_json::to_string(&c.component_type).unwrap(),
-            "data": c.data,
-            "created_at": c.created_at.to_rfc3339(),
-            "version": c.version,
-        })).collect();
+        let source_components_snapshot: Vec<_> = result
+            .components
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "id": c.id.to_string(),
+                    "component_type": serde_json::to_string(&c.component_type).unwrap(),
+                    "data": c.data,
+                    "created_at": c.created_at.to_rfc3339(),
+                    "version": c.version,
+                })
+            })
+            .collect();
 
         existing.touch();
 
@@ -432,7 +466,9 @@ async fn import_with_adapter(
     // Create cross-reference relationships using efficient lookup
     for cross_ref in &result.cross_references {
         let target_id = match cross_ref {
-            knowledge_import::features::importer::CrossReference::FileRef { target_path, .. } => {
+            knowledge_import::features::importer::CrossReference::FileRef {
+                target_path, ..
+            } => {
                 // Look up target entity by Provenance source path
                 let target_path_str = target_path.to_string_lossy();
                 let matching_components = ComponentRepository::find_by_component_data(
@@ -445,8 +481,11 @@ async fn import_with_adapter(
 
                 matching_components.first().map(|c| c.entity_id)
             }
-            knowledge_import::features::importer::CrossReference::WikilinkRef { target_name, .. } |
-            knowledge_import::features::importer::CrossReference::MentionRef { target_name } => {
+            knowledge_import::features::importer::CrossReference::WikilinkRef {
+                target_name,
+                ..
+            }
+            | knowledge_import::features::importer::CrossReference::MentionRef { target_name } => {
                 // Look up target entity by Title component
                 let matching_components = ComponentRepository::find_by_component_data(
                     store,
@@ -458,7 +497,10 @@ async fn import_with_adapter(
 
                 matching_components.first().map(|c| c.entity_id)
             }
-            knowledge_import::features::importer::CrossReference::SectionRef { target_path, .. } => {
+            knowledge_import::features::importer::CrossReference::SectionRef {
+                target_path,
+                ..
+            } => {
                 // Look up target entity by Provenance source path, store section as metadata
                 let target_path_str = target_path.to_string_lossy();
                 let matching_components = ComponentRepository::find_by_component_data(
@@ -479,7 +521,9 @@ async fn import_with_adapter(
         };
 
         // For URL references, create a relationship with URL metadata but no target entity
-        if let knowledge_import::features::importer::CrossReference::UrlRef { url, link_text } = cross_ref {
+        if let knowledge_import::features::importer::CrossReference::UrlRef { url, link_text } =
+            cross_ref
+        {
             let rel = knowledge_core::features::relationship::Relationship::new(
                 entity.id,
                 entity.id, // Self-reference for external URLs
@@ -506,12 +550,9 @@ async fn import_with_adapter(
         // For internal references (FileRef, WikilinkRef, MentionRef, SectionRef)
         if let Some(target_id) = target_id {
             // Check if relationship already exists
-            let existing = RelationshipRepository::find_by_source_and_target(
-                store,
-                entity.id,
-                target_id,
-            )
-            .await?;
+            let existing =
+                RelationshipRepository::find_by_source_and_target(store, entity.id, target_id)
+                    .await?;
             if existing.is_some() {
                 continue;
             }
@@ -529,7 +570,11 @@ async fn import_with_adapter(
                 "type": "References"
             });
 
-            if let knowledge_import::features::importer::CrossReference::SectionRef { section, .. } = cross_ref {
+            if let knowledge_import::features::importer::CrossReference::SectionRef {
+                section,
+                ..
+            } = cross_ref
+            {
                 event_data["section"] = serde_json::json!(section);
             }
 
@@ -643,10 +688,7 @@ async fn cmd_search(
     Ok(())
 }
 
-async fn cmd_get(
-    store: Arc<SqliteStore>,
-    id_str: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn cmd_get(store: Arc<SqliteStore>, id_str: &str) -> Result<(), Box<dyn std::error::Error>> {
     let id = uuid::Uuid::parse_str(id_str)?;
     let entity = EntityRepository::get(store.as_ref(), id)
         .await?
@@ -712,7 +754,10 @@ async fn cmd_list(
             .and_then(|c| c.data.as_str().map(String::from))
             .unwrap_or_else(|| "Untitled".to_string());
 
-        println!("  [{:?}] {} -- \"{}\"", entity.entity_type, entity.id, title);
+        println!(
+            "  [{:?}] {} -- \"{}\"",
+            entity.entity_type, entity.id, title
+        );
     }
 
     Ok(())
@@ -741,10 +786,7 @@ async fn cmd_archive(
     };
     EventLog::append(store.as_ref(), &event).await?;
 
-    println!(
-        "Archived: Entity {} ({:?})",
-        entity.id, entity.entity_type
-    );
+    println!("Archived: Entity {} ({:?})", entity.id, entity.entity_type);
     Ok(())
 }
 
@@ -772,10 +814,7 @@ async fn cmd_restore(
     };
     EventLog::append(store.as_ref(), &event).await?;
 
-    println!(
-        "Restored: Entity {} ({:?})",
-        entity.id, entity.entity_type
-    );
+    println!("Restored: Entity {} ({:?})", entity.id, entity.entity_type);
     Ok(())
 }
 

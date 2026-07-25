@@ -5,7 +5,7 @@ use pulldown_cmark::{Event, Parser, Tag};
 use std::collections::HashMap;
 use std::path::Path;
 
-use super::adapter::{CrossReference, ImportError, ImportAdapter, ImportResult};
+use super::adapter::{CrossReference, ImportAdapter, ImportError, ImportResult};
 
 /// Markdown file importer implementing the ImportAdapter trait.
 pub struct MarkdownImporter;
@@ -336,7 +336,9 @@ author: "Chris"
 This is a test document."#;
 
         let importer = MarkdownImporter::new();
-        let result = importer.import_content(content, Path::new("test.md")).unwrap();
+        let result = importer
+            .import_content(content, Path::new("test.md"))
+            .unwrap();
 
         assert_eq!(result.entity.entity_type, EntityType::new("Article"));
         assert!(!result.components.is_empty());
@@ -370,7 +372,9 @@ This is a test document."#;
 Some content here."#;
 
         let importer = MarkdownImporter::new();
-        let result = importer.import_content(content, Path::new("test.md")).unwrap();
+        let result = importer
+            .import_content(content, Path::new("test.md"))
+            .unwrap();
 
         let title = result
             .components
@@ -385,7 +389,9 @@ Some content here."#;
         let content = "Just some content without a heading.";
 
         let importer = MarkdownImporter::new();
-        let result = importer.import_content(content, Path::new("my-article.md")).unwrap();
+        let result = importer
+            .import_content(content, Path::new("my-article.md"))
+            .unwrap();
 
         let title = result
             .components
@@ -402,7 +408,9 @@ Some content here."#;
 See [other file](other.md) for more details."#;
 
         let importer = MarkdownImporter::new();
-        let result = importer.import_content(content, Path::new("test.md")).unwrap();
+        let result = importer
+            .import_content(content, Path::new("test.md"))
+            .unwrap();
 
         assert_eq!(result.cross_references.len(), 1);
         assert!(result.cross_references[0]
@@ -420,12 +428,12 @@ See [other file](other.md) for more details."#;
 See [website](https://example.com) for more."#;
 
         let importer = MarkdownImporter::new();
-        let result = importer.import_content(content, Path::new("test.md")).unwrap();
+        let result = importer
+            .import_content(content, Path::new("test.md"))
+            .unwrap();
 
         assert_eq!(result.cross_references.len(), 1);
-        assert!(result.cross_references[0]
-            .as_url_ref()
-            .is_some());
+        assert!(result.cross_references[0].as_url_ref().is_some());
     }
 
     #[test]
@@ -435,7 +443,9 @@ See [website](https://example.com) for more."#;
 See [section](other.md#introduction) for more."#;
 
         let importer = MarkdownImporter::new();
-        let result = importer.import_content(content, Path::new("test.md")).unwrap();
+        let result = importer
+            .import_content(content, Path::new("test.md"))
+            .unwrap();
 
         assert_eq!(result.cross_references.len(), 1);
         let section_ref = result.cross_references[0].as_section_ref().unwrap();
@@ -455,7 +465,9 @@ type: paper
 Content here."#;
 
         let importer = MarkdownImporter::new();
-        let result = importer.import_content(content, Path::new("paper.md")).unwrap();
+        let result = importer
+            .import_content(content, Path::new("paper.md"))
+            .unwrap();
 
         assert_eq!(result.entity.entity_type, EntityType::new("paper"));
     }

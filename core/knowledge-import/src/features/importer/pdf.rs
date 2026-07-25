@@ -1,12 +1,14 @@
 use async_trait::async_trait;
 use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::{Entity, EntityType};
+use pdf_oxide::extractors::xmp::XmpExtractor;
+use pdf_oxide::PdfDocument;
 use std::path::Path;
 
-use super::adapter::{ImportError, ImportAdapter, ImportResult};
+use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 /// PDF file importer implementing the ImportAdapter trait.
-/// Uses lopdf for text extraction and metadata parsing.
+/// Uses pdf_oxide for text extraction and metadata parsing.
 pub struct PdfImporter;
 
 impl Default for PdfImporter {
@@ -31,13 +33,12 @@ impl ImportAdapter for PdfImporter {
     }
 
     async fn import(&self, path: &Path) -> Result<ImportResult, ImportError> {
-        let doc = lopdf::Document::load(path)
-            .map_err(|e| ImportError::Parse(format!("Failed to load PDF: {}", e)))?;
+        let doc = PdfDocument::open(path).map_err(|e| ImportError::Parse(format!("{}", e)))?;
 
         // Extract text from all pages
         let mut text_content = String::new();
-        for page_id in doc.page_iter() {
-            if let Ok(page_text) = extract_page_text(&doc, page_id) {
+        for page_idx in doc.page_indices() {
+            if let Ok(page_text) = doc.extract_text(page_idx) {
                 text_content.push_str(&page_text);
                 text_content.push('\n');
             }
@@ -46,32 +47,30 @@ impl ImportAdapter for PdfImporter {
         // Check if we got any text (scanned PDF detection)
         let has_text = !text_content.trim().is_empty();
         if !has_text {
-            eprintln!("WARNING: Scanned PDF detected (no extractable text): {}", path.display());
+            eprintln!(
+                "WARNING: Scanned PDF detected (no extractable text): {}",
+                path.display()
+            );
         }
 
-        // Extract metadata from PDF properties
+        // Extract metadata (XMP first, legacy Info dict as fallback)
         let metadata = extract_metadata(&doc);
 
         // Determine title from metadata or filename
-        let title = metadata
-            .title
-            .clone()
-            .unwrap_or_else(|| {
-                path.file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("Untitled PDF")
-                    .to_string()
-            });
+        let title = metadata.title.clone().unwrap_or_else(|| {
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("Untitled PDF")
+                .to_string()
+        });
 
         let entity = Entity::new(EntityType::new("Article"));
 
-        let mut components = vec![
-            Component::new(
-                entity.id,
-                ComponentType::Title,
-                serde_json::json!(title),
-            ),
-        ];
+        let mut components = vec![Component::new(
+            entity.id,
+            ComponentType::Title,
+            serde_json::json!(title),
+        )];
 
         // Only add Content component if we extracted text
         if has_text {
@@ -83,9 +82,7 @@ impl ImportAdapter for PdfImporter {
         }
 
         // BinaryContent component for the original PDF
-        let file_size = std::fs::metadata(path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
         components.push(Component::new(
             entity.id,
@@ -168,70 +165,22 @@ struct PdfMetadata {
     creation_date: Option<String>,
 }
 
-fn extract_metadata(doc: &lopdf::Document) -> PdfMetadata {
+fn extract_metadata(doc: &PdfDocument) -> PdfMetadata {
     let mut title = None;
     let mut author = None;
     let mut creation_date = None;
 
-    // Try to get metadata from the document info dictionary
-    if let Ok(info_id) = doc.trailer.get(b"Info") {
-        if let Ok(info_obj) = doc.dereference(info_id) {
-            if let lopdf::Object::Dictionary(dict) = info_obj.1 {
-                if let Ok(title_obj) = dict.get(b"Title") {
-                    if let Ok(title_val) = doc.dereference(title_obj) {
-                        if let lopdf::Object::String(s, _) = title_val.1 {
-                            title = String::from_utf8(s.clone()).ok();
-                        }
-                    }
-                }
-                if let Ok(author_obj) = dict.get(b"Author") {
-                    if let Ok(author_val) = doc.dereference(author_obj) {
-                        if let lopdf::Object::String(s, _) = author_val.1 {
-                            author = String::from_utf8(s.clone()).ok();
-                        }
-                    }
-                }
-                // Extract creation date from PDF metadata
-                if let Ok(date_obj) = dict.get(b"CreationDate") {
-                    if let Ok(date_val) = doc.dereference(date_obj) {
-                        if let lopdf::Object::String(s, _) = date_val.1 {
-                            creation_date = String::from_utf8(s.clone()).ok();
-                        }
-                    }
-                }
-            }
-        }
+    if let Ok(Some(xmp)) = XmpExtractor::extract(doc) {
+        title = xmp.dc_title;
+        author = xmp.dc_creator.into_iter().next();
+        creation_date = xmp.xmp_create_date;
     }
 
-    PdfMetadata { title, author, creation_date }
-}
-
-fn extract_page_text(doc: &lopdf::Document, page_id: lopdf::ObjectId) -> Result<String, ImportError> {
-    let mut text = String::new();
-
-    let content_bytes = doc.get_page_content(page_id)
-        .map_err(|e| ImportError::Parse(format!("Failed to get page content: {}", e)))?;
-
-    // Parse the content stream
-    let content = lopdf::content::Content::decode(&content_bytes)
-        .map_err(|e| ImportError::Parse(format!("Failed to decode content stream: {}", e)))?;
-
-    for operation in content.operations {
-        match operation.operator.as_str() {
-            "Tj" | "TJ" => {
-                for operand in &operation.operands {
-                    if let lopdf::Object::String(s, _) = operand {
-                        if let Ok(t) = String::from_utf8(s.clone()) {
-                            text.push_str(&t);
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
+    PdfMetadata {
+        title,
+        author,
+        creation_date,
     }
-
-    Ok(text)
 }
 
 #[cfg(test)]
@@ -240,7 +189,7 @@ mod tests {
     use std::io::Write;
     use tempfile::NamedTempFile;
 
-    fn create_minimal_pdf(title: &str, content: &str) -> NamedTempFile {
+    fn create_minimal_pdf(_title: &str, content: &str) -> NamedTempFile {
         let mut file = NamedTempFile::new().unwrap();
         // Minimal valid PDF structure
         let pdf = format!(
@@ -315,19 +264,25 @@ startxref
         assert_eq!(result.entity.entity_type, EntityType::new("Article"));
 
         // Should have Title component (falls back to filename if no PDF metadata)
-        let title = result.components.iter()
+        let title = result
+            .components
+            .iter()
             .find(|c| c.component_type == ComponentType::Title)
             .unwrap();
         assert!(title.data.is_string());
 
         // Should have BinaryContent component
-        let binary = result.components.iter()
+        let binary = result
+            .components
+            .iter()
             .find(|c| c.component_type == ComponentType::BinaryContent)
             .unwrap();
         assert_eq!(binary.data.get("mime_type").unwrap(), "application/pdf");
 
         // Should have Provenance with format: pdf
-        let provenance = result.components.iter()
+        let provenance = result
+            .components
+            .iter()
             .find(|c| c.component_type == ComponentType::Provenance)
             .unwrap();
         assert_eq!(provenance.data.get("format").unwrap(), "pdf");

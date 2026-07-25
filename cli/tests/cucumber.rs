@@ -30,10 +30,7 @@ impl CliWorld {
         let path = self.temp_path().to_path_buf();
         let db_path = path.join("test.db");
         let mut cmd = assert_cmd::Command::cargo_bin("kos").unwrap();
-        cmd.current_dir(&path)
-            .arg("--db")
-            .arg(&db_path)
-            .args(args);
+        cmd.current_dir(&path).arg("--db").arg(&db_path).args(args);
         self.last_output = Some(cmd.output().unwrap());
     }
 
@@ -208,7 +205,9 @@ async fn run_kos_command(world: &mut CliWorld, cmd: String) {
 #[when("I extract the entity ID from the last import")]
 async fn extract_entity_id(world: &mut CliWorld) {
     if let Some(id) = world.extract_entity_id_from_created() {
-        world.entity_ids.insert("_last_imported".to_string(), id.clone());
+        world
+            .entity_ids
+            .insert("_last_imported".to_string(), id.clone());
         world.last_entity_id = Some(id);
     }
 }
@@ -216,7 +215,9 @@ async fn extract_entity_id(world: &mut CliWorld) {
 #[when(expr = "I extract the entity ID for {string}")]
 async fn extract_entity_id_for_title_step(world: &mut CliWorld, title: String) {
     if let Some(id) = world.extract_entity_id_for_title(&title) {
-        world.entity_ids.insert("_last_imported".to_string(), id.clone());
+        world
+            .entity_ids
+            .insert("_last_imported".to_string(), id.clone());
         world.last_entity_id = Some(id);
     }
 }

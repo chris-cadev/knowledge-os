@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use std::path::Path;
 
-use super::adapter::{ImportError, ImportAdapter, ImportResult};
+use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 /// URL importer that fetches content from web URLs.
 pub struct UrlImporter {
@@ -69,17 +69,16 @@ impl UrlImporter {
     ) -> Result<ImportResult, ImportError> {
         use super::pdf::PdfImporter;
 
-        let tmp = tempfile::NamedTempFile::new()
-            .map_err(ImportError::Io)?;
-        std::fs::write(tmp.path(), bytes)
-            .map_err(ImportError::Io)?;
+        let tmp = tempfile::NamedTempFile::new().map_err(ImportError::Io)?;
+        std::fs::write(tmp.path(), bytes).map_err(ImportError::Io)?;
 
         let pdf_importer = PdfImporter::new();
         let mut result = pdf_importer.import(tmp.path()).await?;
 
         // Override the provenance source with the URL
         for comp in &mut result.components {
-            if comp.component_type == knowledge_core::features::component::ComponentType::Provenance {
+            if comp.component_type == knowledge_core::features::component::ComponentType::Provenance
+            {
                 comp.data = serde_json::json!({
                     "source": url,
                     "imported_at": chrono::Utc::now().to_rfc3339(),
@@ -117,11 +116,7 @@ impl UrlImporter {
         };
 
         let components = vec![
-            Component::new(
-                entity.id,
-                ComponentType::Title,
-                serde_json::json!(title),
-            ),
+            Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
             Component::new(
                 entity.id,
                 ComponentType::Content,
@@ -144,11 +139,7 @@ impl UrlImporter {
                     "imported_at": chrono::Utc::now().to_rfc3339(),
                 }),
             ),
-            Component::new(
-                entity.id,
-                ComponentType::Language,
-                serde_json::json!("en"),
-            ),
+            Component::new(entity.id, ComponentType::Language, serde_json::json!("en")),
         ];
 
         Ok(ImportResult {

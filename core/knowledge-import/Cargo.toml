@@ -15,7 +15,7 @@ async-trait = "0.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 regex = "1"
 lazy_static = "1"
-lopdf = "0.34"
+pdf_oxide = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 tempfile = "3"
 

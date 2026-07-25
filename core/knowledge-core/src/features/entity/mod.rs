@@ -35,7 +35,9 @@ impl EntityType {
         // For case-insensitive matching per PRD-0002:
         // If the input matches a known type (case-insensitively), use the canonical form
         // Otherwise, preserve the original casing for custom types
-        let canonical = Self::KNOWN_TYPES.iter().find(|&&kt| kt.eq_ignore_ascii_case(type_name));
+        let canonical = Self::KNOWN_TYPES
+            .iter()
+            .find(|&&kt| kt.eq_ignore_ascii_case(type_name));
         match canonical {
             Some(&kt) => Self(kt.to_string()),
             None => Self(type_name.to_string()),

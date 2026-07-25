@@ -18,7 +18,10 @@ async fn test_entity_full_lifecycle() {
     EntityRepository::save(&store, &entity).await.unwrap();
 
     // Read
-    let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
+    let loaded = EntityRepository::get(&store, entity.id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.id, entity.id);
     assert!(loaded.is_active);
     assert_eq!(loaded.version, 1);
@@ -26,13 +29,19 @@ async fn test_entity_full_lifecycle() {
     // Update via touch
     entity.touch();
     EntityRepository::save(&store, &entity).await.unwrap();
-    let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
+    let loaded = EntityRepository::get(&store, entity.id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.version, 2);
 
     // Archive
     entity.archive();
     EntityRepository::save(&store, &entity).await.unwrap();
-    let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
+    let loaded = EntityRepository::get(&store, entity.id)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(!loaded.is_active);
 
     // List should not include archived
@@ -58,7 +67,11 @@ async fn test_component_lifecycle_with_version_tracking() {
     EntityRepository::save(&store, &entity).await.unwrap();
 
     // Create component
-    let comp = Component::new(entity.id, ComponentType::Title, serde_json::json!("Original"));
+    let comp = Component::new(
+        entity.id,
+        ComponentType::Title,
+        serde_json::json!("Original"),
+    );
     ComponentRepository::save(&store, &comp).await.unwrap();
 
     let comps = ComponentRepository::get(&store, entity.id).await.unwrap();
@@ -67,7 +80,9 @@ async fn test_component_lifecycle_with_version_tracking() {
     assert_eq!(comps[0].version, 1);
 
     // Update component data
-    ComponentRepository::update_data(&store, comp.id, serde_json::json!("Updated")).await.unwrap();
+    ComponentRepository::update_data(&store, comp.id, serde_json::json!("Updated"))
+        .await
+        .unwrap();
 
     let comps = ComponentRepository::get(&store, entity.id).await.unwrap();
     assert_eq!(comps[0].data, serde_json::json!("Updated"));
@@ -96,19 +111,27 @@ async fn test_relationship_1hop_traversal() {
     RelationshipRepository::save(&store, &r2).await.unwrap();
 
     // 1-hop from a
-    let outgoing = RelationshipRepository::by_source(&store, a.id).await.unwrap();
+    let outgoing = RelationshipRepository::by_source(&store, a.id)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 2);
 
     // 1-hop to b
-    let incoming = RelationshipRepository::by_target(&store, b.id).await.unwrap();
+    let incoming = RelationshipRepository::by_target(&store, b.id)
+        .await
+        .unwrap();
     assert_eq!(incoming.len(), 1);
 
     // Find specific relationship
-    let found = RelationshipRepository::find_by_source_and_target(&store, a.id, b.id).await.unwrap();
+    let found = RelationshipRepository::find_by_source_and_target(&store, a.id, b.id)
+        .await
+        .unwrap();
     assert!(found.is_some());
 
     // Query by type
-    let refs = RelationshipRepository::find_by_type(&store, "References").await.unwrap();
+    let refs = RelationshipRepository::find_by_type(&store, "References")
+        .await
+        .unwrap();
     assert_eq!(refs.len(), 2);
 }
 
@@ -119,14 +142,38 @@ async fn test_search_with_type_and_tag_filtering() {
     let concept = Entity::new(EntityType::new("Concept"));
 
     let article_comps = vec![
-        Component::new(article.id, ComponentType::Title, serde_json::json!("Rust Programming")),
-        Component::new(article.id, ComponentType::Content, serde_json::json!("Rust is a systems language")),
-        Component::new(article.id, ComponentType::Tags, serde_json::json!(["rust", "programming"])),
+        Component::new(
+            article.id,
+            ComponentType::Title,
+            serde_json::json!("Rust Programming"),
+        ),
+        Component::new(
+            article.id,
+            ComponentType::Content,
+            serde_json::json!("Rust is a systems language"),
+        ),
+        Component::new(
+            article.id,
+            ComponentType::Tags,
+            serde_json::json!(["rust", "programming"]),
+        ),
     ];
     let concept_comps = vec![
-        Component::new(concept.id, ComponentType::Title, serde_json::json!("Rust Language")),
-        Component::new(concept.id, ComponentType::Content, serde_json::json!("Rust is a language")),
-        Component::new(concept.id, ComponentType::Tags, serde_json::json!(["rust", "language"])),
+        Component::new(
+            concept.id,
+            ComponentType::Title,
+            serde_json::json!("Rust Language"),
+        ),
+        Component::new(
+            concept.id,
+            ComponentType::Content,
+            serde_json::json!("Rust is a language"),
+        ),
+        Component::new(
+            concept.id,
+            ComponentType::Tags,
+            serde_json::json!(["rust", "language"]),
+        ),
     ];
 
     EntityRepository::save(&store, &article).await.unwrap();
@@ -135,27 +182,36 @@ async fn test_search_with_type_and_tag_filtering() {
     store.index_entity(&concept, &concept_comps).await.unwrap();
 
     // No filter
-    let results = store.search(&SearchQuery {
-        query: "Rust".to_string(),
-        entity_type: None,
-        tag: None,
-    }).await.unwrap();
+    let results = store
+        .search(&SearchQuery {
+            query: "Rust".to_string(),
+            entity_type: None,
+            tag: None,
+        })
+        .await
+        .unwrap();
     assert_eq!(results.len(), 2);
 
     // Filter by type
-    let results = store.search(&SearchQuery {
-        query: "Rust".to_string(),
-        entity_type: Some("Article".to_string()),
-        tag: None,
-    }).await.unwrap();
+    let results = store
+        .search(&SearchQuery {
+            query: "Rust".to_string(),
+            entity_type: Some("Article".to_string()),
+            tag: None,
+        })
+        .await
+        .unwrap();
     assert_eq!(results.len(), 1);
 
     // Filter by tag
-    let results = store.search(&SearchQuery {
-        query: "Rust".to_string(),
-        entity_type: None,
-        tag: Some("programming".to_string()),
-    }).await.unwrap();
+    let results = store
+        .search(&SearchQuery {
+            query: "Rust".to_string(),
+            entity_type: None,
+            tag: Some("programming".to_string()),
+        })
+        .await
+        .unwrap();
     assert_eq!(results.len(), 1);
 }
 
@@ -164,16 +220,29 @@ async fn test_search_snippets() {
     let store = test_store();
     let entity = Entity::new(EntityType::new("Article"));
     let comps = vec![
-        Component::new(entity.id, ComponentType::Title, serde_json::json!("Transformer Architecture")),
-        Component::new(entity.id, ComponentType::Content, serde_json::json!("The transformer model uses self-attention mechanisms for sequence processing")),
+        Component::new(
+            entity.id,
+            ComponentType::Title,
+            serde_json::json!("Transformer Architecture"),
+        ),
+        Component::new(
+            entity.id,
+            ComponentType::Content,
+            serde_json::json!(
+                "The transformer model uses self-attention mechanisms for sequence processing"
+            ),
+        ),
     ];
     store.index_entity(&entity, &comps).await.unwrap();
 
-    let results = store.search(&SearchQuery {
-        query: "attention".to_string(),
-        entity_type: None,
-        tag: None,
-    }).await.unwrap();
+    let results = store
+        .search(&SearchQuery {
+            query: "attention".to_string(),
+            entity_type: None,
+            tag: None,
+        })
+        .await
+        .unwrap();
 
     assert_eq!(results.len(), 1);
     assert!(results[0].snippet.is_some());
@@ -187,27 +256,40 @@ async fn test_search_rebuild() {
     let entity = Entity::new(EntityType::new("Article"));
     let comps = vec![
         Component::new(entity.id, ComponentType::Title, serde_json::json!("Test")),
-        Component::new(entity.id, ComponentType::Content, serde_json::json!("Content")),
+        Component::new(
+            entity.id,
+            ComponentType::Content,
+            serde_json::json!("Content"),
+        ),
     ];
     store.index_entity(&entity, &comps).await.unwrap();
 
     // Verify search works
-    let results = store.search(&SearchQuery {
-        query: "Test".to_string(),
-        entity_type: None,
-        tag: None,
-    }).await.unwrap();
+    let results = store
+        .search(&SearchQuery {
+            query: "Test".to_string(),
+            entity_type: None,
+            tag: None,
+        })
+        .await
+        .unwrap();
     assert_eq!(results.len(), 1);
 
     // Rebuild
-    store.rebuild(&[(entity.clone(), comps.clone())]).await.unwrap();
+    store
+        .rebuild(&[(entity.clone(), comps.clone())])
+        .await
+        .unwrap();
 
     // Verify search still works
-    let results = store.search(&SearchQuery {
-        query: "Test".to_string(),
-        entity_type: None,
-        tag: None,
-    }).await.unwrap();
+    let results = store
+        .search(&SearchQuery {
+            query: "Test".to_string(),
+            entity_type: None,
+            tag: None,
+        })
+        .await
+        .unwrap();
     assert_eq!(results.len(), 1);
 }
 
@@ -246,10 +328,16 @@ async fn test_version_history_tracking() {
     let entity = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &entity).await.unwrap();
 
-    EntityRepository::increment_version(&store, entity.id).await.unwrap();
-    EntityRepository::increment_version(&store, entity.id).await.unwrap();
+    EntityRepository::increment_version(&store, entity.id)
+        .await
+        .unwrap();
+    EntityRepository::increment_version(&store, entity.id)
+        .await
+        .unwrap();
 
-    let history = EntityRepository::get_version_history(&store, entity.id).await.unwrap();
+    let history = EntityRepository::get_version_history(&store, entity.id)
+        .await
+        .unwrap();
     assert_eq!(history.len(), 2);
     assert_eq!(history[0].version, 2);
     assert_eq!(history[1].version, 1);
@@ -272,9 +360,15 @@ async fn test_transactional_write_entity_and_components() {
         data: serde_json::json!({}),
     };
 
-    store.save_entity_with_components(&entity, &components, &event).await.unwrap();
+    store
+        .save_entity_with_components(&entity, &components, &event)
+        .await
+        .unwrap();
 
-    let loaded = EntityRepository::get(&store, entity.id).await.unwrap().unwrap();
+    let loaded = EntityRepository::get(&store, entity.id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.id, entity.id);
 
     let comps = ComponentRepository::get(&store, entity.id).await.unwrap();
@@ -289,8 +383,16 @@ async fn test_update_entity_with_components_replaces_all() {
     let store = test_store();
     let entity = Entity::new(EntityType::new("Article"));
     let components = vec![
-        Component::new(entity.id, ComponentType::Title, serde_json::json!("Original Title")),
-        Component::new(entity.id, ComponentType::Content, serde_json::json!("Original Body")),
+        Component::new(
+            entity.id,
+            ComponentType::Title,
+            serde_json::json!("Original Title"),
+        ),
+        Component::new(
+            entity.id,
+            ComponentType::Content,
+            serde_json::json!("Original Body"),
+        ),
     ];
     let event = Event {
         id: uuid::Uuid::new_v4(),
@@ -300,7 +402,10 @@ async fn test_update_entity_with_components_replaces_all() {
         data: serde_json::json!({}),
     };
 
-    store.save_entity_with_components(&entity, &components, &event).await.unwrap();
+    store
+        .save_entity_with_components(&entity, &components, &event)
+        .await
+        .unwrap();
 
     // Update with different components
     let new_entity = {
@@ -309,9 +414,21 @@ async fn test_update_entity_with_components_replaces_all() {
         e
     };
     let new_components = vec![
-        Component::new(entity.id, ComponentType::Title, serde_json::json!("New Title")),
-        Component::new(entity.id, ComponentType::Content, serde_json::json!("New Body")),
-        Component::new(entity.id, ComponentType::Tags, serde_json::json!(["new-tag"])),
+        Component::new(
+            entity.id,
+            ComponentType::Title,
+            serde_json::json!("New Title"),
+        ),
+        Component::new(
+            entity.id,
+            ComponentType::Content,
+            serde_json::json!("New Body"),
+        ),
+        Component::new(
+            entity.id,
+            ComponentType::Tags,
+            serde_json::json!(["new-tag"]),
+        ),
     ];
     let update_event = Event {
         id: uuid::Uuid::new_v4(),
@@ -321,15 +438,24 @@ async fn test_update_entity_with_components_replaces_all() {
         data: serde_json::json!({}),
     };
 
-    store.update_entity_with_components(&new_entity, &new_components, &update_event).await.unwrap();
+    store
+        .update_entity_with_components(&new_entity, &new_components, &update_event)
+        .await
+        .unwrap();
 
     let comps = ComponentRepository::get(&store, entity.id).await.unwrap();
     assert_eq!(comps.len(), 3);
 
-    let title = comps.iter().find(|c| c.component_type == ComponentType::Title).unwrap();
+    let title = comps
+        .iter()
+        .find(|c| c.component_type == ComponentType::Title)
+        .unwrap();
     assert_eq!(title.data, serde_json::json!("New Title"));
 
-    let tags = comps.iter().find(|c| c.component_type == ComponentType::Tags).unwrap();
+    let tags = comps
+        .iter()
+        .find(|c| c.component_type == ComponentType::Tags)
+        .unwrap();
     assert_eq!(tags.data, serde_json::json!(["new-tag"]));
 }
 
@@ -339,11 +465,19 @@ async fn test_entity_resolver_exact_match() {
 
     let existing = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &existing).await.unwrap();
-    let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Test Document"));
-    ComponentRepository::save(&store, &title_comp).await.unwrap();
+    let title_comp = Component::new(
+        existing.id,
+        ComponentType::Title,
+        serde_json::json!("Test Document"),
+    );
+    ComponentRepository::save(&store, &title_comp)
+        .await
+        .unwrap();
 
     let candidate = Entity::new(EntityType::new("Article"));
-    let candidates = EntityResolver::find_candidates(&store, &candidate, "Test Document", None).await.unwrap();
+    let candidates = EntityResolver::find_candidates(&store, &candidate, "Test Document", None)
+        .await
+        .unwrap();
     assert_eq!(candidates.len(), 1);
     assert_eq!(candidates[0].entity_id, existing.id);
     assert_eq!(candidates[0].confidence, 1.0);
@@ -355,11 +489,19 @@ async fn test_entity_resolver_no_match_different_type() {
 
     let existing = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &existing).await.unwrap();
-    let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Test Document"));
-    ComponentRepository::save(&store, &title_comp).await.unwrap();
+    let title_comp = Component::new(
+        existing.id,
+        ComponentType::Title,
+        serde_json::json!("Test Document"),
+    );
+    ComponentRepository::save(&store, &title_comp)
+        .await
+        .unwrap();
 
     let candidate = Entity::new(EntityType::new("Concept"));
-    let candidates = EntityResolver::find_candidates(&store, &candidate, "Test Document", None).await.unwrap();
+    let candidates = EntityResolver::find_candidates(&store, &candidate, "Test Document", None)
+        .await
+        .unwrap();
     assert!(candidates.is_empty());
 }
 
@@ -369,11 +511,19 @@ async fn test_entity_resolver_no_match_different_title() {
 
     let existing = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &existing).await.unwrap();
-    let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Existing Document"));
-    ComponentRepository::save(&store, &title_comp).await.unwrap();
+    let title_comp = Component::new(
+        existing.id,
+        ComponentType::Title,
+        serde_json::json!("Existing Document"),
+    );
+    ComponentRepository::save(&store, &title_comp)
+        .await
+        .unwrap();
 
     let candidate = Entity::new(EntityType::new("Article"));
-    let candidates = EntityResolver::find_candidates(&store, &candidate, "Different Title", None).await.unwrap();
+    let candidates = EntityResolver::find_candidates(&store, &candidate, "Different Title", None)
+        .await
+        .unwrap();
     assert!(candidates.is_empty());
 }
 
@@ -389,18 +539,28 @@ async fn test_entity_resolver_merge() {
     let rel = Relationship::new(duplicate.id, canonical.id, RelationshipType::References);
     RelationshipRepository::save(&store, &rel).await.unwrap();
 
-    let comp = Component::new(duplicate.id, ComponentType::Content, serde_json::json!("data"));
+    let comp = Component::new(
+        duplicate.id,
+        ComponentType::Content,
+        serde_json::json!("data"),
+    );
     ComponentRepository::save(&store, &comp).await.unwrap();
 
-    EntityResolver::merge(&store, canonical.id, duplicate.id, 1.0).await.unwrap();
+    EntityResolver::merge(&store, canonical.id, duplicate.id, 1.0)
+        .await
+        .unwrap();
 
     let loaded = EntityRepository::get(&store, duplicate.id).await.unwrap();
     assert!(loaded.is_none());
 
-    let comps = ComponentRepository::get(&store, canonical.id).await.unwrap();
+    let comps = ComponentRepository::get(&store, canonical.id)
+        .await
+        .unwrap();
     assert_eq!(comps.len(), 1);
 
-    let rels = RelationshipRepository::by_source(&store, canonical.id).await.unwrap();
+    let rels = RelationshipRepository::by_source(&store, canonical.id)
+        .await
+        .unwrap();
     assert_eq!(rels.len(), 0);
 }
 
@@ -417,11 +577,17 @@ async fn test_find_by_component_data() {
     );
     ComponentRepository::save(&store, &prov).await.unwrap();
 
-    let found = ComponentRepository::find_by_component_data(&store, "Provenance", "source", "test.md").await.unwrap();
+    let found =
+        ComponentRepository::find_by_component_data(&store, "Provenance", "source", "test.md")
+            .await
+            .unwrap();
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].entity_id, entity.id);
 
-    let not_found = ComponentRepository::find_by_component_data(&store, "Provenance", "source", "other.md").await.unwrap();
+    let not_found =
+        ComponentRepository::find_by_component_data(&store, "Provenance", "source", "other.md")
+            .await
+            .unwrap();
     assert!(not_found.is_empty());
 }
 
@@ -432,12 +598,20 @@ async fn test_entity_resolver_normalized_match() {
     // Store with title "Hello World"
     let existing = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &existing).await.unwrap();
-    let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Hello World"));
-    ComponentRepository::save(&store, &title_comp).await.unwrap();
+    let title_comp = Component::new(
+        existing.id,
+        ComponentType::Title,
+        serde_json::json!("Hello World"),
+    );
+    ComponentRepository::save(&store, &title_comp)
+        .await
+        .unwrap();
 
     // Query with lowercase version - should match via normalized strategy
     let candidate = Entity::new(EntityType::new("Article"));
-    let candidates = EntityResolver::find_candidates(&store, &candidate, "hello world", None).await.unwrap();
+    let candidates = EntityResolver::find_candidates(&store, &candidate, "hello world", None)
+        .await
+        .unwrap();
     assert_eq!(candidates.len(), 1);
     assert_eq!(candidates[0].entity_id, existing.id);
     assert_eq!(candidates[0].confidence, 0.95);
@@ -450,12 +624,25 @@ async fn test_entity_resolver_fuzzy_match() {
     // Store "Attention Is All You Need"
     let existing = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &existing).await.unwrap();
-    let title_comp = Component::new(existing.id, ComponentType::Title, serde_json::json!("Attention Is All You Need"));
-    ComponentRepository::save(&store, &title_comp).await.unwrap();
+    let title_comp = Component::new(
+        existing.id,
+        ComponentType::Title,
+        serde_json::json!("Attention Is All You Need"),
+    );
+    ComponentRepository::save(&store, &title_comp)
+        .await
+        .unwrap();
 
     // Query with variant that differs slightly - should match via fuzzy strategy
     let candidate = Entity::new(EntityType::new("Article"));
-    let candidates = EntityResolver::find_candidates(&store, &candidate, "Attention Is All You Need (2017)", None).await.unwrap();
+    let candidates = EntityResolver::find_candidates(
+        &store,
+        &candidate,
+        "Attention Is All You Need (2017)",
+        None,
+    )
+    .await
+    .unwrap();
 
     assert!(!candidates.is_empty());
     assert!(candidates[0].confidence > 0.95);
@@ -468,13 +655,25 @@ async fn test_delete_by_entity() {
     let entity = Entity::new(EntityType::new("Article"));
     EntityRepository::save(&store, &entity).await.unwrap();
 
-    ComponentRepository::save(&store, &Component::new(entity.id, ComponentType::Title, serde_json::json!("t"))).await.unwrap();
-    ComponentRepository::save(&store, &Component::new(entity.id, ComponentType::Content, serde_json::json!("c"))).await.unwrap();
+    ComponentRepository::save(
+        &store,
+        &Component::new(entity.id, ComponentType::Title, serde_json::json!("t")),
+    )
+    .await
+    .unwrap();
+    ComponentRepository::save(
+        &store,
+        &Component::new(entity.id, ComponentType::Content, serde_json::json!("c")),
+    )
+    .await
+    .unwrap();
 
     let comps = ComponentRepository::get(&store, entity.id).await.unwrap();
     assert_eq!(comps.len(), 2);
 
-    ComponentRepository::delete_by_entity(&store, entity.id).await.unwrap();
+    ComponentRepository::delete_by_entity(&store, entity.id)
+        .await
+        .unwrap();
 
     let comps = ComponentRepository::get(&store, entity.id).await.unwrap();
     assert!(comps.is_empty());
@@ -491,7 +690,11 @@ async fn test_merge_audit_log_and_undo() {
     EntityRepository::save(&store, &duplicate).await.unwrap();
 
     // Add components to duplicate
-    let comp = Component::new(duplicate.id, ComponentType::Content, serde_json::json!("data"));
+    let comp = Component::new(
+        duplicate.id,
+        ComponentType::Content,
+        serde_json::json!("data"),
+    );
     ComponentRepository::save(&store, &comp).await.unwrap();
 
     // Log the merge
@@ -505,18 +708,23 @@ async fn test_merge_audit_log_and_undo() {
         confidence: 0.92,
         timestamp: chrono::Utc::now(),
         reason: "Jaro-Winkler similarity >= 0.85".to_string(),
-        snapshot: Some(serde_json::json!({
-            "entity_type": duplicate.entity_type.as_str(),
-            "is_active": duplicate.is_active,
-            "created_at": duplicate.created_at.to_rfc3339(),
-            "updated_at": duplicate.updated_at.to_rfc3339(),
-            "version": duplicate.version,
-        }).to_string()),
+        snapshot: Some(
+            serde_json::json!({
+                "entity_type": duplicate.entity_type.as_str(),
+                "is_active": duplicate.is_active,
+                "created_at": duplicate.created_at.to_rfc3339(),
+                "updated_at": duplicate.updated_at.to_rfc3339(),
+                "version": duplicate.version,
+            })
+            .to_string(),
+        ),
     };
     EntityResolver::log_merge(&store, &entry).await.unwrap();
 
     // Verify merge history
-    let history = EntityResolver::get_merge_history(&store, canonical.id).await.unwrap();
+    let history = EntityResolver::get_merge_history(&store, canonical.id)
+        .await
+        .unwrap();
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].id, entry.id);
     assert_eq!(history[0].confidence, 0.92);
@@ -525,7 +733,9 @@ async fn test_merge_audit_log_and_undo() {
     EntityResolver::undo_merge(&store, entry.id).await.unwrap();
 
     // Verify merge entry removed
-    let history = EntityResolver::get_merge_history(&store, canonical.id).await.unwrap();
+    let history = EntityResolver::get_merge_history(&store, canonical.id)
+        .await
+        .unwrap();
     assert!(history.is_empty());
 }
 
@@ -551,13 +761,16 @@ async fn test_merge_history_by_source_and_target() {
         confidence: 1.0,
         timestamp: chrono::Utc::now(),
         reason: "Exact match".to_string(),
-        snapshot: Some(serde_json::json!({
-            "entity_type": entity_a.entity_type.as_str(),
-            "is_active": entity_a.is_active,
-            "created_at": entity_a.created_at.to_rfc3339(),
-            "updated_at": entity_a.updated_at.to_rfc3339(),
-            "version": entity_a.version,
-        }).to_string()),
+        snapshot: Some(
+            serde_json::json!({
+                "entity_type": entity_a.entity_type.as_str(),
+                "is_active": entity_a.is_active,
+                "created_at": entity_a.created_at.to_rfc3339(),
+                "updated_at": entity_a.updated_at.to_rfc3339(),
+                "version": entity_a.version,
+            })
+            .to_string(),
+        ),
     };
     EntityResolver::log_merge(&store, &entry1).await.unwrap();
 
@@ -572,22 +785,29 @@ async fn test_merge_history_by_source_and_target() {
         confidence: 0.95,
         timestamp: chrono::Utc::now(),
         reason: "Normalized match".to_string(),
-        snapshot: Some(serde_json::json!({
-            "entity_type": entity_c.entity_type.as_str(),
-            "is_active": entity_c.is_active,
-            "created_at": entity_c.created_at.to_rfc3339(),
-            "updated_at": entity_c.updated_at.to_rfc3339(),
-            "version": entity_c.version,
-        }).to_string()),
+        snapshot: Some(
+            serde_json::json!({
+                "entity_type": entity_c.entity_type.as_str(),
+                "is_active": entity_c.is_active,
+                "created_at": entity_c.created_at.to_rfc3339(),
+                "updated_at": entity_c.updated_at.to_rfc3339(),
+                "version": entity_c.version,
+            })
+            .to_string(),
+        ),
     };
     EntityResolver::log_merge(&store, &entry2).await.unwrap();
 
     // Query by target (B) should find both
-    let history = EntityResolver::get_merge_history(&store, entity_b.id).await.unwrap();
+    let history = EntityResolver::get_merge_history(&store, entity_b.id)
+        .await
+        .unwrap();
     assert_eq!(history.len(), 2);
 
     // Query by source (A) should find one
-    let history = EntityResolver::get_merge_history(&store, entity_a.id).await.unwrap();
+    let history = EntityResolver::get_merge_history(&store, entity_a.id)
+        .await
+        .unwrap();
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].source_id, entity_a.id);
 }

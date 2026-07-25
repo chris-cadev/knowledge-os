@@ -19,37 +19,61 @@ language: "en"
 This paper explores transformer architectures."#;
 
     let importer = MarkdownImporter::new();
-    let result = importer.import_content(content, Path::new("paper.md")).unwrap();
+    let result = importer
+        .import_content(content, Path::new("paper.md"))
+        .unwrap();
 
     assert_eq!(result.entity.entity_type, EntityType::new("Article"));
 
-    let title = result.components.iter()
+    let title = result
+        .components
+        .iter()
         .find(|c| c.component_type == ComponentType::Title)
         .unwrap();
     assert_eq!(title.data, serde_json::json!("My Research Paper"));
 
-    let tags = result.components.iter()
+    let tags = result
+        .components
+        .iter()
         .find(|c| c.component_type == ComponentType::Tags)
         .unwrap();
-    assert_eq!(tags.data, serde_json::json!(["machine-learning", "transformers"]));
+    assert_eq!(
+        tags.data,
+        serde_json::json!(["machine-learning", "transformers"])
+    );
 
-    let author = result.components.iter()
+    let author = result
+        .components
+        .iter()
         .find(|c| c.component_type == ComponentType::Author)
         .unwrap();
     assert_eq!(author.data, serde_json::json!("Jane Doe"));
 
-    let lang = result.components.iter()
+    let lang = result
+        .components
+        .iter()
         .find(|c| c.component_type == ComponentType::Language)
         .unwrap();
     assert_eq!(lang.data, serde_json::json!("en"));
 
-    let provenance = result.components.iter()
+    let provenance = result
+        .components
+        .iter()
         .find(|c| c.component_type == ComponentType::Provenance)
         .unwrap();
-    assert_eq!(provenance.data.get("source").unwrap().as_str().unwrap(), "paper.md");
+    assert_eq!(
+        provenance.data.get("source").unwrap().as_str().unwrap(),
+        "paper.md"
+    );
 
-    assert!(result.components.iter().any(|c| c.component_type == ComponentType::Timeline));
-    assert!(result.components.iter().any(|c| c.component_type == ComponentType::Content));
+    assert!(result
+        .components
+        .iter()
+        .any(|c| c.component_type == ComponentType::Timeline));
+    assert!(result
+        .components
+        .iter()
+        .any(|c| c.component_type == ComponentType::Content));
 }
 
 #[test]
@@ -59,22 +83,34 @@ fn test_import_without_frontmatter_uses_h1() {
 Some body content here."#;
 
     let importer = MarkdownImporter::new();
-    let result = importer.import_content(content, Path::new("test.md")).unwrap();
+    let result = importer
+        .import_content(content, Path::new("test.md"))
+        .unwrap();
 
-    let title = result.components.iter()
+    let title = result
+        .components
+        .iter()
         .find(|c| c.component_type == ComponentType::Title)
         .unwrap();
     assert_eq!(title.data, serde_json::json!("My Document Title"));
 
     // Should default language to en
-    let lang = result.components.iter()
+    let lang = result
+        .components
+        .iter()
         .find(|c| c.component_type == ComponentType::Language)
         .unwrap();
     assert_eq!(lang.data, serde_json::json!("en"));
 
     // Should not have Tags or Author
-    assert!(!result.components.iter().any(|c| c.component_type == ComponentType::Tags));
-    assert!(!result.components.iter().any(|c| c.component_type == ComponentType::Author));
+    assert!(!result
+        .components
+        .iter()
+        .any(|c| c.component_type == ComponentType::Tags));
+    assert!(!result
+        .components
+        .iter()
+        .any(|c| c.component_type == ComponentType::Author));
 }
 
 #[test]
@@ -82,9 +118,13 @@ fn test_import_without_frontmatter_or_heading_uses_filename() {
     let content = "Just some plain content.";
 
     let importer = MarkdownImporter::new();
-    let result = importer.import_content(content, Path::new("my-article.md")).unwrap();
+    let result = importer
+        .import_content(content, Path::new("my-article.md"))
+        .unwrap();
 
-    let title = result.components.iter()
+    let title = result
+        .components
+        .iter()
         .find(|c| c.component_type == ComponentType::Title)
         .unwrap();
     assert_eq!(title.data, serde_json::json!("my-article"));
@@ -97,7 +137,9 @@ fn test_cross_references_extracted_from_markdown() {
 See [other file](other.md) and [another](docs/another.md)."#;
 
     let importer = MarkdownImporter::new();
-    let result = importer.import_content(content, Path::new("test.md")).unwrap();
+    let result = importer
+        .import_content(content, Path::new("test.md"))
+        .unwrap();
 
     assert_eq!(result.cross_references.len(), 2);
     assert!(result.cross_references[0]
@@ -121,7 +163,9 @@ fn test_cross_references_extract_md_and_url_links() {
 See [website](https://example.com) and [file](other.md)."#;
 
     let importer = MarkdownImporter::new();
-    let result = importer.import_content(content, Path::new("test.md")).unwrap();
+    let result = importer
+        .import_content(content, Path::new("test.md"))
+        .unwrap();
 
     // Should extract both URL reference and .md file reference
     assert_eq!(result.cross_references.len(), 2);
@@ -147,9 +191,13 @@ fn main() {}
 ```"#;
 
     let importer = MarkdownImporter::new();
-    let result = importer.import_content(content, Path::new("test.md")).unwrap();
+    let result = importer
+        .import_content(content, Path::new("test.md"))
+        .unwrap();
 
-    let content_comp = result.components.iter()
+    let content_comp = result
+        .components
+        .iter()
         .find(|c| c.component_type == ComponentType::Content)
         .unwrap();
     let body = content_comp.data.as_str().unwrap();
@@ -172,7 +220,9 @@ language: "fr"
 Body content."#;
 
     let importer = MarkdownImporter::new();
-    let result = importer.import_content(content, Path::new("test.md")).unwrap();
+    let result = importer
+        .import_content(content, Path::new("test.md"))
+        .unwrap();
 
     let expected_types = vec![
         ComponentType::Title,
@@ -186,8 +236,12 @@ Body content."#;
 
     for expected in &expected_types {
         assert!(
-            result.components.iter().any(|c| c.component_type == *expected),
-            "Missing component type: {:?}", expected
+            result
+                .components
+                .iter()
+                .any(|c| c.component_type == *expected),
+            "Missing component type: {:?}",
+            expected
         );
     }
 }

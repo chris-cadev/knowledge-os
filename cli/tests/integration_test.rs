@@ -11,11 +11,17 @@ fn write_file(dir: &std::path::Path, name: &str, content: &str) -> std::path::Pa
 #[test]
 fn test_import_single_file() {
     let tmp = TempDir::new().unwrap();
-    let md = write_file(tmp.path(), "test.md", "---\ntitle: \"Test Doc\"\ntags:\n  - rust\n---\n\n# Test\n\nHello world.");
+    let md = write_file(
+        tmp.path(),
+        "test.md",
+        "---\ntitle: \"Test Doc\"\ntags:\n  - rust\n---\n\n# Test\n\nHello world.",
+    );
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(&md)
         .output()
@@ -34,9 +40,11 @@ fn test_import_directory() {
     write_file(tmp.path(), "b.md", "# Doc B\n\nContent B.");
     write_file(tmp.path(), "not_a.txt", "ignore this");
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(tmp.path())
         .output()
@@ -54,9 +62,11 @@ fn test_idempotent_reimport_updates_version() {
     let md = write_file(tmp.path(), "test.md", "# Same Title\n\nOriginal content.");
 
     // First import
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(&md)
         .output()
@@ -64,9 +74,11 @@ fn test_idempotent_reimport_updates_version() {
     assert!(output.status.success());
 
     // Second import (should update, not create)
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(&md)
         .output()
@@ -74,8 +86,16 @@ fn test_idempotent_reimport_updates_version() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stdout.contains("Duplicates resolved: 1"), "Expected 'Duplicates resolved: 1', got stdout: {}", stdout);
-    assert!(!stderr.contains("ERROR"), "Expected no errors, got stderr: {}", stderr);
+    assert!(
+        stdout.contains("Duplicates resolved: 1"),
+        "Expected 'Duplicates resolved: 1', got stdout: {}",
+        stdout
+    );
+    assert!(
+        !stderr.contains("ERROR"),
+        "Expected no errors, got stderr: {}",
+        stderr
+    );
 }
 
 #[test]
@@ -84,18 +104,22 @@ fn test_search_by_keyword() {
     let md = write_file(tmp.path(), "test.md", "---\ntitle: \"Transformer Paper\"\ntags:\n  - transformer\n---\n\n# Transformer\n\nAttention is all you need.");
 
     // Import
-    Command::cargo_bin("kos").unwrap()
+    Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(&md)
         .output()
         .unwrap();
 
     // Search
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("search")
         .arg("transformer")
         .output()
@@ -110,23 +134,36 @@ fn test_search_by_keyword() {
 #[test]
 fn test_search_with_type_filter() {
     let tmp = TempDir::new().unwrap();
-    write_file(tmp.path(), "a.md", "---\ntitle: \"Article One\"\n---\n\nBody.");
-    write_file(tmp.path(), "b.md", "---\ntitle: \"Article Two\"\n---\n\nBody.");
+    write_file(
+        tmp.path(),
+        "a.md",
+        "---\ntitle: \"Article One\"\n---\n\nBody.",
+    );
+    write_file(
+        tmp.path(),
+        "b.md",
+        "---\ntitle: \"Article Two\"\n---\n\nBody.",
+    );
 
-    Command::cargo_bin("kos").unwrap()
+    Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(tmp.path())
         .output()
         .unwrap();
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("search")
         .arg("Article")
-        .arg("--type").arg("Article")
+        .arg("--type")
+        .arg("Article")
         .output()
         .unwrap();
 
@@ -141,17 +178,21 @@ fn test_list_entities() {
     write_file(tmp.path(), "a.md", "# Doc A");
     write_file(tmp.path(), "b.md", "# Doc B");
 
-    Command::cargo_bin("kos").unwrap()
+    Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(tmp.path())
         .output()
         .unwrap();
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("list")
         .output()
         .unwrap();
@@ -167,9 +208,11 @@ fn test_archive_and_restore() {
     let md = write_file(tmp.path(), "test.md", "# Archive Test");
 
     // Import
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(&md)
         .output()
@@ -181,9 +224,11 @@ fn test_archive_and_restore() {
     let id = id_line.split_whitespace().nth(2).unwrap();
 
     // Archive
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("archive")
         .arg(id)
         .output()
@@ -191,9 +236,11 @@ fn test_archive_and_restore() {
     assert!(output.status.success());
 
     // List should be empty
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("list")
         .output()
         .unwrap();
@@ -201,9 +248,11 @@ fn test_archive_and_restore() {
     assert!(stdout.contains("No entities found"));
 
     // Restore
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("restore")
         .arg(id)
         .output()
@@ -211,9 +260,11 @@ fn test_archive_and_restore() {
     assert!(output.status.success());
 
     // List should show it again
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("list")
         .output()
         .unwrap();
@@ -224,11 +275,17 @@ fn test_archive_and_restore() {
 #[test]
 fn test_get_entity_details() {
     let tmp = TempDir::new().unwrap();
-    let md = write_file(tmp.path(), "test.md", "---\ntitle: \"Detail Test\"\ntags:\n  - test\n---\n\n# Detail Test\n\nSome content.");
+    let md = write_file(
+        tmp.path(),
+        "test.md",
+        "---\ntitle: \"Detail Test\"\ntags:\n  - test\n---\n\n# Detail Test\n\nSome content.",
+    );
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(&md)
         .output()
@@ -237,9 +294,11 @@ fn test_get_entity_details() {
     let id_line = stdout.lines().find(|l| l.contains("Created:")).unwrap();
     let id = id_line.split_whitespace().nth(2).unwrap();
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("get")
         .arg(id)
         .output()
@@ -256,13 +315,19 @@ fn test_get_entity_details() {
 #[test]
 fn test_cross_references_create_relationships() {
     let tmp = TempDir::new().unwrap();
-    write_file(tmp.path(), "source.md", "# Source\n\nSee [target](target.md).");
+    write_file(
+        tmp.path(),
+        "source.md",
+        "# Source\n\nSee [target](target.md).",
+    );
     write_file(tmp.path(), "target.md", "# Target\n\nTarget content.");
 
     // Import directory
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(tmp.path())
         .output()
@@ -270,9 +335,11 @@ fn test_cross_references_create_relationships() {
     assert!(output.status.success());
 
     // List entities
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("list")
         .output()
         .unwrap();
@@ -285,17 +352,21 @@ fn test_rebuild_index() {
     let tmp = TempDir::new().unwrap();
     write_file(tmp.path(), "test.md", "# Rebuild Test");
 
-    Command::cargo_bin("kos").unwrap()
+    Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(tmp.path().join("test.md"))
         .output()
         .unwrap();
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("rebuild-index")
         .output()
         .unwrap();
@@ -310,9 +381,11 @@ fn test_db_flag_configurable() {
     let tmp = TempDir::new().unwrap();
     let md = write_file(tmp.path(), "test.md", "# DB Flag Test");
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("custom.db")
+        .arg("--db")
+        .arg("custom.db")
         .arg("import")
         .arg(&md)
         .output()
@@ -326,17 +399,21 @@ fn test_search_result_has_snippet() {
     let tmp = TempDir::new().unwrap();
     let md = write_file(tmp.path(), "test.md", "---\ntitle: \"Snippet Test\"\n---\n\n# Snippet Test\n\nThe transformer architecture uses self-attention.");
 
-    Command::cargo_bin("kos").unwrap()
+    Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(&md)
         .output()
         .unwrap();
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("search")
         .arg("transformer")
         .output()
@@ -351,9 +428,11 @@ fn test_search_result_has_snippet() {
 fn test_import_error_handling() {
     let tmp = TempDir::new().unwrap();
     // Import a non-existent file
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(tmp.path().join("nonexistent.md"))
         .output()
@@ -367,12 +446,18 @@ fn test_import_error_handling() {
 fn test_batch_import_progress_output() {
     let tmp = TempDir::new().unwrap();
     for i in 0..5 {
-        write_file(tmp.path(), &format!("doc{}.md", i), &format!("# Doc {}\n\nContent {}.", i, i));
+        write_file(
+            tmp.path(),
+            &format!("doc{}.md", i),
+            &format!("# Doc {}\n\nContent {}.", i, i),
+        );
     }
 
-    let output = Command::cargo_bin("kos").unwrap()
+    let output = Command::cargo_bin("kos")
+        .unwrap()
         .current_dir(tmp.path())
-        .arg("--db").arg("test.db")
+        .arg("--db")
+        .arg("test.db")
         .arg("import")
         .arg(tmp.path())
         .output()

@@ -23,9 +23,15 @@ pub trait EntityRepository: Send + Sync {
     async fn find_by_type(&self, entity_type: &str) -> Result<Vec<Entity>, StorageError>;
     async fn find_by_title(&self, title: &str) -> Result<Vec<Entity>, StorageError>;
     async fn increment_version(&self, id: Uuid) -> Result<(), StorageError>;
-    async fn find_by_component_type(&self, component_type: &str) -> Result<Vec<Entity>, StorageError>;
+    async fn find_by_component_type(
+        &self,
+        component_type: &str,
+    ) -> Result<Vec<Entity>, StorageError>;
     async fn find_by_tag(&self, tag: &str) -> Result<Vec<Entity>, StorageError>;
-    async fn get_version_history(&self, entity_id: Uuid) -> Result<Vec<EntityVersion>, StorageError>;
+    async fn get_version_history(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<EntityVersion>, StorageError>;
 }
 
 #[async_trait]
@@ -41,7 +47,10 @@ pub trait RelationshipRepository: Send + Sync {
         source_id: Uuid,
         target_id: Uuid,
     ) -> Result<Option<Relationship>, StorageError>;
-    async fn find_by_type(&self, relationship_type: &str) -> Result<Vec<Relationship>, StorageError>;
+    async fn find_by_type(
+        &self,
+        relationship_type: &str,
+    ) -> Result<Vec<Relationship>, StorageError>;
 }
 
 #[async_trait]
@@ -49,9 +58,18 @@ pub trait ComponentRepository: Send + Sync {
     async fn get(&self, entity_id: Uuid) -> Result<Vec<Component>, StorageError>;
     async fn save(&self, component: &Component) -> Result<(), StorageError>;
     async fn delete(&self, id: Uuid) -> Result<(), StorageError>;
-    async fn find_by_type(&self, entity_id: Uuid, component_type: &str) -> Result<Vec<Component>, StorageError>;
+    async fn find_by_type(
+        &self,
+        entity_id: Uuid,
+        component_type: &str,
+    ) -> Result<Vec<Component>, StorageError>;
     async fn update_data(&self, id: Uuid, data: serde_json::Value) -> Result<(), StorageError>;
-    async fn find_by_component_data(&self, component_type: &str, json_path: &str, value: &str) -> Result<Vec<Component>, StorageError>;
+    async fn find_by_component_data(
+        &self,
+        component_type: &str,
+        json_path: &str,
+        value: &str,
+    ) -> Result<Vec<Component>, StorageError>;
     async fn delete_by_entity(&self, entity_id: Uuid) -> Result<(), StorageError>;
 }
 
@@ -72,7 +90,11 @@ pub struct SearchResult {
 
 #[async_trait]
 pub trait SearchIndex: Send + Sync {
-    async fn index_entity(&self, entity: &Entity, components: &[Component]) -> Result<(), StorageError>;
+    async fn index_entity(
+        &self,
+        entity: &Entity,
+        components: &[Component],
+    ) -> Result<(), StorageError>;
     async fn remove_entity(&self, entity_id: Uuid) -> Result<(), StorageError>;
     async fn search(&self, query: &SearchQuery) -> Result<Vec<SearchResult>, StorageError>;
     async fn rebuild(&self, entities: &[(Entity, Vec<Component>)]) -> Result<(), StorageError>;
@@ -120,6 +142,11 @@ pub struct ResolutionCandidate {
     pub entity_id: Uuid,
     pub confidence: f64,
     pub reason: String,
+    /// Component scores for composite resolution (None for non-composite strategies)
+    pub title_score: Option<f64>,
+    pub content_score: Option<f64>,
+    pub metadata_score: Option<f64>,
+    pub structural_score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,16 +160,29 @@ pub struct MergeAuditEntry {
     pub confidence: f64,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub reason: String,
-    pub snapshot: Option<String>,  // JSON snapshot of pre-merge state for undo
+    pub snapshot: Option<String>, // JSON snapshot of pre-merge state for undo
 }
 
 #[async_trait]
 pub trait EntityResolver: Send + Sync {
-    async fn find_candidates(&self, entity: &Entity, title: &str, content: Option<&str>) -> Result<Vec<ResolutionCandidate>, StorageError>;
-    async fn merge(&self, canonical_id: Uuid, duplicate_id: Uuid, confidence: f64) -> Result<(), StorageError>;
+    async fn find_candidates(
+        &self,
+        entity: &Entity,
+        title: &str,
+        content: Option<&str>,
+    ) -> Result<Vec<ResolutionCandidate>, StorageError>;
+    async fn merge(
+        &self,
+        canonical_id: Uuid,
+        duplicate_id: Uuid,
+        confidence: f64,
+    ) -> Result<(), StorageError>;
     async fn log_merge(&self, entry: &MergeAuditEntry) -> Result<(), StorageError>;
     async fn undo_merge(&self, merge_id: Uuid) -> Result<(), StorageError>;
-    async fn get_merge_history(&self, entity_id: Uuid) -> Result<Vec<MergeAuditEntry>, StorageError>;
+    async fn get_merge_history(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<MergeAuditEntry>, StorageError>;
     async fn get_all_merge_history(&self) -> Result<Vec<MergeAuditEntry>, StorageError>;
 }
 
