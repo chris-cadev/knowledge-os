@@ -74,19 +74,26 @@ Proposed --> Accepted --> [Deprecated | Superseded]
 
 ## ADR Index
 
-| ADR      | Title                                                        | Status   | Date       |
-| -------- | ------------------------------------------------------------ | -------- | ---------- |
-| ADR-0001 | [Knowledge Model as Canonical Source of Truth](adr-0001.md)  | Accepted | 2026-07-21 |
-| ADR-0002 | [Storage Independence via Adapter Pattern](adr-0002.md)      | Accepted | 2026-07-21 |
-| ADR-0003 | [Entity Component Model for Knowledge Entities](adr-0003.md) | Accepted | 2026-07-21 |
-| ADR-0004 | [Event-Driven Derivation Pipeline](adr-0004.md)              | Accepted | 2026-07-21 |
-| ADR-0005 | [Compiler-Inspired Architecture](adr-0005.md)                | Accepted | 2026-07-21 |
-| ADR-0006 | [Entity Resolution as Critical Layer](adr-0006.md)           | Accepted | 2026-07-22 |
-| ADR-0007 | [Multi-Format Import via ImportAdapter Trait](adr-0007.md)   | Accepted | 2026-07-22 |
-| ADR-0008 | [Fuzzy Entity Resolution with Confidence Scoring](adr-0008.md) | Accepted | 2026-07-22 |
-| ADR-0009 | [Extended Cross-Reference Patterns](adr-0009.md)            | Accepted | 2026-07-22 |
-| ADR-0010 | [Entity Type Inference from Frontmatter](adr-0010.md)        | Accepted | 2026-07-22 |
-| ADR-0011 | [BinaryContent Component](adr-0011.md)                      | Accepted | 2026-07-22 |
+| ADR      | Title                                                            | Status   | Date       |
+| -------- | ---------------------------------------------------------------- | -------- | ---------- |
+| ADR-0001 | [Knowledge Model as Canonical Source of Truth](adr-0001.md)      | Accepted | 2026-07-21 |
+| ADR-0002 | [Storage Independence via Adapter Pattern](adr-0002.md)          | Accepted | 2026-07-21 |
+| ADR-0003 | [Entity Component Model for Knowledge Entities](adr-0003.md)     | Accepted | 2026-07-21 |
+| ADR-0004 | [Event-Driven Derivation Pipeline](adr-0004.md)                  | Accepted | 2026-07-21 |
+| ADR-0005 | [Compiler-Inspired Architecture](adr-0005.md)                    | Accepted | 2026-07-21 |
+| ADR-0006 | [Entity Resolution as Critical Layer](adr-0006.md)               | Accepted | 2026-07-22 |
+| ADR-0007 | [Multi-Format Import via ImportAdapter Trait](adr-0007.md)       | Accepted | 2026-07-22 |
+| ADR-0008 | [Fuzzy Entity Resolution with Confidence Scoring](adr-0008.md)   | Accepted | 2026-07-22 |
+| ADR-0009 | [Extended Cross-Reference Patterns](adr-0009.md)                 | Accepted | 2026-07-22 |
+| ADR-0010 | [Entity Type Inference from Frontmatter](adr-0010.md)            | Accepted | 2026-07-22 |
+| ADR-0011 | [BinaryContent Component](adr-0011.md)                           | Accepted | 2026-07-22 |
+| ADR-0012 | [PDF Parser Selection](adr-0012.md)                              | Accepted | 2026-07-24 |
+| ADR-0013 | [Composite Entity Resolution with Weighted Signals](adr-0013.md) | Accepted | 2026-07-24 |
+| ADR-0014 | [Bounded Graph Traversal via Recursive CTE](adr-0014.md)         | Proposed | 2026-07-24 |
+| ADR-0015 | [View Projection System](adr-0015.md)                            | Proposed | 2026-07-24 |
+| ADR-0016 | [Plugin System Architecture](adr-0016.md)                        | Proposed | 2026-07-24 |
+| ADR-0017 | [Semantic Search via Embeddings](adr-0017.md)                    | Proposed | 2026-07-24 |
+| ADR-0018 | [Collection Entity for Curated Groups](adr-0018.md)              | Proposed | 2026-07-24 |
 
 ---
 
