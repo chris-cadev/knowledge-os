@@ -1,6 +1,6 @@
 # IP-001: Phase 1 -- Graph Traversal
 
-**Status:** Draft
+**Status:** Complete
 **ADR(s):** [ADR-0014](../../architecture/adrs/adr-0014.md) (Bounded Graph Traversal via Recursive CTE)
 **PRD(s):** [PRD-0003](../prds/prd-0003-graph-exploration-and-plugins.md) (US1: Navigate entity relationships)
 **Estimated effort:** ~3 days
@@ -266,4 +266,44 @@ D1 is pure type definitions -- no behavior changes. D2 adds the actual recursive
 
 ## Implementation Notes
 
-*(Filled in during/after implementation)*
+### Deviations from ADR-0014
+
+1. **Cycle detection:** ADR-0014 specifies `SELECT DISTINCT` for cycle detection. Implementation uses path tracking with `NOT LIKE` check on accumulated path string (`(',' || t.path || ',') NOT LIKE ('%,' || e.id || ',%')`). This provides explicit cycle detection at each recursion step rather than relying on `UNION` deduplication. The `UNION` (not `UNION ALL`) already deduplicates identical `(id, depth)` pairs, but path tracking prevents revisiting nodes reachable via different paths at the same depth.
+
+2. **Relationship type filter:** `cmd_traverse` hardcodes `RelationshipType::References` for the `--type` flag (line 969 of `cli/src/main.rs`). The `RelationshipType` enum currently has a single variant. The filter works correctly for `references` but does not yet support other relationship types. This is a known limitation pending relationship type expansion.
+
+### Delivered vs. Planned
+
+| Deliverable | Status | Notes |
+|-------------|--------|-------|
+| D1: Types & Port | Complete | All types match plan exactly. `TraversalConfig::default()` adds `default_max_results: 100`. |
+| D2: Recursive CTE | Complete | Implements outgoing, incoming, and both directions. Path reconstruction via `reconstruct_path` and `reconstruct_edges` helper methods. |
+| D3: CLI Command | Complete | `Traverse` subcommand with all planned flags. Output format matches PRD-0003 example. |
+
+### BDD Coverage
+
+4 of 6 planned scenarios implemented in `cli/features/prd-0003/traversal.feature`:
+- Basic outgoing traversal
+- Bidirectional traversal
+- Depth limiting
+- Nonexistent entity error
+
+Missing BDD scenarios (covered by integration tests):
+- Relationship type filter
+- Entity type filter
+
+### Integration Test Coverage
+
+14 traversal test calls in `core/knowledge-storage/tests/integration_test.rs` covering:
+- Chain (A -> B -> C -> D)
+- Tree (A -> {B, C}, B -> {D, E}, C -> {F})
+- Cycle (A -> B -> C -> A)
+- Diamond (A -> {B, C}, B -> D, C -> D)
+- Bidirectional (A <-> B)
+- Disconnected (A -> B, C -> D)
+- Depth limiting
+- Relationship type filtering
+- Entity type filtering
+- Start-not-found error
+- Empty graph
+- Max results limit

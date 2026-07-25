@@ -9,36 +9,43 @@
 
 ## Context
 
-ADR-0016 chose in-process plugins (trait objects compiled into the binary) with TOML manifests, a capability registry, and error boundaries. Dynamic library loading is deferred -- Rust has no stable ABI.
+ADR-0016 chose in-process plugins (trait objects compiled into the binary) with TOML manifests, a capability registry, and error boundaries. Dynamic library loading is deferred — Rust has no stable ABI.
 
-This phase creates the `knowledge-plugin` crate (new workspace member), implements the plugin infrastructure, and refactors the existing Markdown importer as the first plugin. The existing `ImportAdapter` trait from `knowledge-import` becomes a plugin capability.
+This phase creates the `knowledge-plugin` crate (new workspace member), implements the plugin infrastructure, and refactors the existing importers as plugins. The existing `ImportAdapter` trait from `knowledge-import` becomes a plugin capability.
+
+**Prerequisite:** IP-001 (Graph Traversal) is complete.
+
+**Dependency:** The `CapabilityRegistry` references `AiAdapter` and `VectorStore` traits (from IP-004). D1 defines minimal stubs for these traits in `knowledge-core`. IP-004 D1 refines them with full API (e.g., `dimensions()`). This allows IP-003 to proceed independently of IP-004.
 
 ---
 
 ## Deliverables
 
-### D1: Plugin Types and Plugin Trait
+### D1: Plugin Types, Capability Stubs, and Plugin Trait
 
-**Purpose:** Define the plugin manifest, trait, and capability types in `knowledge-core`
+**Purpose:** Define the plugin manifest, trait, capability types, and minimal `AiAdapter`/`VectorStore` stubs in `knowledge-core`
 
 **Files:**
 
-| File | Action | Description |
-|------|--------|-------------|
-| `core/knowledge-core/src/ports/mod.rs` | Modify | Add `Plugin` trait, `PluginManifest`, `PluginCapability`, `PluginError` types |
+| File                                   | Action | Description                                                                                                             |
+| -------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `core/knowledge-core/src/ports/mod.rs` | Modify | Add `Plugin` trait, `PluginManifest`, `PluginCapability`, `PluginError`, `AiAdapter` (stub), `VectorStore` (stub) types |
 
 **New types (per ADR-0016):**
 
 ```rust
+// --- Plugin Manifest ---
+
 pub struct PluginManifest {
     pub name: String,
     pub version: String,
     pub description: String,
     pub author: String,
     pub license: Option<String>,
-    pub capabilities: Vec<PluginCapability>,
-    pub priority: Option<u32>,
+    pub priority: Option<u32>, // Lower = preferred, default 100
 }
+
+// --- Plugin Capability ---
 
 pub enum PluginCapability {
     Importer { formats: Vec<String> },
@@ -47,11 +54,15 @@ pub enum PluginCapability {
     VectorStore { name: String },
 }
 
+// --- Plugin Trait ---
+
 pub trait Plugin: Send + Sync {
     fn manifest(&self) -> &PluginManifest;
     fn activate(&self) -> Result<(), PluginError>;
     fn deactivate(&self) -> Result<(), PluginError>;
 }
+
+// --- Plugin Error ---
 
 #[derive(Debug, thiserror::Error)]
 pub enum PluginError {
@@ -64,13 +75,51 @@ pub enum PluginError {
     #[error("Plugin timeout: {0}")]
     Timeout(String),
 }
+
+// --- AI Adapter Stub (refined in IP-004 D1) ---
+
+#[async_trait]
+pub trait AiAdapter: Send + Sync {
+    async fn embed(&self, content: &str) -> Result<Vec<f32>, AiError>;
+    fn model_name(&self) -> &str;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AiError {
+    #[error("Provider error: {0}")]
+    Provider(String),
+    #[error("Network error: {0}")]
+    Network(String),
+}
+
+// --- Vector Store Stub (refined in IP-004 D1) ---
+
+#[async_trait]
+pub trait VectorStore: Send + Sync {
+    async fn upsert(&self, entity_id: &str, vector: &[f32]) -> Result<(), VectorError>;
+    async fn search(&self, query: &[f32], k: usize) -> Result<Vec<VectorResult>, VectorError>;
+    async fn delete(&self, entity_id: &str) -> Result<(), VectorError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum VectorError {
+    #[error("Storage error: {0}")]
+    Storage(String),
+}
+
+pub struct VectorResult {
+    pub entity_id: String,
+    pub score: f64,
+}
 ```
+
+**Why stubs in D1:** ADR-0016's `CapabilityRegistry` references `Box<dyn AiAdapter>` and `Box<dyn VectorStore>`. These traits must exist in `knowledge-core` before `knowledge-plugin` can compile. IP-004 D1 refines them with `dimensions()`, `VectorFilter`, `VectorMetadata`, and `rebuild()`. The stubs are forward-compatible — adding methods to a trait is a breaking change, but since no external consumers exist yet, this is acceptable.
 
 **Verification:**
 - `cargo check -p knowledge-core` compiles
 - `cargo test -p knowledge-core` passes
 
-**Exit criteria:** Plugin types compile
+**Exit criteria:** Plugin types and capability stubs compile
 
 ---
 
@@ -80,16 +129,16 @@ pub enum PluginError {
 
 **Files:**
 
-| File | Action | Description |
-|------|--------|-------------|
-| `Cargo.toml` | Modify | Add `core/knowledge-plugin` to workspace members |
-| `core/knowledge-plugin/Cargo.toml` | Create | Crate manifest with dependencies: knowledge-core, toml, thiserror, tokio |
-| `core/knowledge-plugin/src/lib.rs` | Create | Module declarations |
-| `core/knowledge-plugin/src/manifest.rs` | Create | TOML manifest parser |
-| `core/knowledge-plugin/src/registry.rs` | Create | `CapabilityRegistry` implementation |
-| `core/knowledge-plugin/src/sandbox.rs` | Create | `safe_call` error boundary wrapper |
-| `core/knowledge-plugin/src/loader.rs` | Create | Plugin discovery and loading |
-| `core/knowledge-plugin/tests/integration_test.rs` | Create | Plugin system integration tests |
+| File                                              | Action | Description                                                              |
+| ------------------------------------------------- | ------ | ------------------------------------------------------------------------ |
+| `Cargo.toml`                                      | Modify | Add `core/knowledge-plugin` to workspace members                         |
+| `core/knowledge-plugin/Cargo.toml`                | Create | Crate manifest with dependencies: knowledge-core, toml, thiserror, tokio |
+| `core/knowledge-plugin/src/lib.rs`                | Create | Module declarations                                                      |
+| `core/knowledge-plugin/src/manifest.rs`           | Create | TOML manifest parser                                                     |
+| `core/knowledge-plugin/src/registry.rs`           | Create | `CapabilityRegistry` implementation                                      |
+| `core/knowledge-plugin/src/sandbox.rs`            | Create | `safe_call` error boundary wrapper                                       |
+| `core/knowledge-plugin/src/loader.rs`             | Create | Plugin discovery and loading                                             |
+| `core/knowledge-plugin/tests/integration_test.rs` | Create | Plugin system integration tests                                          |
 
 **CapabilityRegistry (per ADR-0016):**
 
@@ -102,9 +151,22 @@ pub struct CapabilityRegistry {
 }
 
 impl CapabilityRegistry {
+    pub fn new() -> Self { ... }
     pub fn register_importer(&mut self, format: String, adapter: Box<dyn ImportAdapter>);
+    pub fn register_renderer(&mut self, name: String, adapter: Box<dyn ViewAdapter>);
+    pub fn register_ai_provider(&mut self, name: String, adapter: Box<dyn AiAdapter>);
+    pub fn register_vector_store(&mut self, name: String, adapter: Box<dyn VectorStore>);
     pub fn get_importer(&self, format: &str) -> Result<&dyn ImportAdapter, PluginError>;
-    // ... similar for other capabilities
+    pub fn get_renderer(&self, name: &str) -> Result<&dyn ViewAdapter, PluginError>;
+    pub fn get_ai_provider(&self, name: &str) -> Result<&dyn AiAdapter, PluginError>;
+    pub fn get_vector_store(&self, name: &str) -> Result<&dyn VectorStore, PluginError>;
+    pub fn list_plugins(&self) -> Vec<PluginInfo>;
+}
+
+pub struct PluginInfo {
+    pub name: String,
+    pub version: String,
+    pub capabilities: Vec<String>,
 }
 ```
 
@@ -142,20 +204,22 @@ where
 
 ---
 
-### D3: Markdown Importer as First Plugin
+### D3: Importers Refactored as Plugins
 
-**Purpose:** Refactor existing Markdown importer to register as a plugin
+**Purpose:** Refactor existing Markdown, PDF, and URL importers to register as plugins
 
 **Files:**
 
-| File | Action | Description |
-|------|--------|-------------|
-| `core/knowledge-import/src/features/importer/markdown.rs` | Modify | Implement `Plugin` trait for `MarkdownImporter` |
-| `core/knowledge-import/src/features/importer/mod.rs` | Modify | Export `MarkdownImporterPlugin` |
+| File                                                      | Action | Description                                                               |
+| --------------------------------------------------------- | ------ | ------------------------------------------------------------------------- |
+| `core/knowledge-import/src/features/importer/markdown.rs` | Modify | Add `Plugin` impl for `MarkdownImporter`                                  |
+| `core/knowledge-import/src/features/importer/pdf.rs`      | Modify | Add `Plugin` impl for `PdfImporter`                                       |
+| `core/knowledge-import/src/features/importer/url.rs`      | Modify | Add `Plugin` impl for `UrlImporter`                                       |
+| `core/knowledge-import/src/features/importer/mod.rs`      | Modify | Export `MarkdownImporterPlugin`, `PdfImporterPlugin`, `UrlImporterPlugin` |
 
 **Implementation notes:**
 
-The existing `MarkdownImporter` already implements `ImportAdapter`. We add `Plugin` implementation:
+Each existing importer already implements `ImportAdapter`. We add `Plugin` implementation:
 
 ```rust
 pub struct MarkdownImporterPlugin {
@@ -173,15 +237,10 @@ impl ImportAdapter for MarkdownImporterPlugin {
 }
 ```
 
-Similarly, `PdfImporter` and `UrlImporter` become plugins:
-
-```rust
-pub struct PdfImporterPlugin { manifest: PluginManifest }
-pub struct UrlImporterPlugin { manifest: PluginManifest }
-```
+Similarly for `PdfImporterPlugin` and `UrlImporterPlugin`.
 
 **Verification:**
-- Unit test: MarkdownImporterPlugin manifest matches ImportAdapter capabilities
+- Unit test: each plugin's manifest matches its ImportAdapter capabilities
 - Integration test: all 3 importers register correctly with CapabilityRegistry
 - Integration test: existing import tests still pass (no regression)
 
@@ -195,11 +254,11 @@ pub struct UrlImporterPlugin { manifest: PluginManifest }
 
 **Files:**
 
-| File | Action | Description |
-|------|--------|-------------|
-| `cli/src/main.rs` | Modify | Add `Plugin` subcommand with `list` and `info` subcommands |
-| `cli/features/prd-0003/plugin.feature` | Create | BDD scenarios for plugin management |
-| `cli/tests/cucumber.rs` | Modify | Add step definitions for plugin commands |
+| File                                   | Action | Description                                                |
+| -------------------------------------- | ------ | ---------------------------------------------------------- |
+| `cli/src/main.rs`                      | Modify | Add `Plugin` subcommand with `list` and `info` subcommands |
+| `cli/features/prd-0003/plugin.feature` | Create | BDD scenarios for plugin management                        |
+| `cli/tests/cucumber.rs`                | Modify | Add step definitions for plugin commands                   |
 
 **CLI interface (per PRD-0003):**
 
@@ -228,18 +287,22 @@ Feature: Plugin Management
   I want to see loaded plugins
   So that I know what capabilities are available
 
+  Background:
+    Given an empty database
+
   Scenario: List plugins
-    Given the system has plugins loaded
     When I run "kos plugin list"
-    Then I should see a list of plugins with name, version, and capabilities
+    Then the output contains "markdown-importer"
+    And the output contains "pdf-importer"
+    And the output contains "url-importer"
 
   Scenario: Plugin info
-    Given the system has plugins loaded
     When I run "kos plugin info markdown-importer"
-    Then I should see detailed information about the markdown-importer plugin
+    Then the output contains "markdown-importer"
+    And the output contains "0.1.0"
 
   Scenario: Plugin failure isolation
-    Given a plugin that fails during import
+    Given a file that causes importer failure
     When I run "kos import <file>"
     Then the import should fail gracefully
     And the core system should remain running
@@ -259,24 +322,26 @@ Feature: Plugin Management
 D1 (types) -> D2 (plugin crate) -> D3 (importer refactoring) -> D4 (CLI)
 ```
 
-D1 defines types. D2 creates the plugin infrastructure. D3 refactors existing importers as plugins. D4 wires to CLI.
+D1 defines types in `knowledge-core`. D2 creates the plugin infrastructure in `knowledge-plugin`. D3 refactors existing importers as plugins. D4 wires to CLI.
 
 ---
 
 ## Verification Strategy
 
-| Level | Command | Coverage |
-|-------|---------|----------|
-| Unit | `cargo test -p knowledge-plugin` | Manifest parsing, registry, error boundaries |
-| Integration | `cargo test -p knowledge-plugin --test integration_test` | Plugin loading, activation |
-| E2E | `cargo test --test cucumber -p knowledge-cli` | CLI plugin commands |
-| Regression | `cargo test -p knowledge-import` | Existing import tests still pass |
-| Lint | `cargo clippy -- -D warnings && cargo fmt --check` | Code quality |
+| Level       | Command                                                  | Coverage                                     |
+| ----------- | -------------------------------------------------------- | -------------------------------------------- |
+| Unit        | `cargo test -p knowledge-plugin`                         | Manifest parsing, registry, error boundaries |
+| Integration | `cargo test -p knowledge-plugin --test integration_test` | Plugin loading, activation                   |
+| E2E         | `cargo test --test cucumber -p knowledge-cli`            | CLI plugin commands                          |
+| Regression  | `cargo test -p knowledge-import`                         | Existing import tests still pass             |
+| Lint        | `cargo clippy -- -D warnings && cargo fmt --check`       | Code quality                                 |
 
 ---
 
 ## Exit Criteria
 
+- [ ] `Plugin`, `PluginManifest`, `PluginCapability`, `PluginError` in `knowledge-core/src/ports/mod.rs`
+- [ ] `AiAdapter` (stub) and `VectorStore` (stub) in `knowledge-core/src/ports/mod.rs`
 - [ ] `knowledge-plugin` crate created and added to workspace
 - [ ] TOML manifest parsing works
 - [ ] `CapabilityRegistry` with register/retrieve for all capability types
