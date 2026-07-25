@@ -32,6 +32,16 @@ Testing, security, deployment, and practices. These documents define how the sys
 | [api-specification.md](api-specification.md) | REST and MCP API surfaces -- entity and relationship CRUD, search, rendering, and AI agent integration               |
 | [ui-design-system.md](ui-design-system.md)   | Design tokens, component specs, accessibility -- colors, typography, spacing, components, and WCAG 2.1 AA compliance |
 
+### Implementation Plans
+
+| Plan                                                         | Phase | ADR(s)                                 | Purpose                                                                  |
+| ------------------------------------------------------------ | ----- | -------------------------------------- | ------------------------------------------------------------------------ |
+| [IP-001](implementation-plans/IP-001-graph-traversal.md)    | 1     | ADR-0014                              | Graph traversal via recursive CTE, bounded depth, cycle detection        |
+| [IP-002](implementation-plans/IP-002-view-projections.md)   | 2     | ADR-0015                              | Tree, graph, table, timeline views; synchronization; filtering           |
+| [IP-003](implementation-plans/IP-003-plugin-system.md)      | 3     | ADR-0016                              | Plugin infrastructure, manifest parsing, capability registry, sandboxing |
+| [IP-004](implementation-plans/IP-004-semantic-search.md)    | 4     | ADR-0017                              | Embedding generation, in-memory vector store, hybrid search via RRF      |
+| [IP-005](implementation-plans/IP-005-collections-and-api.md)| 5     | ADR-0018                              | Collection entity, membership, tree view integration, API surface        |
+
 ---
 
 ## Note
