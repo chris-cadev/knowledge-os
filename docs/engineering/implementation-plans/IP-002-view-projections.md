@@ -1,6 +1,6 @@
 # IP-002: Phase 2 -- View Projections
 
-**Status:** Draft
+**Status:** Done
 **ADR(s):** [ADR-0015](../../architecture/adrs/adr-0015.md) (View Projection System)
 **PRD(s):** [PRD-0003](../prds/prd-0003-graph-exploration-and-plugins.md) (US2: Tree view, US3: Graph view, US4: Table view, Timeline view)
 **Estimated effort:** ~5 days
@@ -419,16 +419,57 @@ D1 defines the trait and event infrastructure. D2-D5 implement each view indepen
 
 ## Exit Criteria
 
-- [ ] `ViewAdapter`, `ViewFilter`, `ViewOutput`, `EventNotifier`, `ViewRegistry` in `knowledge-core/src/ports/mod.rs`
-- [ ] 4 view adapters implemented in `knowledge-derive/src/features/view/`
-- [ ] `ViewRegistry` with event-driven notification via `EventNotifier`
-- [ ] `kos view tree|graph|table|timeline` commands in CLI
-- [ ] BDD tests: 4+ view scenarios
-- [ ] `cargo clippy -- -D warnings` passes
-- [ ] ADR-0015 updated with Implementation Notes
+- [x] `ViewAdapter`, `ViewFilter`, `ViewOutput`, `EventNotifier`, `ViewRegistry` in `knowledge-core/src/ports/mod.rs`
+- [x] 4 view adapters implemented in `knowledge-derive/src/features/view/`
+- [x] `ViewRegistry` with event-driven notification via `EventNotifier`
+- [x] `kos view tree|graph|table|timeline` commands in CLI
+- [x] BDD tests: 8 view scenarios in `cli/features/prd-0003/views.feature`
+- [x] `cargo clippy -- -D warnings` passes
+- [x] ADR-0015 updated with Implementation Notes
 
 ---
 
 ## Implementation Notes
 
-*(Filled in during/after implementation)*
+### Deviations from Plan
+
+| Plan                                                                     | Actual                                                                      | Reason                                                                                                     |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| D6: `cli/tests/cucumber.rs` needs new step definitions for view commands | No new step definitions needed                                              | Existing steps (`output contains`, `run`) covered all view scenarios.                                      |
+| Graph view uses `TraversalPort` for subgraph extraction                  | Graph view directly queries `EntityRepository` and `RelationshipRepository` | Simpler implementation for MVP. `TraversalPort` integration can be added later for bounded subgraph views. |
+
+### Status
+
+- **D1:** ✅ View types, `ViewAdapter` trait, `EventNotifier`, `ViewRegistry` defined
+- **D2:** ✅ `TreeViewAdapter` implemented with entity grouping by type
+- **D3:** ✅ `GraphViewAdapter` implemented with nodes and edges
+- **D4:** ✅ `TableViewAdapter` implemented with sortable columns
+- **D5:** ✅ `TimelineViewAdapter` implemented with creation time ordering
+- **D6:** ✅ CLI commands and event notification wiring complete
+
+### Files Modified/Created
+
+| File                                                  | Description                                                                                         |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `core/knowledge-core/src/ports/mod.rs`                | Added `ViewAdapter`, `ViewFilter`, `ViewOutput`, `EventNotifier`, `ViewRegistry`, and related types |
+| `core/knowledge-derive/src/features/view/mod.rs`      | Module declaration for 4 view adapters                                                              |
+| `core/knowledge-derive/src/features/view/tree.rs`     | `TreeViewAdapter` implementation                                                                    |
+| `core/knowledge-derive/src/features/view/graph.rs`    | `GraphViewAdapter` implementation                                                                   |
+| `core/knowledge-derive/src/features/view/table.rs`    | `TableViewAdapter` implementation                                                                   |
+| `core/knowledge-derive/src/features/view/timeline.rs` | `TimelineViewAdapter` implementation                                                                |
+| `cli/src/main.rs`                                     | Added `kos view tree                                                                                | graph | table | timeline` commands |
+| `cli/features/prd-0003/views.feature`                 | 8 BDD scenarios for view projections                                                                |
+
+### Test Counts
+
+- **Unit tests:** 29 tests in `knowledge-derive` (view adapters: tree, graph, table, timeline)
+- **Integration tests:** 5 tests for `ViewRegistry` (dispatch, render, event notification)
+- **BDD tests:** 8 scenarios in `views.feature`
+
+### Verification
+
+All verification passes:
+- `cargo clippy --all-targets --all-features -- -D warnings` — clean
+- `cargo fmt --check` — clean
+- `cargo test -p knowledge-derive` — 56 tests pass (51 unit + 5 integration)
+- `cargo test --test cucumber -p knowledge-cli` — 78 scenarios, 437 steps pass

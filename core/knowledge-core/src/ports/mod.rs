@@ -655,13 +655,13 @@ pub enum PluginError {
 }
 
 // =============================================================================
-// AI Adapter Stub (refined in IP-004 D1)
+// AI Adapter (refined in IP-004 D1)
 // =============================================================================
 
 /// Port for AI operations (embeddings, completions).
 ///
-/// This is a minimal stub defined in IP-003. IP-004 D1 refines it with
-/// `dimensions()`, `VectorFilter`, `VectorMetadata`, and `rebuild()`.
+/// Refined in IP-004 D1 with `dimensions()`. Implementations produce
+/// fixed-dimensionality embedding vectors from text content.
 #[async_trait]
 pub trait AiAdapter: Send + Sync {
     /// Generate an embedding vector for the given content.
@@ -674,6 +674,9 @@ pub trait AiAdapter: Send + Sync {
 
     /// Return the name of the AI model used by this adapter.
     fn model_name(&self) -> &str;
+
+    /// Return the dimensionality of embedding vectors produced by this adapter.
+    fn dimensions(&self) -> usize;
 }
 
 /// Errors that can occur during AI operations.
@@ -689,28 +692,40 @@ pub enum AiError {
 }
 
 // =============================================================================
-// Vector Store Stub (refined in IP-004 D1)
+// Vector Store (refined in IP-004 D1)
 // =============================================================================
 
 /// Port for vector storage operations (similarity search, upsert, delete).
 ///
-/// This is a minimal stub defined in IP-003. IP-004 D1 refines it with
-/// `dimensions()`, `VectorFilter`, `VectorMetadata`, and `rebuild()`.
+/// Refined in IP-004 D1 with `metadata`, `filter`, and `rebuild()`.
+/// Implementations store embedding vectors and support nearest-neighbor search.
 #[async_trait]
 pub trait VectorStore: Send + Sync {
     /// Insert or update a vector for the given entity.
     ///
     /// # Errors
     ///
+    /// Returns `VectorError::DimensionMismatch` if the vector length does not
+    /// match the expected dimensions.
     /// Returns `VectorError::Storage` on storage failures.
-    async fn upsert(&self, entity_id: &str, vector: &[f32]) -> Result<(), VectorError>;
+    async fn upsert(
+        &self,
+        entity_id: &str,
+        vector: &[f32],
+        metadata: Option<VectorMetadata>,
+    ) -> Result<(), VectorError>;
 
     /// Search for the k nearest vectors to the query vector.
     ///
     /// # Errors
     ///
     /// Returns `VectorError::Storage` on storage failures.
-    async fn search(&self, query: &[f32], k: usize) -> Result<Vec<VectorResult>, VectorError>;
+    async fn search(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<VectorFilter>,
+    ) -> Result<Vec<VectorResult>, VectorError>;
 
     /// Delete the vector for the given entity.
     ///
@@ -718,6 +733,16 @@ pub trait VectorStore: Send + Sync {
     ///
     /// Returns `VectorError::Storage` on storage failures.
     async fn delete(&self, entity_id: &str) -> Result<(), VectorError>;
+
+    /// Rebuild the vector index from scratch.
+    ///
+    /// Implementations should clear all stored vectors and return success.
+    /// Callers are responsible for re-populating the store after rebuild.
+    ///
+    /// # Errors
+    ///
+    /// Returns `VectorError::Storage` on storage failures.
+    async fn rebuild(&self) -> Result<(), VectorError>;
 }
 
 /// Errors that can occur during vector storage operations.
@@ -726,6 +751,32 @@ pub enum VectorError {
     /// The vector store returned an error.
     #[error("Storage error: {0}")]
     Storage(String),
+
+    /// The vector length does not match the expected dimensions.
+    #[error("Dimension mismatch: expected {expected}, got {actual}")]
+    DimensionMismatch { expected: usize, actual: usize },
+}
+
+/// Filter criteria for vector search results.
+#[derive(Debug, Clone, Default)]
+pub struct VectorFilter {
+    /// Include only entities of these types.
+    pub entity_types: Option<Vec<EntityType>>,
+    /// Include only entities with any of these tags.
+    pub tags: Option<Vec<String>>,
+    /// Minimum similarity score threshold.
+    pub min_score: Option<f64>,
+}
+
+/// Metadata attached to a stored vector.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VectorMetadata {
+    /// Name of the embedding model that produced this vector.
+    pub model: String,
+    /// Entity type of the owning entity.
+    pub entity_type: String,
+    /// Title of the owning entity.
+    pub title: String,
 }
 
 /// A single result from a vector similarity search.
@@ -734,5 +785,16 @@ pub struct VectorResult {
     /// The entity ID that this vector belongs to.
     pub entity_id: String,
     /// The similarity score (higher = more similar).
+    pub score: f64,
+    /// Metadata attached to the stored vector, if available.
+    pub metadata: Option<VectorMetadata>,
+}
+
+/// A single result from hybrid (RRF-fused) search.
+#[derive(Debug, Clone)]
+pub struct FusedResult {
+    /// The entity ID of the result.
+    pub entity_id: String,
+    /// The fused RRF score (higher = more relevant).
     pub score: f64,
 }

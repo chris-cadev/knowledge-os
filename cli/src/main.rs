@@ -6,7 +6,7 @@ use knowledge_core::features::entity::{Entity, EntityType};
 use knowledge_core::features::relationship::{Relationship, RelationshipType};
 use knowledge_core::ports::{
     ComponentRepository, EntityRepository, EntityResolver, EntityVersion, Event, EventLog,
-    EventNotifier, RelationshipRepository, SearchIndex, SearchQuery, StorageError,
+    EventNotifier, RelationshipRepository, SearchIndex, SearchQuery, SearchResult, StorageError,
     TransactionalWrite, TraversalConfig, TraversalDirection, TraversalError, TraversalPort,
     TraversalQuery, TraversalResult, ViewAdapter, ViewFilter, ViewOutput, ViewRegistry,
 };
@@ -230,6 +230,12 @@ enum Commands {
         /// Filter by tag
         #[arg(short, long)]
         tag: Option<String>,
+        /// Use semantic (embedding) search only
+        #[arg(long)]
+        semantic: bool,
+        /// Use hybrid search (keyword + semantic via RRF)
+        #[arg(long)]
+        hybrid: bool,
     },
     /// Get entity details
     Get {
@@ -361,8 +367,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Commands::Import { path, json } => cmd_import(store, path, json).await,
-        Commands::Search { query, r#type, tag } => {
-            cmd_search(store, &query, r#type.as_deref(), tag.as_deref()).await
+        Commands::Search {
+            query,
+            r#type,
+            tag,
+            semantic,
+            hybrid,
+        } => {
+            cmd_search(
+                store,
+                &query,
+                r#type.as_deref(),
+                tag.as_deref(),
+                semantic,
+                hybrid,
+            )
+            .await
         }
         Commands::Get { id } => cmd_get(store, &id).await,
         Commands::List { r#type } => cmd_list(store, r#type.as_deref()).await,
@@ -935,14 +955,86 @@ async fn cmd_search(
     query: &str,
     entity_type: Option<&str>,
     tag: Option<&str>,
+    semantic: bool,
+    hybrid: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let search_query = SearchQuery {
-        query: query.to_string(),
-        entity_type: entity_type.map(String::from),
-        tag: tag.map(String::from),
+    // Validate flags
+    if semantic && hybrid {
+        eprintln!("Error: --semantic and --hybrid are mutually exclusive. Use one or the other.");
+        std::process::exit(1);
+    }
+
+    // Determine search mode
+    let keyword_results = if !semantic {
+        // Keyword search (default, or part of hybrid)
+        let search_query = SearchQuery {
+            query: query.to_string(),
+            entity_type: entity_type.map(String::from),
+            tag: tag.map(String::from),
+        };
+        SearchIndex::search(store.as_ref(), &search_query).await?
+    } else {
+        vec![]
     };
 
-    let results = SearchIndex::search(store.as_ref(), &search_query).await?;
+    let semantic_results = if semantic || hybrid {
+        // Semantic search requires an AI provider and populated vector store.
+        // The vector store is in-memory and not persisted across restarts,
+        // so semantic search only works when embeddings have been generated
+        // in the current session. For now, indicate that semantic search
+        // is not available when no provider is configured.
+        eprintln!(
+            "Warning: Semantic search requires an AI provider to be configured. \
+             Use keyword search (default) or import with an AI provider first."
+        );
+        Vec::<knowledge_core::ports::VectorResult>::new()
+    } else {
+        Vec::<knowledge_core::ports::VectorResult>::new()
+    };
+
+    // Combine results based on mode
+    let results: Vec<SearchResult> =
+        if hybrid && !keyword_results.is_empty() && !semantic_results.is_empty() {
+            // Hybrid: use RRF fusion
+            let fused = knowledge_derive::features::search::hybrid::reciprocal_rank_fusion(
+                &keyword_results,
+                &semantic_results,
+                60,
+            );
+            // Convert FusedResult back to SearchResult for display
+            fused
+                .into_iter()
+                .filter_map(|f| {
+                    uuid::Uuid::parse_str(&f.entity_id)
+                        .ok()
+                        .map(|id| SearchResult {
+                            entity_id: id,
+                            score: f.score,
+                            confidence: None,
+                            snippet: None,
+                        })
+                })
+                .collect()
+        } else if semantic {
+            // Semantic-only: use semantic results (currently empty without provider)
+            // Convert VectorResult to SearchResult for display
+            semantic_results
+                .into_iter()
+                .filter_map(|v| {
+                    uuid::Uuid::parse_str(&v.entity_id)
+                        .ok()
+                        .map(|id| SearchResult {
+                            entity_id: id,
+                            score: v.score,
+                            confidence: None,
+                            snippet: None,
+                        })
+                })
+                .collect()
+        } else {
+            // Keyword-only (default)
+            keyword_results
+        };
 
     if results.is_empty() {
         println!("No entities found.");

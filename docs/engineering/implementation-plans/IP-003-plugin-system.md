@@ -1,6 +1,6 @@
 # IP-003: Phase 3 -- Plugin System
 
-**Status:** Draft
+**Status:** Done
 **ADR(s):** [ADR-0016](../../architecture/adrs/adr-0016.md) (Plugin System Architecture)
 **PRD(s):** [PRD-0003](../prds/prd-0003-graph-exploration-and-plugins.md) (US5: Use a plugin importer)
 **Estimated effort:** ~4 days
@@ -340,21 +340,63 @@ D1 defines types in `knowledge-core`. D2 creates the plugin infrastructure in `k
 
 ## Exit Criteria
 
-- [ ] `Plugin`, `PluginManifest`, `PluginCapability`, `PluginError` in `knowledge-core/src/ports/mod.rs`
-- [ ] `AiAdapter` (stub) and `VectorStore` (stub) in `knowledge-core/src/ports/mod.rs`
-- [ ] `knowledge-plugin` crate created and added to workspace
-- [ ] TOML manifest parsing works
-- [ ] `CapabilityRegistry` with register/retrieve for all capability types
-- [ ] `safe_call` error boundary catches plugin failures
-- [ ] Markdown, PDF, URL importers refactored as plugins
-- [ ] `kos plugin list` and `kos plugin info` commands
-- [ ] BDD tests: 3+ plugin scenarios
-- [ ] Existing import tests pass (no regression)
-- [ ] `cargo clippy -- -D warnings` passes
-- [ ] ADR-0016 updated with Implementation Notes
+- [x] `Plugin`, `PluginManifest`, `PluginCapability`, `PluginError` in `knowledge-core/src/ports/mod.rs`
+- [x] `AiAdapter` (stub) and `VectorStore` (stub) in `knowledge-core/src/ports/mod.rs`
+- [x] `knowledge-plugin` crate created and added to workspace
+- [x] TOML manifest parsing works
+- [x] `CapabilityRegistry` with register/retrieve for all capability types
+- [x] `safe_call` error boundary catches plugin failures
+- [x] Markdown, PDF, URL importers refactored as plugins
+- [x] `kos plugin list` and `kos plugin info` commands
+- [x] BDD tests: 5 plugin scenarios in `cli/features/prd-0003/plugin.feature`
+- [x] Existing import tests pass (no regression)
+- [x] `cargo clippy -- -D warnings` passes
+- [x] ADR-0016 updated with Implementation Notes
 
 ---
 
 ## Implementation Notes
 
-*(Filled in during/after implementation)*
+### Deviations from Plan
+
+| Plan                                        | Actual                                          | Reason                                                                                     |
+| ------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| D1: `AiAdapter` and `VectorStore` stubs     | Stubs defined with minimal API                  | IP-004 D1 refines them with full API. Backward compatible.                                 |
+| D3: Refactor importers as plugins           | Importers refactored with `PluginMetadata` impl | `PluginAdapter<T>` wrapper bridges `ImportAdapter` + `PluginMetadata` into `Plugin` trait. |
+| D4: `kos plugin list` and `kos plugin info` | Implemented with pretty-print output            | Table format for `list`, detailed format for `info`.                                       |
+
+### Status
+
+- **D1:** ✅ Plugin types and capability stubs defined in `knowledge-core`
+- **D2:** ✅ `knowledge-plugin` crate created with `CapabilityRegistry`, `safe_call`, manifest parsing
+- **D3:** ✅ Markdown, PDF, URL importers refactored as plugins
+- **D4:** ✅ CLI commands `kos plugin list` and `kos plugin info` implemented
+
+### Files Modified/Created
+
+| File                                    | Description                                                                                                             |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `core/knowledge-core/src/ports/mod.rs`  | Added `Plugin`, `PluginManifest`, `PluginCapability`, `PluginError`, `PluginMetadata`, `AiAdapter`, `VectorStore` stubs |
+| `core/knowledge-plugin/Cargo.toml`      | New crate for plugin infrastructure                                                                                     |
+| `core/knowledge-plugin/src/lib.rs`      | Module declarations                                                                                                     |
+| `core/knowledge-plugin/src/manifest.rs` | TOML manifest parsing                                                                                                   |
+| `core/knowledge-plugin/src/registry.rs` | `CapabilityRegistry` with register/retrieve for all capability types                                                    |
+| `core/knowledge-plugin/src/sandbox.rs`  | `safe_call` error boundary                                                                                              |
+| `core/knowledge-plugin/src/loader.rs`   | Plugin loading and registration                                                                                         |
+| `cli/src/main.rs`                       | Added `kos plugin list` and `kos plugin info` commands                                                                  |
+| `cli/features/prd-0003/plugin.feature`  | 5 BDD scenarios for plugin management                                                                                   |
+
+### Test Counts
+
+- **Unit tests:** 23 tests in `knowledge-plugin` (manifest parsing, registry, error boundaries)
+- **Integration tests:** 6 tests for plugin loading and activation
+- **BDD tests:** 5 scenarios in `plugin.feature`
+
+### Verification
+
+All verification passes:
+- `cargo clippy --all-targets --all-features -- -D warnings` — clean
+- `cargo fmt --check` — clean
+- `cargo test -p knowledge-plugin` — 29 tests pass (23 unit + 6 integration)
+- `cargo test -p knowledge-import` — existing import tests pass (no regression)
+- `cargo test --test cucumber -p knowledge-cli` — 78 scenarios, 437 steps pass

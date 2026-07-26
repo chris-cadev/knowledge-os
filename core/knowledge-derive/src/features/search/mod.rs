@@ -1,5 +1,12 @@
 use knowledge_core::features::entity::Entity;
 
+pub mod hybrid;
+pub mod pipeline;
+pub mod vector_store;
+
+#[cfg(test)]
+pub mod mock_embedder;
+
 pub struct SearchIndex;
 
 impl Default for SearchIndex {
