@@ -551,3 +551,188 @@ pub trait CollectionRepository: Send + Sync {
     /// Get all entities belonging to a collection.
     async fn get_members(&self, collection_id: Uuid) -> Result<Vec<Entity>, StorageError>;
 }
+
+// =============================================================================
+// Plugin System
+// =============================================================================
+
+/// Metadata for a plugin, declared in a TOML manifest.
+///
+/// Every plugin provides a manifest that describes its identity, version,
+/// and optional configuration. The manifest is parsed at startup and
+/// validated against the plugin's declared capabilities.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginManifest {
+    /// Unique name identifying this plugin (e.g., "markdown-importer").
+    pub name: String,
+    /// Semantic version string (e.g., "0.1.0").
+    pub version: String,
+    /// Human-readable description of the plugin's purpose.
+    pub description: String,
+    /// Plugin author name.
+    pub author: String,
+    /// SPDX license identifier, if applicable.
+    pub license: Option<String>,
+    /// Priority for conflict resolution (lower = preferred, default 100).
+    pub priority: Option<u32>,
+}
+
+impl PluginManifest {
+    /// Effective priority value, defaulting to 100 when not set.
+    pub fn effective_priority(&self) -> u32 {
+        self.priority.unwrap_or(100)
+    }
+}
+
+/// A capability declared by a plugin.
+///
+/// The capability registry routes requests to plugins based on their
+/// declared capabilities. Each variant maps to a specific adapter trait.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum PluginCapability {
+    /// Importer plugin handling specific file formats (e.g., "markdown", "pdf").
+    Importer { formats: Vec<String> },
+    /// Renderer plugin providing a named view projection.
+    Renderer { name: String },
+    /// AI provider plugin offering specific capabilities (e.g., "embedding", "chat").
+    AiProvider { capabilities: Vec<String> },
+    /// Vector store plugin with a named storage backend.
+    VectorStore { name: String },
+}
+
+/// Core trait that all plugins must implement.
+///
+/// Plugins are in-process trait objects compiled into the binary.
+/// They follow a lifecycle: discovery, registration, activation, execution, deactivation.
+pub trait Plugin: Send + Sync {
+    /// Return the manifest metadata for this plugin.
+    fn manifest(&self) -> &PluginManifest;
+
+    /// Activate the plugin. Called once at startup after registration.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PluginError::ActivationFailed` if initialization fails.
+    fn activate(&self) -> Result<(), PluginError>;
+
+    /// Deactivate the plugin. Called once at shutdown.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PluginError::ActivationFailed` if cleanup fails.
+    fn deactivate(&self) -> Result<(), PluginError>;
+}
+
+/// Trait for types that provide plugin metadata.
+///
+/// Implement this alongside `ImportAdapter` (or any adapter trait) to make
+/// your type usable as a plugin without writing wrapper structs.
+/// The generic `PluginAdapter<T>` wrapper in `knowledge-import` bridges
+/// `PluginMetadata` + `ImportAdapter` into the `Plugin` trait.
+pub trait PluginMetadata {
+    /// Return the manifest for this plugin.
+    fn manifest(&self) -> PluginManifest;
+}
+
+/// Errors that can occur during plugin operations.
+#[derive(Debug, thiserror::Error)]
+pub enum PluginError {
+    /// The requested plugin was not found in the registry.
+    #[error("Plugin not found: {0}")]
+    NotFound(String),
+
+    /// Plugin initialization or cleanup failed.
+    #[error("Plugin activation failed: {0}")]
+    ActivationFailed(String),
+
+    /// The plugin encountered an error during execution.
+    #[error("Plugin execution failed: {0}")]
+    ExecutionFailed(String),
+
+    /// The plugin exceeded its allowed execution time.
+    #[error("Plugin timeout: {0}")]
+    Timeout(String),
+}
+
+// =============================================================================
+// AI Adapter Stub (refined in IP-004 D1)
+// =============================================================================
+
+/// Port for AI operations (embeddings, completions).
+///
+/// This is a minimal stub defined in IP-003. IP-004 D1 refines it with
+/// `dimensions()`, `VectorFilter`, `VectorMetadata`, and `rebuild()`.
+#[async_trait]
+pub trait AiAdapter: Send + Sync {
+    /// Generate an embedding vector for the given content.
+    ///
+    /// # Errors
+    ///
+    /// Returns `AiError::Provider` if the AI provider rejects the request.
+    /// Returns `AiError::Network` if the network request fails.
+    async fn embed(&self, content: &str) -> Result<Vec<f32>, AiError>;
+
+    /// Return the name of the AI model used by this adapter.
+    fn model_name(&self) -> &str;
+}
+
+/// Errors that can occur during AI operations.
+#[derive(Debug, thiserror::Error)]
+pub enum AiError {
+    /// The AI provider returned an error.
+    #[error("Provider error: {0}")]
+    Provider(String),
+
+    /// A network request to the AI provider failed.
+    #[error("Network error: {0}")]
+    Network(String),
+}
+
+// =============================================================================
+// Vector Store Stub (refined in IP-004 D1)
+// =============================================================================
+
+/// Port for vector storage operations (similarity search, upsert, delete).
+///
+/// This is a minimal stub defined in IP-003. IP-004 D1 refines it with
+/// `dimensions()`, `VectorFilter`, `VectorMetadata`, and `rebuild()`.
+#[async_trait]
+pub trait VectorStore: Send + Sync {
+    /// Insert or update a vector for the given entity.
+    ///
+    /// # Errors
+    ///
+    /// Returns `VectorError::Storage` on storage failures.
+    async fn upsert(&self, entity_id: &str, vector: &[f32]) -> Result<(), VectorError>;
+
+    /// Search for the k nearest vectors to the query vector.
+    ///
+    /// # Errors
+    ///
+    /// Returns `VectorError::Storage` on storage failures.
+    async fn search(&self, query: &[f32], k: usize) -> Result<Vec<VectorResult>, VectorError>;
+
+    /// Delete the vector for the given entity.
+    ///
+    /// # Errors
+    ///
+    /// Returns `VectorError::Storage` on storage failures.
+    async fn delete(&self, entity_id: &str) -> Result<(), VectorError>;
+}
+
+/// Errors that can occur during vector storage operations.
+#[derive(Debug, thiserror::Error)]
+pub enum VectorError {
+    /// The vector store returned an error.
+    #[error("Storage error: {0}")]
+    Storage(String),
+}
+
+/// A single result from a vector similarity search.
+#[derive(Debug, Clone)]
+pub struct VectorResult {
+    /// The entity ID that this vector belongs to.
+    pub entity_id: String,
+    /// The similarity score (higher = more similar).
+    pub score: f64,
+}

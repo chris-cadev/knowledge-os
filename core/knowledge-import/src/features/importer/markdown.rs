@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::{Entity, EntityType};
+use knowledge_core::ports::{PluginManifest, PluginMetadata};
 use pulldown_cmark::{Event, Parser, Tag};
 use std::collections::HashMap;
 use std::path::Path;
@@ -20,7 +21,22 @@ impl MarkdownImporter {
     pub fn new() -> Self {
         Self
     }
+}
 
+impl PluginMetadata for MarkdownImporter {
+    fn manifest(&self) -> PluginManifest {
+        PluginManifest {
+            name: "markdown-importer".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Import Markdown files as knowledge entities".to_string(),
+            author: "Knowledge OS".to_string(),
+            license: Some("MIT".to_string()),
+            priority: Some(100),
+        }
+    }
+}
+
+impl MarkdownImporter {
     /// Import Markdown content from a string.
     pub fn import_content(
         &self,

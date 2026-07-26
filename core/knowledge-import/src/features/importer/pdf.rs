@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::{Entity, EntityType};
+use knowledge_core::ports::{PluginManifest, PluginMetadata};
 use pdf_oxide::extractors::xmp::XmpExtractor;
 use pdf_oxide::PdfDocument;
 use std::path::Path;
@@ -20,6 +21,19 @@ impl Default for PdfImporter {
 impl PdfImporter {
     pub fn new() -> Self {
         Self
+    }
+}
+
+impl PluginMetadata for PdfImporter {
+    fn manifest(&self) -> PluginManifest {
+        PluginManifest {
+            name: "pdf-importer".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Import PDF files as knowledge entities".to_string(),
+            author: "Knowledge OS".to_string(),
+            license: Some("MIT".to_string()),
+            priority: Some(100),
+        }
     }
 }
 

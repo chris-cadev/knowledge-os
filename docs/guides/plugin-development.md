@@ -1,194 +1,221 @@
 # Plugin Development Guide
 
-> Plugins extend capabilities without modifying the core. Every subsystem supports extension.
+> Plugins extend Knowledge OS capabilities without modifying the core. Every subsystem supports extension.
 
 ---
 
 ## Overview
 
-Knowledge OS is designed as a core system surrounded by plugins. Plugins implement adapters for storage engines, importers, exporters, renderers, AI providers, and automation agents.
+Knowledge OS is designed as a core system surrounded by plugins. Plugins implement adapters for importers, renderers, AI providers, vector stores, and other capabilities.
 
-This guide explains how to develop, test, and distribute plugins.
-
----
-
-## Plugin Types
-
-| Type         | Interface           | Purpose                          |
-| ------------ | ------------------- | -------------------------------- |
-| `importer`   | `ImportAdapter`     | Import from external formats     |
-| `exporter`   | `ExportAdapter`     | Export to external formats       |
-| `renderer`   | `RenderAdapter`     | Render canonical data to output  |
-| `storage`    | `StorageAdapter`    | Persist data to a storage engine |
-| `search`     | `SearchAdapter`     | Index and retrieve text          |
-| `vector`     | `VectorAdapter`     | Store and query embeddings       |
-| `graph`      | `GraphAdapter`      | Store and traverse relationships |
-| `cache`      | `CacheAdapter`      | Cache derived data               |
-| `ai`         | `AiAdapter`         | Provide AI operations            |
-| `automation` | `AutomationAdapter` | Automate knowledge operations    |
-| `view`       | `ViewAdapter`       | Render a view projection         |
+The plugin system provides:
+- **`Plugin` trait** -- lifecycle management (activate/deactivate)
+- **`PluginMetadata` trait** -- manifest metadata for any adapter
+- **`PluginAdapter<T>`** -- generic wrapper bridging adapters into the plugin system
+- **`CapabilityRegistry`** -- central registry mapping capabilities to implementations
+- **Error boundaries** -- sandboxed execution with 30-second timeouts
 
 ---
 
-## Plugin Manifest
+## Quick Start: Creating an Importer Plugin
 
-Every plugin has a manifest file (`knowledge-plugin.toml`):
+The minimum viable plugin requires two trait implementations on a single struct:
 
-```toml
-[plugin]
-name = "my-custom-importer"
-version = "0.1.0"
-description = "Import custom format files as knowledge entities"
-author = "Your Name"
-license = "MIT"
-
-[plugin.capabilities]
-importers = ["custom-format"]
-
-[plugin.dependencies]
-knowledge-os = ">=0.1.0"
-
-[plugin.permissions]
-files = ["read"]
-network = []
-```
-
-### Manifest Fields
-
-- `name`: Unique plugin identifier (snake_case)
-- `version`: Semantic version
-- `description`: Human-readable description
-- `author`: Plugin author
-- `license`: License identifier
-- `capabilities`: What the plugin provides
-- `dependencies`: Required Knowledge OS version
-- `permissions`: System permissions required
-
----
-
-## Implementing an Importer
-
-### Step 1: Implement the ImportAdapter Trait
+### Step 1: Implement the Adapter
 
 ```rust
-use knowledge_os::plugin::{ImportAdapter, ImportSource, ImportedEntity};
+use async_trait::async_trait;
+use knowledge_core::ports::{PluginManifest, PluginMetadata};
+use knowledge_import::features::importer::{ImportAdapter, ImportError, ImportResult};
+use std::path::Path;
 
-pub struct MyImporter;
+pub struct BibTexImporter;
 
-impl ImportAdapter for MyImporter {
-    fn can_import(&self, source: &ImportSource) -> bool {
-        source.path.ends_with(".myformat")
+#[async_trait]
+impl ImportAdapter for BibTexImporter {
+    fn can_import(&self, path: &Path) -> bool {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case("bib"))
+            .unwrap_or(false)
     }
 
-    fn import(&self, source: &ImportSource) -> Result<Vec<ImportedEntity>> {
-        let content = std::fs::read_to_string(&source.path)?;
-        let entities = parse_myformat(&content)?;
-        Ok(entities)
+    async fn import(&self, path: &Path) -> Result<ImportResult, ImportError> {
+        let content = std::fs::read_to_string(path)?;
+        let entity = parse_bibtex(&content);
+        Ok(ImportResult {
+            entity,
+            components: vec![],
+            cross_references: vec![],
+        })
     }
 
-    fn supported_types(&self) -> &[&str] {
-        &["custom-format"]
+    fn supported_extensions(&self) -> &[&str] {
+        &["bib"]
     }
 }
 ```
 
-### Step 2: Register the Plugin
+### Step 2: Implement PluginMetadata
 
 ```rust
-use knowledge_os::plugin::register;
-
-fn main() {
-    register(MyImporter);
-}
-```
-
-### Step 3: Build and Test
-
-```bash
-cargo build --release
-cargo test
-```
-
----
-
-## Implementing a Storage Adapter
-
-### Step 1: Implement the StorageAdapter Trait
-
-```rust
-use knowledge_os::plugin::{StorageAdapter, Entity, EntityId, QueryFilter, HealthStatus};
-
-pub struct MyStorage {
-    connection: MyDatabaseConnection,
-}
-
-impl StorageAdapter for MyStorage {
-    async fn persist(&self, entity: &Entity) -> Result<()> {
-        self.connection.upsert(entity).await
-    }
-
-    async fn retrieve(&self, id: &EntityId) -> Result<Option<Entity>> {
-        self.connection.find_by_id(id).await
-    }
-
-    async fn query(&self, filter: &QueryFilter) -> Result<Vec<Entity>> {
-        self.connection.query(filter).await
-    }
-
-    async fn health(&self) -> HealthStatus {
-        match self.connection.ping().await {
-            Ok(_) => HealthStatus::Healthy,
-            Err(_) => HealthStatus::Unhealthy,
+impl PluginMetadata for BibTexImporter {
+    fn manifest(&self) -> PluginManifest {
+        PluginManifest {
+            name: "bibtex-importer".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Import BibTeX bibliography files".to_string(),
+            author: "Your Name".to_string(),
+            license: Some("MIT".to_string()),
+            priority: Some(100),
         }
     }
 }
 ```
 
-### Step 2: Implement Configuration
+### Step 3: Wrap and Register
 
 ```rust
-use serde::Deserialize;
+use knowledge_import::features::importer::PluginAdapter;
+use knowledge_plugin::registry::CapabilityRegistry;
 
-#[derive(Deserialize)]
-pub struct MyStorageConfig {
-    pub url: String,
-    pub database: String,
+let adapter = BibTexImporter;
+let plugin = PluginAdapter::new(adapter);
+
+let mut registry = CapabilityRegistry::new();
+registry.register_plugin(Box::new(plugin));
+```
+
+That's it. No wrapper struct needed.
+
+---
+
+## Architecture
+
+### Crate Structure
+
+| Crate | Provides |
+|-------|----------|
+| `knowledge-core` | `Plugin`, `PluginMetadata`, `PluginManifest`, `PluginError` traits/types |
+| `knowledge-import` | `ImportAdapter`, `PluginAdapter<T>`, built-in importer plugins |
+| `knowledge-plugin` | `CapabilityRegistry`, `safe_call` error boundary, plugin discovery |
+
+### Dependency Chain
+
+```
+knowledge-plugin → knowledge-import → knowledge-core
+```
+
+### Key Types
+
+**`Plugin` trait** (`knowledge-core::ports`):
+```rust
+pub trait Plugin: Send + Sync {
+    fn manifest(&self) -> &PluginManifest;
+    fn activate(&self) -> Result<(), PluginError>;
+    fn deactivate(&self) -> Result<(), PluginError>;
+}
+```
+
+**`PluginMetadata` trait** (`knowledge-core::ports`):
+```rust
+pub trait PluginMetadata {
+    fn manifest(&self) -> PluginManifest;
+}
+```
+
+**`PluginAdapter<T>`** (`knowledge_import::features::importer::plugins`):
+```rust
+pub struct PluginAdapter<T> {
+    manifest: PluginManifest,
+    inner: T,
+}
+
+impl<T: PluginMetadata + Send + Sync> Plugin for PluginAdapter<T> { ... }
+impl<T: ImportAdapter + Send + Sync> ImportAdapter for PluginAdapter<T> { ... }
+```
+
+**`CapabilityRegistry`** (`knowledge_plugin::registry`):
+```rust
+pub struct CapabilityRegistry {
+    importers: HashMap<String, Box<dyn ImportAdapter>>,
+    renderers: HashMap<String, Box<dyn ViewAdapter>>,
+    ai_providers: HashMap<String, Box<dyn AiAdapter>>,
+    vector_stores: HashMap<String, Box<dyn VectorStore>>,
+    plugins: Vec<Box<dyn Plugin>>,
+    manifests: Vec<PluginManifest>,
 }
 ```
 
 ---
 
-## Implementing an AI Adapter
+## Manifest Format
 
-### Step 1: Implement the AiAdapter Trait
+Every plugin provides a `PluginManifest` (defined in `knowledge-core::ports`):
 
 ```rust
-use knowledge_os::plugin::{AiAdapter, Classification, Relationship, Entity, AiResponse};
+pub struct PluginManifest {
+    pub name: String,        // Unique identifier (e.g., "bibtex-importer")
+    pub version: String,     // Semantic version (e.g., "0.1.0")
+    pub description: String, // Human-readable purpose
+    pub author: String,      // Author name
+    pub license: Option<String>, // SPDX license identifier
+    pub priority: Option<u32>,   // Conflict resolution (lower = preferred, default 100)
+}
+```
 
-pub struct MyAiProvider {
-    client: MyApiClient,
+For external plugin discovery, manifests are stored in TOML files (`plugin.toml`):
+
+```toml
+[plugin]
+name = "bibtex-importer"
+version = "0.1.0"
+description = "Import BibTeX bibliography files"
+author = "Your Name"
+license = "MIT"
+priority = 100
+```
+
+---
+
+## Using the Built-in Registry
+
+The `built_in_plugins()` function returns a pre-populated registry with all built-in importers:
+
+```rust
+use knowledge_plugin::registry::built_in_plugins;
+
+let registry = built_in_plugins();
+let plugins = registry.list_plugins();
+
+for plugin in &plugins {
+    println!("{} v{}", plugin.name, plugin.version);
 }
 
-impl AiAdapter for MyAiProvider {
-    async fn classify(&self, content: &str, taxonomy: &str) -> Result<Vec<Classification>> {
-        self.client.classify(content, taxonomy).await
-    }
+// Retrieve a specific importer
+let importer = registry.get_importer("markdown")?;
+let result = importer.import(path).await?;
+```
 
-    async fn extract_relationships(&self, content: &str, entities: &[Entity]) -> Result<Vec<Relationship>> {
-        self.client.extract(content, entities).await
-    }
+---
 
-    async fn summarize(&self, content: &str, max_length: usize) -> Result<String> {
-        self.client.summarize(content, max_length).await
-    }
+## Error Handling
 
-    async fn embed(&self, content: &str) -> Result<Vec<f64>> {
-        self.client.embed(content).await
-    }
+Plugin errors are caught by the `safe_call` error boundary:
 
-    async fn answer(&self, question: &str, context: &[Entity]) -> Result<AiResponse> {
-        self.client.answer(question, context).await
-    }
+```rust
+use knowledge_plugin::sandbox::safe_call;
+
+let result = safe_call("my-plugin", async {
+    // Plugin operation that might fail
+    my_adapter.import(path).await.map_err(|e| PluginError::ExecutionFailed(e.to_string()))
+}).await;
+
+match result {
+    Ok(Some(result)) => { /* success */ }
+    Ok(None) => { /* plugin error, logged and swallowed */ }
+    Err(PluginError::Timeout(msg)) => { /* timeout */ }
+    _ => {}
 }
 ```
 
@@ -202,20 +229,26 @@ impl AiAdapter for MyAiProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use knowledge_import::features::importer::PluginAdapter;
 
     #[test]
-    fn test_can_import() {
-        let importer = MyImporter;
-        let source = ImportSource { path: "test.myformat".into() };
-        assert!(importer.can_import(&source));
+    fn test_plugin_manifest() {
+        let plugin = PluginAdapter::new(BibTexImporter);
+        assert_eq!(plugin.manifest().name, "bibtex-importer");
     }
 
     #[test]
-    fn test_import() {
-        let importer = MyImporter;
-        let source = ImportSource { path: "fixtures/test.myformat".into() };
-        let entities = importer.import(&source).unwrap();
-        assert!(!entities.is_empty());
+    fn test_can_import() {
+        let plugin = PluginAdapter::new(BibTexImporter);
+        assert!(plugin.can_import(Path::new("refs.bib")));
+        assert!(!plugin.can_import(Path::new("notes.md")));
+    }
+
+    #[test]
+    fn test_lifecycle() {
+        let plugin = PluginAdapter::new(BibTexImporter);
+        assert!(plugin.activate().is_ok());
+        assert!(plugin.deactivate().is_ok());
     }
 }
 ```
@@ -224,36 +257,30 @@ mod tests {
 
 ```rust
 #[tokio::test]
-async fn test_storage_adapter() {
-    let storage = MyStorage::new(test_config());
-    let entity = create_test_entity();
-    storage.persist(&entity).await.unwrap();
-    let retrieved = storage.retrieve(&entity.id).await.unwrap();
-    assert_eq!(retrieved.unwrap().id, entity.id);
+async fn test_register_and_retrieve() {
+    let mut registry = CapabilityRegistry::new();
+    let plugin = PluginAdapter::new(BibTexImporter);
+    let manifest = plugin.manifest().clone();
+
+    registry.register_plugin(Box::new(plugin));
+    registry.register_importer("bibtex".to_string(), Box::new(BibTexImporter));
+
+    assert_eq!(registry.plugin_count(), 1);
+    let importer = registry.get_importer("bibtex").unwrap();
+    assert!(importer.can_import(Path::new("refs.bib")));
 }
 ```
 
 ---
 
-## Distribution
+## Plugin Lifecycle
 
-### Local Installation
-
-```bash
-knowledge-os plugin install ./target/release/libmy_importer.so
-```
-
-### Marketplace Installation
-
-```bash
-knowledge-os plugin install my-custom-importer
-```
-
-### Publishing
-
-1. Build the plugin in release mode.
-2. Sign the plugin binary.
-3. Publish to the plugin marketplace.
+1. **Discovery** -- `discover_plugins()` scans directories for `plugin.toml` files
+2. **Resolution** -- `resolve_plugins()` sorts by priority, version, name
+3. **Registration** -- `register_plugin()` adds to the registry
+4. **Activation** -- `activate_all()` calls each plugin's `activate()`
+5. **Execution** -- Plugin operations wrapped in `safe_call()` error boundaries
+6. **Deactivation** -- `deactivate_all()` calls each plugin's `deactivate()`
 
 ---
 

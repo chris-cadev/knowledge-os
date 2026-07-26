@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use knowledge_core::ports::{PluginManifest, PluginMetadata};
 use std::path::Path;
 
 use super::adapter::{ImportAdapter, ImportError, ImportResult};
@@ -18,7 +19,22 @@ impl UrlImporter {
 
         Self { client }
     }
+}
 
+impl PluginMetadata for UrlImporter {
+    fn manifest(&self) -> PluginManifest {
+        PluginManifest {
+            name: "url-importer".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Import content from web URLs".to_string(),
+            author: "Knowledge OS".to_string(),
+            license: Some("MIT".to_string()),
+            priority: Some(100),
+        }
+    }
+}
+
+impl UrlImporter {
     /// Import content from a URL string.
     pub async fn import_url(&self, url: &str) -> Result<ImportResult, ImportError> {
         let response = self
