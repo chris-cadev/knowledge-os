@@ -281,6 +281,11 @@ enum Commands {
         #[command(subcommand)]
         view_type: ViewCommands,
     },
+    /// Manage plugins
+    Plugin {
+        #[command(subcommand)]
+        action: PluginCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -338,6 +343,17 @@ enum ResolutionCommands {
     },
 }
 
+#[derive(Subcommand)]
+enum PluginCommands {
+    /// List all loaded plugins
+    List,
+    /// Show details about a specific plugin
+    Info {
+        /// Plugin name
+        name: String,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -377,6 +393,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
         }
         Commands::View { view_type } => cmd_view(store, view_type).await,
+        Commands::Plugin { action } => match action {
+            PluginCommands::List => cmd_plugin_list().await,
+            PluginCommands::Info { name } => cmd_plugin_info(&name).await,
+        },
     }
 }
 
@@ -1446,6 +1466,59 @@ async fn cmd_view(
                     entry.entity.entity_type, entry.timestamp, entry.label
                 );
             }
+        }
+    }
+
+    Ok(())
+}
+
+async fn cmd_plugin_list() -> Result<(), Box<dyn std::error::Error>> {
+    use knowledge_plugin::registry::built_in_plugins;
+
+    let registry = built_in_plugins();
+    let plugins = registry.list_plugins();
+
+    if plugins.is_empty() {
+        println!("No plugins loaded.");
+        return Ok(());
+    }
+
+    println!("Plugins ({} loaded):\n", plugins.len());
+    for plugin in &plugins {
+        let caps_str = if plugin.name.contains("import") {
+            "[importer]".to_string()
+        } else {
+            "[unknown]".to_string()
+        };
+
+        println!("  {} v{}    {}", plugin.name, plugin.version, caps_str);
+    }
+
+    Ok(())
+}
+
+async fn cmd_plugin_info(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    use knowledge_plugin::registry::built_in_plugins;
+
+    let registry = built_in_plugins();
+    let plugins = registry.list_plugins();
+    let plugin = plugins.iter().find(|p| p.name == name);
+
+    match plugin {
+        Some(info) => {
+            println!("Plugin: {}", info.name);
+            println!("  Version:     {}", info.version);
+            println!("  Description: {}", info.description);
+            if !info.capabilities.is_empty() {
+                println!("  Capabilities:");
+                for cap in &info.capabilities {
+                    println!("    - {}", cap);
+                }
+            }
+        }
+        None => {
+            eprintln!("Plugin '{}' not found.", name);
+            std::process::exit(1);
         }
     }
 

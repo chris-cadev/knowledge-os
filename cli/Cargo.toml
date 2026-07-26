@@ -12,6 +12,7 @@ knowledge-core = { path = "../core/knowledge-core" }
 knowledge-storage = { path = "../core/knowledge-storage" }
 knowledge-import = { path = "../core/knowledge-import" }
 knowledge-derive = { path = "../core/knowledge-derive" }
+knowledge-plugin = { path = "../core/knowledge-plugin" }
 clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 uuid = { version = "1", features = ["v4", "serde"] }
