@@ -287,6 +287,17 @@ async fn assert_output_contains(world: &mut CliWorld, expected: String) {
     );
 }
 
+#[then(expr = "the output does not contain {string}")]
+async fn assert_output_does_not_contain(world: &mut CliWorld, expected: String) {
+    let stdout = world.stdout();
+    assert!(
+        !stdout.contains(&expected),
+        "Expected '{}' to NOT be in stdout, but got:\n{}",
+        expected,
+        stdout
+    );
+}
+
 #[then(expr = "the error output contains {string}")]
 async fn assert_error_output_contains(world: &mut CliWorld, expected: String) {
     let stderr = world.stderr();

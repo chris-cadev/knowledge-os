@@ -9,6 +9,14 @@ fn test_store() -> SqliteStore {
     SqliteStore::new(":memory:").unwrap()
 }
 
+/// Default traversal config for tests.
+fn test_config() -> TraversalConfig {
+    TraversalConfig {
+        default_max_depth: 10,
+        default_max_results: 1000,
+    }
+}
+
 #[tokio::test]
 async fn test_entity_full_lifecycle() {
     let store = test_store();
@@ -810,4 +818,493 @@ async fn test_merge_history_by_source_and_target() {
         .unwrap();
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].source_id, entity_a.id);
+}
+
+// =============================================================================
+// Graph Traversal Tests
+// =============================================================================
+
+/// Helper to create an entity and save it.
+async fn create_entity(store: &SqliteStore, entity_type: &str) -> Entity {
+    let entity = Entity::new(EntityType::new(entity_type));
+    EntityRepository::save(store, &entity).await.unwrap();
+    entity
+}
+
+/// Helper to create a relationship between two entities.
+async fn create_relationship(
+    store: &SqliteStore,
+    source: &Entity,
+    target: &Entity,
+    rel_type: RelationshipType,
+) -> Relationship {
+    let rel = Relationship::new(source.id, target.id, rel_type);
+    RelationshipRepository::save(store, &rel).await.unwrap();
+    rel
+}
+
+#[tokio::test]
+async fn test_traversal_chain() {
+    // A -> B -> C -> D
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+    let d = create_entity(&store, "Concept").await;
+
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    create_relationship(&store, &b, &c, RelationshipType::References).await;
+    create_relationship(&store, &c, &d, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(3),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 3);
+
+    // All should be reachable at expected depths
+    let ids: Vec<Uuid> = results.iter().map(|r| *r.path.last().unwrap()).collect();
+    assert!(ids.contains(&b.id));
+    assert!(ids.contains(&c.id));
+    assert!(ids.contains(&d.id));
+
+    // B at depth 1, C at depth 2, D at depth 3
+    let b_result = results
+        .iter()
+        .find(|r| *r.path.last().unwrap() == b.id)
+        .unwrap();
+    assert_eq!(b_result.depth, 1);
+    let c_result = results
+        .iter()
+        .find(|r| *r.path.last().unwrap() == c.id)
+        .unwrap();
+    assert_eq!(c_result.depth, 2);
+    let d_result = results
+        .iter()
+        .find(|r| *r.path.last().unwrap() == d.id)
+        .unwrap();
+    assert_eq!(d_result.depth, 3);
+}
+
+#[tokio::test]
+async fn test_traversal_tree() {
+    // A -> {B, C}, B -> {D, E}, C -> {F}
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+    let d = create_entity(&store, "Concept").await;
+    let e = create_entity(&store, "Concept").await;
+    let f = create_entity(&store, "Concept").await;
+
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    create_relationship(&store, &a, &c, RelationshipType::References).await;
+    create_relationship(&store, &b, &d, RelationshipType::References).await;
+    create_relationship(&store, &b, &e, RelationshipType::References).await;
+    create_relationship(&store, &c, &f, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(3),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 5);
+
+    // B, C at depth 1
+    let b_result = results
+        .iter()
+        .find(|r| *r.path.last().unwrap() == b.id)
+        .unwrap();
+    assert_eq!(b_result.depth, 1);
+    let c_result = results
+        .iter()
+        .find(|r| *r.path.last().unwrap() == c.id)
+        .unwrap();
+    assert_eq!(c_result.depth, 1);
+
+    // D, E, F at depth 2
+    let d_result = results
+        .iter()
+        .find(|r| *r.path.last().unwrap() == d.id)
+        .unwrap();
+    assert_eq!(d_result.depth, 2);
+    let e_result = results
+        .iter()
+        .find(|r| *r.path.last().unwrap() == e.id)
+        .unwrap();
+    assert_eq!(e_result.depth, 2);
+    let f_result = results
+        .iter()
+        .find(|r| *r.path.last().unwrap() == f.id)
+        .unwrap();
+    assert_eq!(f_result.depth, 2);
+}
+
+#[tokio::test]
+async fn test_traversal_cycle() {
+    // A -> B -> C -> A
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    create_relationship(&store, &b, &c, RelationshipType::References).await;
+    create_relationship(&store, &c, &a, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(5),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    // Should find B at depth 1, C at depth 2
+    // A should NOT appear as a result (it's the start, and cycle prevents revisiting)
+    assert_eq!(results.len(), 2);
+    let ids: Vec<Uuid> = results.iter().map(|r| *r.path.last().unwrap()).collect();
+    assert!(ids.contains(&b.id));
+    assert!(ids.contains(&c.id));
+    assert!(!ids.contains(&a.id));
+}
+
+#[tokio::test]
+async fn test_traversal_diamond() {
+    // A -> {B, C}, B -> D, C -> D
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+    let d = create_entity(&store, "Concept").await;
+
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    create_relationship(&store, &a, &c, RelationshipType::References).await;
+    create_relationship(&store, &b, &d, RelationshipType::References).await;
+    create_relationship(&store, &c, &d, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(3),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    // B, C at depth 1, D at depth 2 (first discovery)
+    assert_eq!(results.len(), 3);
+    let d_result = results
+        .iter()
+        .find(|r| *r.path.last().unwrap() == d.id)
+        .unwrap();
+    assert_eq!(d_result.depth, 2);
+}
+
+#[tokio::test]
+async fn test_traversal_bidirectional() {
+    // A <-> B (bidirectional relationship)
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+
+    // A -> B
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    // C -> A (incoming to A)
+    create_relationship(&store, &c, &a, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Both,
+        max_depth: Some(2),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    // Should find B (outgoing from A) and C (incoming to A)
+    assert_eq!(results.len(), 2);
+    let ids: Vec<Uuid> = results.iter().map(|r| *r.path.last().unwrap()).collect();
+    assert!(ids.contains(&b.id));
+    assert!(ids.contains(&c.id));
+}
+
+#[tokio::test]
+async fn test_traversal_disconnected() {
+    // A -> B, C -> D (disconnected subgraphs)
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+    let d = create_entity(&store, "Concept").await;
+
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    create_relationship(&store, &c, &d, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(3),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    // Should only find B, not C or D
+    assert_eq!(results.len(), 1);
+    assert_eq!(*results[0].path.last().unwrap(), b.id);
+}
+
+#[tokio::test]
+async fn test_traversal_depth_limiting() {
+    // A -> B -> C -> D, depth 1
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+    let d = create_entity(&store, "Concept").await;
+
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    create_relationship(&store, &b, &c, RelationshipType::References).await;
+    create_relationship(&store, &c, &d, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(1),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    // Should only find B at depth 1, not C or D
+    assert_eq!(results.len(), 1);
+    assert_eq!(*results[0].path.last().unwrap(), b.id);
+    assert_eq!(results[0].depth, 1);
+}
+
+#[tokio::test]
+async fn test_traversal_relationship_type_filter() {
+    // A --references--> B, A --related_to--> C
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    let rel_c = Relationship::new(a.id, c.id, RelationshipType::References);
+    RelationshipRepository::save(&store, &rel_c).await.unwrap();
+
+    // Override with a different type for C
+    let mut rel_c_typed = rel_c.clone();
+    rel_c_typed.relationship_type = RelationshipType::References; // same type for now
+    RelationshipRepository::save(&store, &rel_c_typed)
+        .await
+        .unwrap();
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(2),
+        max_results: None,
+        relationship_type: Some(RelationshipType::References),
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    // Both B and C should be found since both have References type
+    assert_eq!(results.len(), 2);
+    let ids: Vec<Uuid> = results.iter().map(|r| *r.path.last().unwrap()).collect();
+    assert!(ids.contains(&b.id));
+    assert!(ids.contains(&c.id));
+}
+
+#[tokio::test]
+async fn test_traversal_entity_type_filter() {
+    // A (Article) -> B (Concept), A -> C (Person)
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Person").await;
+
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    create_relationship(&store, &a, &c, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(2),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: Some(EntityType::new("Concept")),
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    // Should only find B (Concept), not C (Person)
+    assert_eq!(results.len(), 1);
+    assert_eq!(*results[0].path.last().unwrap(), b.id);
+}
+
+#[tokio::test]
+async fn test_traversal_start_not_found() {
+    let store = test_store();
+    let config = test_config();
+    let nonexistent_id = Uuid::new_v4();
+
+    let query = TraversalQuery {
+        start_id: nonexistent_id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(3),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let result = TraversalPort::traverse(&store, &query, &config).await;
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        TraversalError::StartNotFound(id) => assert_eq!(id, nonexistent_id),
+        other => panic!("Expected StartNotFound, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_traversal_start_inactive() {
+    let store = test_store();
+    let mut a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+
+    // Archive the start entity
+    a.archive();
+    EntityRepository::save(&store, &a).await.unwrap();
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(3),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let result = TraversalPort::traverse(&store, &query, &config).await;
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        TraversalError::StartNotFound(_)
+    ));
+}
+
+#[tokio::test]
+async fn test_traversal_incoming() {
+    // A <- B <- C (incoming from A)
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+
+    // B -> A, C -> B (so A can reach B and C via incoming)
+    create_relationship(&store, &b, &a, RelationshipType::References).await;
+    create_relationship(&store, &c, &b, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Incoming,
+        max_depth: Some(3),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 2);
+    let ids: Vec<Uuid> = results.iter().map(|r| *r.path.last().unwrap()).collect();
+    assert!(ids.contains(&b.id));
+    assert!(ids.contains(&c.id));
+}
+
+#[tokio::test]
+async fn test_traversal_result_limit() {
+    // A -> B, A -> C, A -> D (star topology)
+    let store = test_store();
+    let a = create_entity(&store, "Article").await;
+    let b = create_entity(&store, "Concept").await;
+    let c = create_entity(&store, "Concept").await;
+    let d = create_entity(&store, "Concept").await;
+
+    create_relationship(&store, &a, &b, RelationshipType::References).await;
+    create_relationship(&store, &a, &c, RelationshipType::References).await;
+    create_relationship(&store, &a, &d, RelationshipType::References).await;
+
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(3),
+        max_results: Some(2),
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+
+    let results = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 2);
 }

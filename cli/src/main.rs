@@ -1,13 +1,203 @@
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
-use knowledge_core::features::component::ComponentType;
+use knowledge_core::features::component::{Component, ComponentType};
+use knowledge_core::features::entity::{Entity, EntityType};
+use knowledge_core::features::relationship::{Relationship, RelationshipType};
 use knowledge_core::ports::{
-    ComponentRepository, EntityRepository, EntityResolver, EventLog, RelationshipRepository,
-    SearchIndex, SearchQuery, TransactionalWrite,
+    ComponentRepository, EntityRepository, EntityResolver, EntityVersion, Event, EventLog,
+    EventNotifier, RelationshipRepository, SearchIndex, SearchQuery, StorageError,
+    TransactionalWrite, TraversalConfig, TraversalDirection, TraversalError, TraversalPort,
+    TraversalQuery, TraversalResult, ViewAdapter, ViewFilter, ViewOutput, ViewRegistry,
+};
+use knowledge_derive::features::view::{
+    graph::GraphViewAdapter, table::TableViewAdapter, timeline::TimelineViewAdapter,
+    tree::TreeViewAdapter,
 };
 use knowledge_storage::adapters::sqlite::SqliteStore;
 use std::path::PathBuf;
 use std::sync::Arc;
+use uuid::Uuid;
+
+// =============================================================================
+// Store Wrapper — bridges Arc<SqliteStore> to Box<dyn Repository>
+// =============================================================================
+
+/// Wrapper that delegates repository trait methods to an `Arc<SqliteStore>`.
+/// Needed because view adapters require `Box<dyn EntityRepository>` etc.,
+/// but the store is shared via `Arc` across commands.
+struct StoreWrapper(Arc<SqliteStore>);
+
+#[async_trait]
+impl EntityRepository for StoreWrapper {
+    async fn get(&self, id: Uuid) -> Result<Option<Entity>, StorageError> {
+        EntityRepository::get(self.0.as_ref(), id).await
+    }
+    async fn save(&self, entity: &Entity) -> Result<(), StorageError> {
+        EntityRepository::save(self.0.as_ref(), entity).await
+    }
+    async fn delete(&self, id: Uuid) -> Result<(), StorageError> {
+        EntityRepository::delete(self.0.as_ref(), id).await
+    }
+    async fn list(&self) -> Result<Vec<Entity>, StorageError> {
+        EntityRepository::list(self.0.as_ref()).await
+    }
+    async fn find_by_type(&self, entity_type: &str) -> Result<Vec<Entity>, StorageError> {
+        EntityRepository::find_by_type(self.0.as_ref(), entity_type).await
+    }
+    async fn find_by_title(&self, title: &str) -> Result<Vec<Entity>, StorageError> {
+        EntityRepository::find_by_title(self.0.as_ref(), title).await
+    }
+    async fn increment_version(&self, id: Uuid) -> Result<(), StorageError> {
+        EntityRepository::increment_version(self.0.as_ref(), id).await
+    }
+    async fn find_by_component_type(
+        &self,
+        component_type: &str,
+    ) -> Result<Vec<Entity>, StorageError> {
+        EntityRepository::find_by_component_type(self.0.as_ref(), component_type).await
+    }
+    async fn find_by_tag(&self, tag: &str) -> Result<Vec<Entity>, StorageError> {
+        EntityRepository::find_by_tag(self.0.as_ref(), tag).await
+    }
+    async fn get_version_history(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<EntityVersion>, StorageError> {
+        EntityRepository::get_version_history(self.0.as_ref(), entity_id).await
+    }
+}
+
+#[async_trait]
+impl ComponentRepository for StoreWrapper {
+    async fn get(&self, entity_id: Uuid) -> Result<Vec<Component>, StorageError> {
+        ComponentRepository::get(self.0.as_ref(), entity_id).await
+    }
+    async fn save(&self, component: &Component) -> Result<(), StorageError> {
+        ComponentRepository::save(self.0.as_ref(), component).await
+    }
+    async fn delete(&self, id: Uuid) -> Result<(), StorageError> {
+        ComponentRepository::delete(self.0.as_ref(), id).await
+    }
+    async fn find_by_type(
+        &self,
+        entity_id: Uuid,
+        component_type: &str,
+    ) -> Result<Vec<Component>, StorageError> {
+        ComponentRepository::find_by_type(self.0.as_ref(), entity_id, component_type).await
+    }
+    async fn update_data(&self, id: Uuid, data: serde_json::Value) -> Result<(), StorageError> {
+        ComponentRepository::update_data(self.0.as_ref(), id, data).await
+    }
+    async fn find_by_component_data(
+        &self,
+        component_type: &str,
+        json_path: &str,
+        value: &str,
+    ) -> Result<Vec<Component>, StorageError> {
+        ComponentRepository::find_by_component_data(
+            self.0.as_ref(),
+            component_type,
+            json_path,
+            value,
+        )
+        .await
+    }
+    async fn delete_by_entity(&self, entity_id: Uuid) -> Result<(), StorageError> {
+        ComponentRepository::delete_by_entity(self.0.as_ref(), entity_id).await
+    }
+}
+
+#[async_trait]
+impl RelationshipRepository for StoreWrapper {
+    async fn get(&self, id: Uuid) -> Result<Option<Relationship>, StorageError> {
+        RelationshipRepository::get(self.0.as_ref(), id).await
+    }
+    async fn save(&self, relationship: &Relationship) -> Result<(), StorageError> {
+        RelationshipRepository::save(self.0.as_ref(), relationship).await
+    }
+    async fn update(&self, relationship: &Relationship) -> Result<(), StorageError> {
+        RelationshipRepository::update(self.0.as_ref(), relationship).await
+    }
+    async fn delete(&self, id: Uuid) -> Result<(), StorageError> {
+        RelationshipRepository::delete(self.0.as_ref(), id).await
+    }
+    async fn by_source(&self, source_id: Uuid) -> Result<Vec<Relationship>, StorageError> {
+        RelationshipRepository::by_source(self.0.as_ref(), source_id).await
+    }
+    async fn by_target(&self, target_id: Uuid) -> Result<Vec<Relationship>, StorageError> {
+        RelationshipRepository::by_target(self.0.as_ref(), target_id).await
+    }
+    async fn find_by_source_and_target(
+        &self,
+        source_id: Uuid,
+        target_id: Uuid,
+    ) -> Result<Option<Relationship>, StorageError> {
+        RelationshipRepository::find_by_source_and_target(self.0.as_ref(), source_id, target_id)
+            .await
+    }
+    async fn find_by_type(
+        &self,
+        relationship_type: &str,
+    ) -> Result<Vec<Relationship>, StorageError> {
+        RelationshipRepository::find_by_type(self.0.as_ref(), relationship_type).await
+    }
+}
+
+#[async_trait]
+impl TraversalPort for StoreWrapper {
+    async fn traverse(
+        &self,
+        query: &TraversalQuery,
+        config: &TraversalConfig,
+    ) -> Result<Vec<TraversalResult>, TraversalError> {
+        TraversalPort::traverse(self.0.as_ref(), query, config).await
+    }
+}
+
+// =============================================================================
+// View Registry Factory
+// =============================================================================
+
+/// Creates a `ViewRegistry` pre-loaded with all four built-in views.
+///
+/// Each call constructs fresh adapter instances backed by `StoreWrapper`.
+/// This is called after write operations so the registry can notify views
+/// to invalidate cached state.
+fn create_view_registry(store: &Arc<SqliteStore>) -> ViewRegistry {
+    let mut registry = ViewRegistry::new();
+    registry.register(Box::new(TreeViewAdapter::new(
+        Box::new(StoreWrapper(store.clone())),
+        Box::new(StoreWrapper(store.clone())),
+        None, // No CollectionRepository until IP-005
+    )));
+    registry.register(Box::new(GraphViewAdapter::new(
+        Box::new(StoreWrapper(store.clone())),
+        Box::new(StoreWrapper(store.clone())),
+        Box::new(StoreWrapper(store.clone())),
+        Box::new(StoreWrapper(store.clone())),
+    )));
+    registry.register(Box::new(TableViewAdapter::new(
+        Box::new(StoreWrapper(store.clone())),
+        Box::new(StoreWrapper(store.clone())),
+    )));
+    registry.register(Box::new(TimelineViewAdapter::new(
+        Box::new(StoreWrapper(store.clone())),
+        Box::new(StoreWrapper(store.clone())),
+    )));
+    registry
+}
+
+/// Notifies all registered views of a canonical event.
+///
+/// Builds a temporary `ViewRegistry` and calls `on_event` on every
+/// registered view. Views rebuild on the next `render()` call.
+async fn notify_event(store: &Arc<SqliteStore>, event: &Event) {
+    let registry = create_view_registry(store);
+    if let Err(e) = registry.notify(event).await {
+        eprintln!("Warning: failed to notify views: {}", e);
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "kos", about = "Knowledge OS CLI")]
@@ -69,6 +259,68 @@ enum Commands {
         #[command(subcommand)]
         action: ResolutionCommands,
     },
+    /// Traverse the entity graph
+    Traverse {
+        /// Entity ID to start traversal from
+        entity_id: String,
+        /// Maximum depth (hops)
+        #[arg(long, default_value = "3")]
+        depth: u32,
+        /// Traversal direction (outgoing, incoming, both)
+        #[arg(long, default_value = "outgoing")]
+        direction: String,
+        /// Filter by relationship type
+        #[arg(short = 't', long)]
+        r#type: Option<String>,
+        /// Filter by entity type
+        #[arg(long)]
+        entity_type: Option<String>,
+    },
+    /// View knowledge in different projections
+    View {
+        #[command(subcommand)]
+        view_type: ViewCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum ViewCommands {
+    /// Hierarchical tree view grouped by entity type
+    Tree {
+        /// Filter by entity type
+        #[arg(short = 'T', long)]
+        r#type: Option<String>,
+    },
+    /// Graph view with nodes and edges
+    Graph {
+        /// Entity ID to start from
+        #[arg(short, long)]
+        from: Option<String>,
+        /// Maximum traversal depth
+        #[arg(long, default_value = "3")]
+        depth: u32,
+        /// Filter by entity type
+        #[arg(short = 'T', long)]
+        r#type: Option<String>,
+    },
+    /// Table view with sortable columns
+    Table {
+        /// Column to sort by
+        #[arg(long)]
+        sort: Option<String>,
+        /// Filter by search query
+        #[arg(short, long)]
+        filter: Option<String>,
+        /// Filter by entity type
+        #[arg(short = 'T', long)]
+        r#type: Option<String>,
+    },
+    /// Timeline view ordered by creation time
+    Timeline {
+        /// Filter by entity type
+        #[arg(short = 'T', long)]
+        r#type: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -107,6 +359,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             ResolutionCommands::Undo { merge_id } => cmd_resolution_undo(store, &merge_id).await,
         },
+        Commands::Traverse {
+            entity_id,
+            depth,
+            direction,
+            r#type,
+            entity_type,
+        } => {
+            cmd_traverse(
+                store,
+                &entity_id,
+                depth,
+                &direction,
+                r#type.as_deref(),
+                entity_type.as_deref(),
+            )
+            .await
+        }
+        Commands::View { view_type } => cmd_view(store, view_type).await,
     }
 }
 
@@ -269,6 +539,22 @@ async fn cmd_import(
                 eprintln!("  {}", err);
             }
         }
+    }
+
+    // Notify views of import completion so they invalidate cached state
+    if created + merged > 0 {
+        let event = knowledge_core::ports::Event {
+            id: uuid::Uuid::new_v4(),
+            event_type: knowledge_core::ports::EventType::EntityCreated,
+            entity_id: uuid::Uuid::nil(),
+            timestamp: chrono::Utc::now(),
+            data: serde_json::json!({
+                "source": "import_batch",
+                "created": created,
+                "merged": merged,
+            }),
+        };
+        notify_event(&store, &event).await;
     }
 
     Ok(())
@@ -786,6 +1072,9 @@ async fn cmd_archive(
     };
     EventLog::append(store.as_ref(), &event).await?;
 
+    // Notify views of archive so they invalidate cached state
+    notify_event(&store, &event).await;
+
     println!("Archived: Entity {} ({:?})", entity.id, entity.entity_type);
     Ok(())
 }
@@ -813,6 +1102,9 @@ async fn cmd_restore(
         data: serde_json::json!({}),
     };
     EventLog::append(store.as_ref(), &event).await?;
+
+    // Notify views of restore so they invalidate cached state
+    notify_event(&store, &event).await;
 
     println!("Restored: Entity {} ({:?})", entity.id, entity.entity_type);
     Ok(())
@@ -904,5 +1196,258 @@ async fn cmd_resolution_undo(
     let merge_id: uuid::Uuid = merge_id_str.parse()?;
     EntityResolver::undo_merge(store.as_ref(), merge_id).await?;
     println!("Undone merge {}", merge_id);
+    Ok(())
+}
+
+async fn cmd_traverse(
+    store: Arc<SqliteStore>,
+    entity_id_str: &str,
+    max_depth: u32,
+    direction_str: &str,
+    rel_type_str: Option<&str>,
+    entity_type_str: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let entity_id = uuid::Uuid::parse_str(entity_id_str)?;
+
+    let direction = match direction_str {
+        "outgoing" => TraversalDirection::Outgoing,
+        "incoming" => TraversalDirection::Incoming,
+        "both" => TraversalDirection::Both,
+        other => {
+            eprintln!(
+                "Invalid direction '{}'. Must be one of: outgoing, incoming, both",
+                other
+            );
+            std::process::exit(1);
+        }
+    };
+
+    let relationship_type = rel_type_str.map(|_s| RelationshipType::References); // Single variant for now
+
+    let entity_type = entity_type_str.map(knowledge_core::features::entity::EntityType::new);
+
+    let query = TraversalQuery {
+        start_id: entity_id,
+        direction,
+        max_depth: Some(max_depth),
+        max_results: None,
+        relationship_type,
+        entity_type_filter: entity_type,
+    };
+
+    let config = TraversalConfig::default();
+    let results = TraversalPort::traverse(store.as_ref(), &query, &config).await?;
+
+    if results.is_empty() {
+        println!("No entities found within {} hops.", max_depth);
+        return Ok(());
+    }
+
+    // Get start entity info for display
+    let start_entity = EntityRepository::get(store.as_ref(), entity_id).await?;
+    let start_title = if let Some(ref entity) = start_entity {
+        let components = ComponentRepository::get(store.as_ref(), entity.id).await?;
+        components
+            .iter()
+            .find(|c| c.component_type == ComponentType::Title)
+            .and_then(|c| c.data.as_str().map(String::from))
+            .unwrap_or_else(|| "Untitled".to_string())
+    } else {
+        "Unknown".to_string()
+    };
+    let start_type = start_entity
+        .as_ref()
+        .map(|e| format!("{:?}", e.entity_type))
+        .unwrap_or_else(|| "Unknown".to_string());
+
+    println!("Entity: \"{}\" ({})", start_title, start_type);
+
+    // Group results by depth
+    let mut by_depth: std::collections::BTreeMap<u32, Vec<_>> = std::collections::BTreeMap::new();
+    for result in &results {
+        by_depth.entry(result.depth).or_default().push(result);
+    }
+
+    for (depth, depth_results) in &by_depth {
+        println!("  Hop {}:", depth);
+        for result in depth_results {
+            let target_id = *result.path.last().unwrap();
+            let target_entity = EntityRepository::get(store.as_ref(), target_id).await?;
+            let target_title = if let Some(ref entity) = target_entity {
+                let components = ComponentRepository::get(store.as_ref(), entity.id).await?;
+                components
+                    .iter()
+                    .find(|c| c.component_type == ComponentType::Title)
+                    .and_then(|c| c.data.as_str().map(String::from))
+                    .unwrap_or_else(|| "Untitled".to_string())
+            } else {
+                "Unknown".to_string()
+            };
+            let target_type = target_entity
+                .as_ref()
+                .map(|e| format!("{:?}", e.entity_type))
+                .unwrap_or_else(|| "Unknown".to_string());
+
+            if let Some(edge) = result.edges.first() {
+                println!(
+                    "    -> {:?} -> \"{}\" ({})",
+                    edge.relationship_type, target_title, target_type
+                );
+            } else {
+                println!("    -> \"{}\" ({})", target_title, target_type);
+            }
+        }
+    }
+
+    println!(
+        "\nTotal: {} entities within {} hops",
+        results.len(),
+        max_depth
+    );
+
+    Ok(())
+}
+
+async fn cmd_view(
+    store: Arc<SqliteStore>,
+    view_type: ViewCommands,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let wrapper = StoreWrapper(store);
+
+    // Build the view filter based on the subcommand
+    let (view_name, filter) = match &view_type {
+        ViewCommands::Tree { r#type } => {
+            let filter = ViewFilter {
+                entity_types: r#type.as_ref().map(|t| vec![EntityType::new(t)]),
+                ..Default::default()
+            };
+            ("tree", filter)
+        }
+        ViewCommands::Graph {
+            from,
+            depth,
+            r#type,
+        } => {
+            let filter = ViewFilter {
+                start_entity_id: from.clone(),
+                max_depth: Some(*depth),
+                entity_types: r#type.as_ref().map(|t| vec![EntityType::new(t)]),
+                ..Default::default()
+            };
+            ("graph", filter)
+        }
+        ViewCommands::Table {
+            sort,
+            filter: search,
+            r#type,
+        } => {
+            let filter = ViewFilter {
+                sort_by: sort.clone(),
+                sort_order: Some(knowledge_core::ports::SortOrder::Asc),
+                search_query: search.clone(),
+                entity_types: r#type.as_ref().map(|t| vec![EntityType::new(t)]),
+                ..Default::default()
+            };
+            ("table", filter)
+        }
+        ViewCommands::Timeline { r#type } => {
+            let filter = ViewFilter {
+                entity_types: r#type.as_ref().map(|t| vec![EntityType::new(t)]),
+                ..Default::default()
+            };
+            ("timeline", filter)
+        }
+    };
+
+    // Create the appropriate view adapter
+    let adapter: Box<dyn ViewAdapter> = match view_name {
+        "tree" => Box::new(TreeViewAdapter::new(
+            Box::new(StoreWrapper(wrapper.0.clone())),
+            Box::new(StoreWrapper(wrapper.0.clone())),
+            None,
+        )),
+        "graph" => Box::new(GraphViewAdapter::new(
+            Box::new(StoreWrapper(wrapper.0.clone())),
+            Box::new(StoreWrapper(wrapper.0.clone())),
+            Box::new(StoreWrapper(wrapper.0.clone())),
+            Box::new(StoreWrapper(wrapper.0.clone())),
+        )),
+        "table" => Box::new(TableViewAdapter::new(
+            Box::new(StoreWrapper(wrapper.0.clone())),
+            Box::new(StoreWrapper(wrapper.0.clone())),
+        )),
+        "timeline" => Box::new(TimelineViewAdapter::new(
+            Box::new(StoreWrapper(wrapper.0.clone())),
+            Box::new(StoreWrapper(wrapper.0.clone())),
+        )),
+        _ => unreachable!(),
+    };
+
+    // Render the view
+    let output = adapter.render(&filter).await?;
+
+    // Print the output
+    match output {
+        ViewOutput::Tree(tree) => {
+            if tree.roots.is_empty() {
+                println!("No entities found.");
+                return Ok(());
+            }
+            println!("Knowledge Graph (Tree View)\n");
+            for root in &tree.roots {
+                println!("  {} ({})", root.label, root.children.len());
+                for child in &root.children {
+                    println!("    {}", child.label);
+                }
+            }
+        }
+        ViewOutput::Graph(graph) => {
+            if graph.nodes.is_empty() {
+                println!("No entities found.");
+                return Ok(());
+            }
+            println!("Knowledge Graph\n");
+            println!("Nodes ({}):", graph.nodes.len());
+            for node in &graph.nodes {
+                println!("  [{}] {} ({})", node.node_type, node.label, node.entity.id);
+            }
+            if !graph.edges.is_empty() {
+                println!("\nEdges ({}):", graph.edges.len());
+                for edge in &graph.edges {
+                    println!(
+                        "  {} --{}--> {}",
+                        edge.source_id, edge.label, edge.target_id
+                    );
+                }
+            }
+        }
+        ViewOutput::Table(table) => {
+            if table.rows.is_empty() {
+                println!("No entities found.");
+                return Ok(());
+            }
+            // Print header
+            let headers: Vec<&str> = table.columns.iter().map(|c| c.name.as_str()).collect();
+            println!("{}", headers.join(" | "));
+            println!("{}", "-".repeat(80));
+            for row in &table.rows {
+                println!("{}", row.cells.join(" | "));
+            }
+        }
+        ViewOutput::Timeline(timeline) => {
+            if timeline.entries.is_empty() {
+                println!("No entities found.");
+                return Ok(());
+            }
+            println!("Timeline\n");
+            for entry in &timeline.entries {
+                println!(
+                    "  [{}] {} -- \"{}\"",
+                    entry.entity.entity_type, entry.timestamp, entry.label
+                );
+            }
+        }
+    }
+
     Ok(())
 }
