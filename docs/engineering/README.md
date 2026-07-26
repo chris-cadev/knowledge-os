@@ -40,7 +40,7 @@ Testing, security, deployment, and practices. These documents define how the sys
 | [IP-002](implementation-plans/IP-002-view-projections.md)   | 2     | ADR-0015                              | Tree, graph, table, timeline views; synchronization; filtering           |
 | [IP-003](implementation-plans/IP-003-plugin-system.md)      | 3     | ADR-0016                              | Plugin infrastructure, manifest parsing, capability registry, sandboxing |
 | [IP-004](implementation-plans/IP-004-semantic-search.md)    | 4     | ADR-0017                              | Embedding generation, in-memory vector store, hybrid search via RRF      |
-| [IP-005](implementation-plans/IP-005-collections-and-api.md)| 5     | ADR-0018                              | Collection entity, membership, tree view integration, API surface        |
+| [IP-005](implementation-plans/IP-005-collections.md)        | 5     | ADR-0018                              | Collection entity, membership, tree view integration                     |
 
 ---
 

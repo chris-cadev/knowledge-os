@@ -93,7 +93,7 @@ Proposed --> Accepted --> [Deprecated | Superseded]
 | ADR-0015 | [View Projection System](adr-0015.md)                            | Proposed | 2026-07-24 | [IP-002](../../engineering/implementation-plans/IP-002-view-projections.md)           |
 | ADR-0016 | [Plugin System Architecture](adr-0016.md)                        | Proposed | 2026-07-24 | [IP-003](../../engineering/implementation-plans/IP-003-plugin-system.md)              |
 | ADR-0017 | [Semantic Search via Embeddings](adr-0017.md)                    | Proposed | 2026-07-24 | [IP-004](../../engineering/implementation-plans/IP-004-semantic-search.md)            |
-| ADR-0018 | [Collection Entity for Curated Groups](adr-0018.md)              | Proposed | 2026-07-24 | [IP-005](../../engineering/implementation-plans/IP-005-collections-and-api.md)        |
+| ADR-0018 | [Collection Entity for Curated Groups](adr-0018.md)              | Proposed | 2026-07-24 | [IP-005](../../engineering/implementation-plans/IP-005-collections.md)                |
 
 ---
 

@@ -15,8 +15,6 @@ ADR-0018 defined Collections as first-class entities with many-to-many membershi
 - IP-001 (Graph Traversal) is complete
 - IP-002 (View Projections) D2 is complete — `TreeViewAdapter` exists with `collection_repo: Option<Box<dyn CollectionRepository>>` parameter
 
-**Note:** The API surface update (REST endpoints for traversal, views, plugins, semantic search, collections) is a cross-cutting integration concern spanning all ADRs. It is excluded from this IP and should be a separate effort after all functional IPs are complete.
-
 ---
 
 ## Deliverables
