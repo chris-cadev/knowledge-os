@@ -1308,3 +1308,352 @@ async fn test_traversal_result_limit() {
         .unwrap();
     assert_eq!(results.len(), 2);
 }
+
+// =============================================================================
+// Collection Tests
+// =============================================================================
+
+use knowledge_core::ports::{Collection, CollectionRepository};
+
+#[tokio::test]
+async fn test_collection_crud() {
+    let store = test_store();
+
+    // Create
+    let collection = Collection {
+        id: Uuid::new_v4(),
+        name: "Papers to Read".to_string(),
+        description: Some("Research papers for literature review".to_string()),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let created = CollectionRepository::create(&store, collection.clone())
+        .await
+        .unwrap();
+    assert_eq!(created.id, collection.id);
+    assert_eq!(created.name, "Papers to Read");
+
+    // Read
+    let loaded = CollectionRepository::get(&store, created.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(loaded.name, "Papers to Read");
+    assert_eq!(
+        loaded.description,
+        Some("Research papers for literature review".to_string())
+    );
+
+    // List
+    let all = CollectionRepository::list(&store).await.unwrap();
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0].name, "Papers to Read");
+
+    // Update
+    let mut updated = loaded;
+    updated.name = "Must Read Papers".to_string();
+    let result = CollectionRepository::update(&store, updated.clone())
+        .await
+        .unwrap();
+    assert_eq!(result.name, "Must Read Papers");
+    let loaded = CollectionRepository::get(&store, created.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(loaded.name, "Must Read Papers");
+
+    // Delete
+    CollectionRepository::delete(&store, created.id)
+        .await
+        .unwrap();
+    let loaded = CollectionRepository::get(&store, created.id).await.unwrap();
+    assert!(loaded.is_none());
+}
+
+#[tokio::test]
+async fn test_collection_update_not_found() {
+    let store = test_store();
+    let collection = Collection {
+        id: Uuid::new_v4(),
+        name: "Nonexistent".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let result = CollectionRepository::update(&store, collection).await;
+    assert!(matches!(result, Err(StorageError::NotFound)));
+}
+
+#[tokio::test]
+async fn test_collection_add_member() {
+    let store = test_store();
+    let entity = create_entity(&store, "Article").await;
+
+    let collection = Collection {
+        id: Uuid::new_v4(),
+        name: "Reading List".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let created = CollectionRepository::create(&store, collection)
+        .await
+        .unwrap();
+
+    // Add member
+    CollectionRepository::add_member(&store, created.id, entity.id)
+        .await
+        .unwrap();
+
+    // Check membership
+    let is_member = CollectionRepository::is_member(&store, created.id, entity.id)
+        .await
+        .unwrap();
+    assert!(is_member);
+
+    // Get members
+    let members = CollectionRepository::get_members(&store, created.id)
+        .await
+        .unwrap();
+    assert_eq!(members.len(), 1);
+    assert_eq!(members[0].id, entity.id);
+}
+
+#[tokio::test]
+async fn test_collection_add_member_duplicate() {
+    let store = test_store();
+    let entity = create_entity(&store, "Article").await;
+
+    let collection = Collection {
+        id: Uuid::new_v4(),
+        name: "Reading List".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let created = CollectionRepository::create(&store, collection)
+        .await
+        .unwrap();
+
+    // Add same member twice — second add should fail with Internal error
+    CollectionRepository::add_member(&store, created.id, entity.id)
+        .await
+        .unwrap();
+    let result = CollectionRepository::add_member(&store, created.id, entity.id).await;
+    assert!(result.is_err(), "Expected error for duplicate membership");
+    match result.unwrap_err() {
+        StorageError::Internal(msg) => assert!(
+            msg.contains("already a member"),
+            "Expected 'already a member' in error, got: {}",
+            msg
+        ),
+        other => panic!("Expected Internal error, got: {:?}", other),
+    }
+
+    let members = CollectionRepository::get_members(&store, created.id)
+        .await
+        .unwrap();
+    assert_eq!(members.len(), 1);
+}
+
+#[tokio::test]
+async fn test_collection_remove_member() {
+    let store = test_store();
+    let entity = create_entity(&store, "Article").await;
+
+    let collection = Collection {
+        id: Uuid::new_v4(),
+        name: "Reading List".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let created = CollectionRepository::create(&store, collection)
+        .await
+        .unwrap();
+
+    CollectionRepository::add_member(&store, created.id, entity.id)
+        .await
+        .unwrap();
+
+    // Remove member
+    CollectionRepository::remove_member(&store, created.id, entity.id)
+        .await
+        .unwrap();
+
+    let is_member = CollectionRepository::is_member(&store, created.id, entity.id)
+        .await
+        .unwrap();
+    assert!(!is_member);
+
+    let members = CollectionRepository::get_members(&store, created.id)
+        .await
+        .unwrap();
+    assert!(members.is_empty());
+}
+
+#[tokio::test]
+async fn test_collection_get_entity_collections() {
+    let store = test_store();
+    let entity = create_entity(&store, "Article").await;
+
+    let coll1 = Collection {
+        id: Uuid::new_v4(),
+        name: "Reading List".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let coll2 = Collection {
+        id: Uuid::new_v4(),
+        name: "Favorites".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let c1 = CollectionRepository::create(&store, coll1).await.unwrap();
+    let c2 = CollectionRepository::create(&store, coll2).await.unwrap();
+
+    CollectionRepository::add_member(&store, c1.id, entity.id)
+        .await
+        .unwrap();
+    CollectionRepository::add_member(&store, c2.id, entity.id)
+        .await
+        .unwrap();
+
+    // Entity should be in both collections
+    let collections = CollectionRepository::get_entity_collections(&store, entity.id)
+        .await
+        .unwrap();
+    assert_eq!(collections.len(), 2);
+    let names: Vec<&str> = collections.iter().map(|c| c.name.as_str()).collect();
+    assert!(names.contains(&"Reading List"));
+    assert!(names.contains(&"Favorites"));
+}
+
+#[tokio::test]
+async fn test_collection_delete_cascade() {
+    let store = test_store();
+    let entity = create_entity(&store, "Article").await;
+
+    let collection = Collection {
+        id: Uuid::new_v4(),
+        name: "To Delete".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let created = CollectionRepository::create(&store, collection)
+        .await
+        .unwrap();
+
+    CollectionRepository::add_member(&store, created.id, entity.id)
+        .await
+        .unwrap();
+
+    // Verify membership exists
+    let members = CollectionRepository::get_members(&store, created.id)
+        .await
+        .unwrap();
+    assert_eq!(members.len(), 1);
+
+    // Delete collection — CASCADE should remove membership records
+    CollectionRepository::delete(&store, created.id)
+        .await
+        .unwrap();
+
+    // Verify collection is gone
+    let loaded = CollectionRepository::get(&store, created.id).await.unwrap();
+    assert!(loaded.is_none());
+
+    // Verify entity still exists (not cascade-deleted)
+    let entity_still_exists = EntityRepository::get(&store, entity.id)
+        .await
+        .unwrap()
+        .is_some();
+    assert!(entity_still_exists);
+}
+
+#[tokio::test]
+async fn test_collection_entity_in_multiple_collections() {
+    let store = test_store();
+    let entity = create_entity(&store, "Article").await;
+
+    let coll1 = Collection {
+        id: Uuid::new_v4(),
+        name: "Collection A".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let coll2 = Collection {
+        id: Uuid::new_v4(),
+        name: "Collection B".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let c1 = CollectionRepository::create(&store, coll1).await.unwrap();
+    let c2 = CollectionRepository::create(&store, coll2).await.unwrap();
+
+    CollectionRepository::add_member(&store, c1.id, entity.id)
+        .await
+        .unwrap();
+    CollectionRepository::add_member(&store, c2.id, entity.id)
+        .await
+        .unwrap();
+
+    // Entity appears in each collection's member list
+    let members1 = CollectionRepository::get_members(&store, c1.id)
+        .await
+        .unwrap();
+    assert_eq!(members1.len(), 1);
+    assert_eq!(members1[0].id, entity.id);
+
+    let members2 = CollectionRepository::get_members(&store, c2.id)
+        .await
+        .unwrap();
+    assert_eq!(members2.len(), 1);
+    assert_eq!(members2[0].id, entity.id);
+
+    // Entity reports both collections
+    let collections = CollectionRepository::get_entity_collections(&store, entity.id)
+        .await
+        .unwrap();
+    assert_eq!(collections.len(), 2);
+}
+
+#[tokio::test]
+async fn test_collection_empty_members() {
+    let store = test_store();
+
+    let collection = Collection {
+        id: Uuid::new_v4(),
+        name: "Empty Collection".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let created = CollectionRepository::create(&store, collection)
+        .await
+        .unwrap();
+
+    let members = CollectionRepository::get_members(&store, created.id)
+        .await
+        .unwrap();
+    assert!(members.is_empty());
+
+    let is_member = CollectionRepository::is_member(&store, created.id, Uuid::new_v4())
+        .await
+        .unwrap();
+    assert!(!is_member);
+}
+
+#[tokio::test]
+async fn test_collection_is_member_nonexistent() {
+    let store = test_store();
+    let is_member = CollectionRepository::is_member(&store, Uuid::new_v4(), Uuid::new_v4())
+        .await
+        .unwrap();
+    assert!(!is_member);
+}

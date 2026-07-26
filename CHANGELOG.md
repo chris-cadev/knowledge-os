@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ---
 
+## [0.4.0] - 2026-07-25
+
+### Added
+
+- Collection entity and repository trait (`core/knowledge-core/src/ports/mod.rs`) — `Collection` struct with `Uuid` ID, `name`, `description`, timestamps; `CollectionRepository` trait with 10 methods
+- SQLite collection storage (`core/knowledge-storage/src/adapters/sqlite/mod.rs`) — `CollectionRepository` implementation for `SqliteStore`, `collections` and `collection_members` table migrations, `PRAGMA foreign_keys = ON`
+- CLI collection commands (`cli/src/main.rs`) — `kos collection create|list|add|remove|members|delete` subcommands
+- BDD tests for collections (`cli/features/prd-0003/collections.feature`) — 12 scenarios covering CRUD, membership, cascade delete, duplicate rejection, multi-collection membership
+- Storage integration tests for collections (`core/knowledge-storage/tests/integration_test.rs`) — 10 tests covering CRUD, membership operations, cascade behavior
+- Tree view collection integration — `TreeViewAdapter` now receives `Some(CollectionRepository)` enabling collection branches in tree view output
+
+### Changed
+
+- ADR-0018 status updated from Proposed to Accepted with implementation notes
+- `SqliteStore::new()` now executes `PRAGMA foreign_keys = ON` for cascade delete support
+- `add_member` uses plain `INSERT` instead of `INSERT OR IGNORE` to enable duplicate membership detection
+
+---
+
 ## [0.1.0] - 2026-07-21
 
 ### Added

@@ -523,13 +523,14 @@ impl EventNotifier for ViewRegistry {
 }
 
 // =============================================================================
-// Collections (stub — implemented fully in IP-005)
+// Collections
 // =============================================================================
 
 /// A curated group of entities.
 ///
-/// This is a minimal definition to support `CollectionRepository` in view adapters.
-/// The full implementation is defined in IP-005 and ADR-0018.
+/// Collections are first-class entities with many-to-many membership.
+/// They are stored in dedicated tables and used by the tree view for
+/// hierarchical grouping. Defined in ADR-0018.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Collection {
     pub id: Uuid,
@@ -541,15 +542,84 @@ pub struct Collection {
 
 /// Repository for managing curated entity collections.
 ///
-/// Stub trait for IP-002 view adapters. Full implementation in IP-005.
+/// Supports CRUD operations on collections and many-to-many membership
+/// management between collections and entities.
 #[async_trait]
 pub trait CollectionRepository: Send + Sync {
-    /// List all collections.
-    async fn list(&self) -> Result<Vec<Collection>, StorageError>;
+    /// Create a new collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::Internal` if the storage layer fails.
+    async fn create(&self, collection: Collection) -> Result<Collection, StorageError>;
+
     /// Get a collection by ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::Internal` if the storage layer fails.
     async fn get(&self, id: Uuid) -> Result<Option<Collection>, StorageError>;
+
+    /// Update an existing collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::NotFound` if the collection does not exist.
+    /// Returns `StorageError::Internal` if the storage layer fails.
+    async fn update(&self, collection: Collection) -> Result<Collection, StorageError>;
+
+    /// Delete a collection and its membership records.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::Internal` if the storage layer fails.
+    async fn delete(&self, id: Uuid) -> Result<(), StorageError>;
+
+    /// List all collections.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::Internal` if the storage layer fails.
+    async fn list(&self) -> Result<Vec<Collection>, StorageError>;
+
+    /// Add an entity to a collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::Internal` if the storage layer fails.
+    async fn add_member(&self, collection_id: Uuid, entity_id: Uuid) -> Result<(), StorageError>;
+
+    /// Remove an entity from a collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::Internal` if the storage layer fails.
+    async fn remove_member(&self, collection_id: Uuid, entity_id: Uuid)
+        -> Result<(), StorageError>;
+
     /// Get all entities belonging to a collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::Internal` if the storage layer fails.
     async fn get_members(&self, collection_id: Uuid) -> Result<Vec<Entity>, StorageError>;
+
+    /// Get all collections containing the given entity.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::Internal` if the storage layer fails.
+    async fn get_entity_collections(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<Collection>, StorageError>;
+
+    /// Check if an entity is a member of a collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::Internal` if the storage layer fails.
+    async fn is_member(&self, collection_id: Uuid, entity_id: Uuid) -> Result<bool, StorageError>;
 }
 
 // =============================================================================

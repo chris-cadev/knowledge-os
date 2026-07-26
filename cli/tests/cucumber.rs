@@ -9,6 +9,7 @@ pub struct CliWorld {
     temp_dir: Option<TempDir>,
     last_output: Option<std::process::Output>,
     last_entity_id: Option<String>,
+    last_collection_id: Option<String>,
     last_merge_id: Option<String>,
     files: HashMap<String, String>,
     entity_ids: HashMap<String, String>,
@@ -102,6 +103,7 @@ async fn empty_database(world: &mut CliWorld) {
     world.temp_dir = Some(TempDir::new().unwrap());
     world.last_output = None;
     world.last_entity_id = None;
+    world.last_collection_id = None;
     world.last_merge_id = None;
     world.files.clear();
     world.entity_ids.clear();
@@ -187,10 +189,14 @@ async fn import_files(world: &mut CliWorld, step: &Step) {
 #[when(expr = "I run {string}")]
 async fn run_kos_command(world: &mut CliWorld, cmd: String) {
     let entity_id = world.last_entity_id.clone();
+    let collection_id = world.last_collection_id.clone();
     let merge_id = world.last_merge_id.clone();
     let mut expanded = cmd.replace("<directory>", &world.temp_path().to_string_lossy());
     if let Some(ref id) = entity_id {
         expanded = expanded.replace("<entity-id>", id);
+    }
+    if let Some(ref id) = collection_id {
+        expanded = expanded.replace("<collection-id>", id);
     }
     if let Some(ref id) = merge_id {
         expanded = expanded.replace("<merge-id>", id);
@@ -268,6 +274,87 @@ async fn run_resolution_undo(world: &mut CliWorld) {
     let id = world.last_merge_id.clone().unwrap();
     let output = world.run_kos_direct(&["resolution", "undo", &id]);
     world.last_output = Some(output);
+}
+
+// =============================================================================
+// Collection Steps
+// =============================================================================
+
+#[when("I extract the collection ID from the last output")]
+async fn extract_collection_id(world: &mut CliWorld) {
+    let stdout = world.stdout();
+    for line in stdout.lines() {
+        if line.contains("Collection created:") || line.contains("Collection deleted:") {
+            // Parse: "Collection created: Name (uuid-here)"
+            if let Some(start) = line.rfind('(') {
+                if let Some(end) = line.rfind(')') {
+                    let id = &line[start + 1..end];
+                    world.last_collection_id = Some(id.to_string());
+                    return;
+                }
+            }
+        }
+    }
+    // Fallback: look for UUID pattern in output
+    for line in stdout.lines() {
+        if let Some(uuid) = extract_uuid(line) {
+            world.last_collection_id = Some(uuid);
+            return;
+        }
+    }
+}
+
+#[when("I add the entity to the collection")]
+async fn add_entity_to_collection(world: &mut CliWorld) {
+    let coll_id = world.last_collection_id.clone().unwrap();
+    let ent_id = world.last_entity_id.clone().unwrap();
+    let output = world.run_kos_direct(&["collection", "add", &coll_id, &ent_id]);
+    world.last_output = Some(output);
+}
+
+#[when("I add the entity to the collection again")]
+async fn add_entity_to_collection_again(world: &mut CliWorld) {
+    let coll_id = world.last_collection_id.clone().unwrap();
+    let ent_id = world.last_entity_id.clone().unwrap();
+    let output = world.run_kos_direct(&["collection", "add", &coll_id, &ent_id]);
+    world.last_output = Some(output);
+}
+
+#[when("I remove the entity from the collection")]
+async fn remove_entity_from_collection(world: &mut CliWorld) {
+    let coll_id = world.last_collection_id.clone().unwrap();
+    let ent_id = world.last_entity_id.clone().unwrap();
+    let output = world.run_kos_direct(&["collection", "remove", &coll_id, &ent_id]);
+    world.last_output = Some(output);
+}
+
+#[when("I show the collection members")]
+async fn show_collection_members(world: &mut CliWorld) {
+    let coll_id = world.last_collection_id.clone().unwrap();
+    let output = world.run_kos_direct(&["collection", "members", &coll_id]);
+    world.last_output = Some(output);
+}
+
+fn extract_uuid(text: &str) -> Option<String> {
+    // Look for UUID pattern: 8-4-4-4-12 hex chars
+    for word in text.split_whitespace() {
+        let clean: String = word
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect();
+        let parts: Vec<&str> = clean.split('-').collect();
+        if parts.len() == 5
+            && parts[0].len() == 8
+            && parts[1].len() == 4
+            && parts[2].len() == 4
+            && parts[3].len() == 4
+            && parts[4].len() == 12
+            && clean.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
+        {
+            return Some(clean);
+        }
+    }
+    None
 }
 
 // =============================================================================

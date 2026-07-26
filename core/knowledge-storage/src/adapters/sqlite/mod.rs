@@ -3,10 +3,10 @@ use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::Entity;
 use knowledge_core::features::relationship::Relationship;
 use knowledge_core::ports::{
-    ComponentRepository, EntityRepository, EntityResolver, EntityVersion, Event, EventLog,
-    MergeAuditEntry, RelationshipRepository, ResolutionCandidate, SearchIndex, SearchQuery,
-    SearchResult, StorageError, TransactionalWrite, TraversalConfig, TraversalError, TraversalPort,
-    TraversalQuery, TraversalResult,
+    Collection, CollectionRepository, ComponentRepository, EntityRepository, EntityResolver,
+    EntityVersion, Event, EventLog, MergeAuditEntry, RelationshipRepository, ResolutionCandidate,
+    SearchIndex, SearchQuery, SearchResult, StorageError, TransactionalWrite, TraversalConfig,
+    TraversalError, TraversalPort, TraversalQuery, TraversalResult,
 };
 use rusqlite::{params, Connection, OptionalExtension};
 use std::sync::Mutex;
@@ -21,6 +21,10 @@ const ENTITY_COLS: &str = "id, entity_type, is_active, created_at, updated_at, v
 impl SqliteStore {
     pub fn new(path: &str) -> Result<Self, StorageError> {
         let conn = Connection::open(path).map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        // Enable foreign key enforcement (required for CASCADE DELETE).
+        conn.execute_batch("PRAGMA foreign_keys = ON")
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS entities (
@@ -100,6 +104,23 @@ impl SqliteStore {
                 evaluated_at TEXT NOT NULL,
                 FOREIGN KEY (source_entity_id) REFERENCES entities(id),
                 FOREIGN KEY (candidate_entity_id) REFERENCES entities(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS collections (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS collection_members (
+                collection_id TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                added_at TEXT NOT NULL,
+                PRIMARY KEY (collection_id, entity_id),
+                FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+                FOREIGN KEY (entity_id) REFERENCES entities(id)
             );",
         )
         .map_err(|e| StorageError::Internal(e.to_string()))?;
@@ -224,6 +245,20 @@ impl SqliteStore {
 
     fn entity_type_str(entity: &Entity) -> String {
         serde_json::to_string(&entity.entity_type).unwrap()
+    }
+
+    fn parse_collection(row: &rusqlite::Row) -> Result<Collection, rusqlite::Error> {
+        Ok(Collection {
+            id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
+            name: row.get(1)?,
+            description: row.get(2)?,
+            created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(3)?)
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(4)?)
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        })
     }
 }
 
@@ -1553,6 +1588,208 @@ impl EntityResolver for SqliteStore {
         let entries: Vec<MergeAuditEntry> = entries.filter_map(|r| r.ok()).collect();
 
         Ok(entries)
+    }
+}
+
+#[async_trait]
+impl CollectionRepository for SqliteStore {
+    async fn create(&self, collection: Collection) -> Result<Collection, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        conn.execute(
+            "INSERT INTO collections (id, name, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                collection.id.to_string(),
+                collection.name,
+                collection.description,
+                collection.created_at.to_rfc3339(),
+                collection.updated_at.to_rfc3339(),
+            ],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+        Ok(collection)
+    }
+
+    async fn get(&self, id: Uuid) -> Result<Option<Collection>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let mut stmt = conn
+            .prepare("SELECT id, name, description, created_at, updated_at FROM collections WHERE id = ?1")
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        stmt.query_row(params![id.to_string()], Self::parse_collection)
+            .optional()
+            .map_err(|e| StorageError::Internal(e.to_string()))
+    }
+
+    async fn update(&self, collection: Collection) -> Result<Collection, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let affected = conn
+            .execute(
+                "UPDATE collections SET name = ?1, description = ?2, updated_at = ?3 WHERE id = ?4",
+                params![
+                    collection.name,
+                    collection.description,
+                    collection.updated_at.to_rfc3339(),
+                    collection.id.to_string(),
+                ],
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        if affected == 0 {
+            return Err(StorageError::NotFound);
+        }
+        Ok(collection)
+    }
+
+    async fn delete(&self, id: Uuid) -> Result<(), StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        // CASCADE DELETE on collection_members handles membership cleanup.
+        conn.execute(
+            "DELETE FROM collections WHERE id = ?1",
+            params![id.to_string()],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn list(&self) -> Result<Vec<Collection>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let mut stmt = conn
+            .prepare("SELECT id, name, description, created_at, updated_at FROM collections ORDER BY name")
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let rows = stmt
+            .query_map([], Self::parse_collection)
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
+    }
+
+    async fn add_member(&self, collection_id: Uuid, entity_id: Uuid) -> Result<(), StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let affected = conn
+            .execute(
+                "INSERT INTO collection_members (collection_id, entity_id, added_at) VALUES (?1, ?2, ?3)",
+                params![
+                    collection_id.to_string(),
+                    entity_id.to_string(),
+                    chrono::Utc::now().to_rfc3339(),
+                ],
+            )
+            .map_err(|e| {
+                if e.to_string().contains("UNIQUE") || e.to_string().contains("already") {
+                    StorageError::Internal(format!(
+                        "Entity {} is already a member of collection {}",
+                        entity_id, collection_id
+                    ))
+                } else {
+                    StorageError::Internal(e.to_string())
+                }
+            })?;
+        if affected == 0 {
+            return Err(StorageError::Internal(format!(
+                "Entity {} is already a member of collection {}",
+                entity_id, collection_id
+            )));
+        }
+        Ok(())
+    }
+
+    async fn remove_member(
+        &self,
+        collection_id: Uuid,
+        entity_id: Uuid,
+    ) -> Result<(), StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        conn.execute(
+            "DELETE FROM collection_members WHERE collection_id = ?1 AND entity_id = ?2",
+            params![collection_id.to_string(), entity_id.to_string()],
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn get_members(&self, collection_id: Uuid) -> Result<Vec<Entity>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT {cols} FROM entities e
+                 JOIN collection_members cm ON cm.entity_id = e.id
+                 WHERE cm.collection_id = ?1 AND e.is_active = 1",
+                cols = ENTITY_COLS
+                    .replacen("id,", "e.id,", 1)
+                    .replacen("entity_type,", "e.entity_type,", 1)
+                    .replacen("is_active,", "e.is_active,", 1)
+                    .replacen("created_at,", "e.created_at,", 1)
+                    .replacen("updated_at,", "e.updated_at,", 1)
+                    .replacen("version", "e.version", 1)
+            ))
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![collection_id.to_string()], Self::parse_entity)
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
+    }
+
+    async fn get_entity_collections(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<Collection>, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT c.id, c.name, c.description, c.created_at, c.updated_at
+                 FROM collections c
+                 JOIN collection_members cm ON cm.collection_id = c.id
+                 WHERE cm.entity_id = ?1",
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![entity_id.to_string()], Self::parse_collection)
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        rows.map(|r| r.map_err(|e| StorageError::Internal(e.to_string())))
+            .collect()
+    }
+
+    async fn is_member(&self, collection_id: Uuid, entity_id: Uuid) -> Result<bool, StorageError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let mut stmt = conn
+            .prepare("SELECT COUNT(*) FROM collection_members WHERE collection_id = ?1 AND entity_id = ?2")
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let count: i64 = stmt
+            .query_row(
+                params![collection_id.to_string(), entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        Ok(count > 0)
     }
 }
 

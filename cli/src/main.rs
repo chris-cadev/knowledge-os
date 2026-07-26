@@ -5,10 +5,11 @@ use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::{Entity, EntityType};
 use knowledge_core::features::relationship::{Relationship, RelationshipType};
 use knowledge_core::ports::{
-    ComponentRepository, EntityRepository, EntityResolver, EntityVersion, Event, EventLog,
-    EventNotifier, RelationshipRepository, SearchIndex, SearchQuery, SearchResult, StorageError,
-    TransactionalWrite, TraversalConfig, TraversalDirection, TraversalError, TraversalPort,
-    TraversalQuery, TraversalResult, ViewAdapter, ViewFilter, ViewOutput, ViewRegistry,
+    Collection, CollectionRepository, ComponentRepository, EntityRepository, EntityResolver,
+    EntityVersion, Event, EventLog, EventNotifier, RelationshipRepository, SearchIndex,
+    SearchQuery, SearchResult, StorageError, TransactionalWrite, TraversalConfig,
+    TraversalDirection, TraversalError, TraversalPort, TraversalQuery, TraversalResult,
+    ViewAdapter, ViewFilter, ViewOutput, ViewRegistry,
 };
 use knowledge_derive::features::view::{
     graph::GraphViewAdapter, table::TableViewAdapter, timeline::TimelineViewAdapter,
@@ -155,6 +156,47 @@ impl TraversalPort for StoreWrapper {
     }
 }
 
+#[async_trait]
+impl CollectionRepository for StoreWrapper {
+    async fn create(&self, collection: Collection) -> Result<Collection, StorageError> {
+        CollectionRepository::create(self.0.as_ref(), collection).await
+    }
+    async fn get(&self, id: Uuid) -> Result<Option<Collection>, StorageError> {
+        CollectionRepository::get(self.0.as_ref(), id).await
+    }
+    async fn update(&self, collection: Collection) -> Result<Collection, StorageError> {
+        CollectionRepository::update(self.0.as_ref(), collection).await
+    }
+    async fn delete(&self, id: Uuid) -> Result<(), StorageError> {
+        CollectionRepository::delete(self.0.as_ref(), id).await
+    }
+    async fn list(&self) -> Result<Vec<Collection>, StorageError> {
+        CollectionRepository::list(self.0.as_ref()).await
+    }
+    async fn add_member(&self, collection_id: Uuid, entity_id: Uuid) -> Result<(), StorageError> {
+        CollectionRepository::add_member(self.0.as_ref(), collection_id, entity_id).await
+    }
+    async fn remove_member(
+        &self,
+        collection_id: Uuid,
+        entity_id: Uuid,
+    ) -> Result<(), StorageError> {
+        CollectionRepository::remove_member(self.0.as_ref(), collection_id, entity_id).await
+    }
+    async fn get_members(&self, collection_id: Uuid) -> Result<Vec<Entity>, StorageError> {
+        CollectionRepository::get_members(self.0.as_ref(), collection_id).await
+    }
+    async fn get_entity_collections(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<Collection>, StorageError> {
+        CollectionRepository::get_entity_collections(self.0.as_ref(), entity_id).await
+    }
+    async fn is_member(&self, collection_id: Uuid, entity_id: Uuid) -> Result<bool, StorageError> {
+        CollectionRepository::is_member(self.0.as_ref(), collection_id, entity_id).await
+    }
+}
+
 // =============================================================================
 // View Registry Factory
 // =============================================================================
@@ -169,7 +211,7 @@ fn create_view_registry(store: &Arc<SqliteStore>) -> ViewRegistry {
     registry.register(Box::new(TreeViewAdapter::new(
         Box::new(StoreWrapper(store.clone())),
         Box::new(StoreWrapper(store.clone())),
-        None, // No CollectionRepository until IP-005
+        Some(Box::new(StoreWrapper(store.clone()))),
     )));
     registry.register(Box::new(GraphViewAdapter::new(
         Box::new(StoreWrapper(store.clone())),
@@ -287,6 +329,11 @@ enum Commands {
         #[command(subcommand)]
         view_type: ViewCommands,
     },
+    /// Manage entity collections
+    Collection {
+        #[command(subcommand)]
+        action: CollectionCommands,
+    },
     /// Manage plugins
     Plugin {
         #[command(subcommand)]
@@ -360,6 +407,44 @@ enum PluginCommands {
     },
 }
 
+#[derive(Subcommand)]
+enum CollectionCommands {
+    /// Create a new collection
+    Create {
+        /// Collection name
+        name: String,
+        /// Optional description
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// List all collections
+    List,
+    /// Add an entity to a collection
+    Add {
+        /// Collection ID
+        collection_id: String,
+        /// Entity ID
+        entity_id: String,
+    },
+    /// Remove an entity from a collection
+    Remove {
+        /// Collection ID
+        collection_id: String,
+        /// Entity ID
+        entity_id: String,
+    },
+    /// List members of a collection
+    Members {
+        /// Collection ID
+        collection_id: String,
+    },
+    /// Delete a collection
+    Delete {
+        /// Collection ID
+        collection_id: String,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -413,6 +498,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
         }
         Commands::View { view_type } => cmd_view(store, view_type).await,
+        Commands::Collection { action } => cmd_collection(&store, action).await,
         Commands::Plugin { action } => match action {
             PluginCommands::List => cmd_plugin_list().await,
             PluginCommands::Info { name } => cmd_plugin_info(&name).await,
@@ -1476,7 +1562,7 @@ async fn cmd_view(
         "tree" => Box::new(TreeViewAdapter::new(
             Box::new(StoreWrapper(wrapper.0.clone())),
             Box::new(StoreWrapper(wrapper.0.clone())),
-            None,
+            Some(Box::new(StoreWrapper(wrapper.0.clone()))),
         )),
         "graph" => Box::new(GraphViewAdapter::new(
             Box::new(StoreWrapper(wrapper.0.clone())),
@@ -1557,6 +1643,125 @@ async fn cmd_view(
                     "  [{}] {} -- \"{}\"",
                     entry.entity.entity_type, entry.timestamp, entry.label
                 );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn cmd_collection(
+    store: &Arc<SqliteStore>,
+    action: CollectionCommands,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let wrapper = StoreWrapper(store.clone());
+
+    match action {
+        CollectionCommands::Create { name, description } => {
+            let now = chrono::Utc::now();
+            let collection = Collection {
+                id: Uuid::new_v4(),
+                name: name.clone(),
+                description,
+                created_at: now,
+                updated_at: now,
+            };
+            let created = CollectionRepository::create(&wrapper, collection).await?;
+            println!("Collection created: {} ({})", created.name, created.id);
+        }
+        CollectionCommands::List => {
+            let collections = CollectionRepository::list(&wrapper).await?;
+            if collections.is_empty() {
+                println!("No collections found.");
+                return Ok(());
+            }
+            println!("Collections ({}):\n", collections.len());
+            for c in &collections {
+                let desc = c.description.as_deref().unwrap_or("(no description)");
+                println!("  {} ({}) — {}", c.name, c.id, desc);
+            }
+        }
+        CollectionCommands::Add {
+            collection_id,
+            entity_id,
+        } => {
+            let coll_id = Uuid::parse_str(&collection_id)?;
+            let ent_id = Uuid::parse_str(&entity_id)?;
+
+            // Verify both exist
+            match CollectionRepository::get(&wrapper, coll_id).await? {
+                Some(c) => println!("Adding entity {} to collection '{}'...", ent_id, c.name),
+                None => {
+                    eprintln!("Error: Collection {} not found.", coll_id);
+                    return Ok(());
+                }
+            }
+            match EntityRepository::get(&wrapper, ent_id).await? {
+                Some(e) => println!("  Entity [{}] ({})", e.entity_type, e.id),
+                None => {
+                    eprintln!("Error: Entity {} not found.", ent_id);
+                    return Ok(());
+                }
+            }
+
+            match CollectionRepository::add_member(&wrapper, coll_id, ent_id).await {
+                Ok(()) => println!("Entity added to collection."),
+                Err(StorageError::Internal(msg)) => {
+                    if msg.contains("already") {
+                        eprintln!("Entity is already a member of this collection.");
+                    } else {
+                        return Err(StorageError::Internal(msg).into());
+                    }
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+        CollectionCommands::Remove {
+            collection_id,
+            entity_id,
+        } => {
+            let coll_id = Uuid::parse_str(&collection_id)?;
+            let ent_id = Uuid::parse_str(&entity_id)?;
+            CollectionRepository::remove_member(&wrapper, coll_id, ent_id).await?;
+            println!("Entity removed from collection.");
+        }
+        CollectionCommands::Members { collection_id } => {
+            let coll_id = Uuid::parse_str(&collection_id)?;
+            match CollectionRepository::get(&wrapper, coll_id).await? {
+                Some(c) => {
+                    let members = CollectionRepository::get_members(&wrapper, coll_id).await?;
+                    if members.is_empty() {
+                        println!("Collection '{}' is empty.", c.name);
+                        return Ok(());
+                    }
+                    println!("Collection '{}' ({} members):\n", c.name, members.len());
+                    for e in &members {
+                        let components = ComponentRepository::get(&wrapper, e.id).await?;
+                        let title = components
+                            .iter()
+                            .find(|c| c.component_type == ComponentType::Title)
+                            .and_then(|c| c.data.as_str().map(String::from))
+                            .unwrap_or_else(|| "Untitled".to_string());
+                        println!("  {} [{}] ({})", title, e.entity_type, e.id);
+                    }
+                }
+                None => {
+                    eprintln!("Error: Collection {} not found.", coll_id);
+                    return Ok(());
+                }
+            }
+        }
+        CollectionCommands::Delete { collection_id } => {
+            let coll_id = Uuid::parse_str(&collection_id)?;
+            match CollectionRepository::get(&wrapper, coll_id).await? {
+                Some(c) => {
+                    CollectionRepository::delete(&wrapper, coll_id).await?;
+                    println!("Collection deleted: {} ({})", c.name, c.id);
+                }
+                None => {
+                    eprintln!("Error: Collection {} not found.", coll_id);
+                    return Ok(());
+                }
             }
         }
     }

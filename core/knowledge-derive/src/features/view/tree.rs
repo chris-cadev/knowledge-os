@@ -420,11 +420,34 @@ mod tests {
 
         #[async_trait]
         impl CollectionRepository for MockCollectionRepo {
-            async fn list(&self) -> Result<Vec<Collection>, StorageError> {
-                Ok(self.collections.clone())
+            async fn create(&self, _collection: Collection) -> Result<Collection, StorageError> {
+                unimplemented!("mock")
             }
             async fn get(&self, id: Uuid) -> Result<Option<Collection>, StorageError> {
                 Ok(self.collections.iter().find(|c| c.id == id).cloned())
+            }
+            async fn update(&self, _collection: Collection) -> Result<Collection, StorageError> {
+                unimplemented!("mock")
+            }
+            async fn delete(&self, _id: Uuid) -> Result<(), StorageError> {
+                unimplemented!("mock")
+            }
+            async fn list(&self) -> Result<Vec<Collection>, StorageError> {
+                Ok(self.collections.clone())
+            }
+            async fn add_member(
+                &self,
+                _collection_id: Uuid,
+                _entity_id: Uuid,
+            ) -> Result<(), StorageError> {
+                unimplemented!("mock")
+            }
+            async fn remove_member(
+                &self,
+                _collection_id: Uuid,
+                _entity_id: Uuid,
+            ) -> Result<(), StorageError> {
+                unimplemented!("mock")
             }
             async fn get_members(&self, collection_id: Uuid) -> Result<Vec<Entity>, StorageError> {
                 Ok(self
@@ -432,6 +455,19 @@ mod tests {
                     .get(&collection_id)
                     .cloned()
                     .unwrap_or_default())
+            }
+            async fn get_entity_collections(
+                &self,
+                _entity_id: Uuid,
+            ) -> Result<Vec<Collection>, StorageError> {
+                unimplemented!("mock")
+            }
+            async fn is_member(
+                &self,
+                _collection_id: Uuid,
+                _entity_id: Uuid,
+            ) -> Result<bool, StorageError> {
+                unimplemented!("mock")
             }
         }
 
