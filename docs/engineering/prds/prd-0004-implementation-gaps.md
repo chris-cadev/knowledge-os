@@ -137,8 +137,8 @@ Yes. The `BinaryContent` and `Embedding` components fit within the existing comp
 | G-021 | **F4.2: Embedding generation** — Mock embedder only; no configurable AI provider for real embeddings                                 | P0       | Stub            |
 | G-022 | **F4.4: Hybrid search** — RRF fusion exists structurally but semantic component always empty; hybrid degrades to keyword-only        | P0       | Stub            |
 | G-023 | **F4.5: Embedding model configuration** — No way to configure which embedding model or provider to use                               | P1       | Not implemented |
-| G-024 | **`kos plugin install <path>`** — Specified in PRD CLI section but not implemented                                                   | P0       | Not implemented |
-| G-025 | **`kos plugin uninstall <name>`** — Specified in PRD CLI section but not implemented                                                 | P1       | Not implemented |
+| G-024 | **`kos plugin install <path>`** — Copies plugin to plugin directory, validates manifest, registers capabilities                           | P0       | Implemented     |
+| G-025 | **`kos plugin uninstall <name>`** — Removes plugin from directory, deregisters capabilities                                             | P1       | Implemented     |
 | G-026 | **`embeddings` table** — No persistent vector storage; in-memory only, lost on restart                                               | P1       | Not implemented |
 | G-027 | **NF benchmarks** — Traversal latency, view rendering latency, plugin load latency all unvalidated                                   | P1       | Not validated   |
 
@@ -339,8 +339,8 @@ No new commands. All gaps relate to completing existing commands or adding flags
 | --- | ----------------------------------------------------------------------------- | -------- |
 | T10 | Plugin discovery — startup scans directory and loads valid manifests          | P0       |
 | T11 | Custom importer — user plugin provides new format, available via `kos import` | P0       |
-| T12 | `kos plugin install` — copies plugin, validates manifest, registers           | P0       |
-| T13 | `kos plugin uninstall` — removes plugin, deregisters                          | P1       |
+| T12 | `kos plugin install` — copies plugin, validates manifest, registers           | P0       | ✅ Done |
+| T13 | `kos plugin uninstall` — removes plugin, deregisters                          | P1       | ✅ Done |
 | T14 | Plugin failure isolation — bad plugin does not crash core system              | P1       |
 | T15 | Plugin timeout — plugin exceeding timeout is terminated                       | P2       |
 

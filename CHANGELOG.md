@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- `kos plugin install <path>` — Install a plugin from a directory containing `plugin.toml` to `~/.knowledge-os/plugins/` (G-024, F3.3)
+- `kos plugin uninstall <name>` — Uninstall an installed plugin by name (G-025, F3.4)
+- `CapabilityRegistry::deregister_importer` and `deregister_plugin` methods for plugin removal
+- `KOS_PLUGIN_DIR` environment variable to override the default plugin directory
+- BDD tests for plugin install/uninstall (`cli/features/prd-0003/plugin.feature`) — 5 new scenarios covering install, uninstall, missing manifest, not-found, and duplicate detection
 - PRD-0004: Implementation Gaps — Cross-PRD Audit (`docs/engineering/prds/prd-0004-implementation-gaps.md`) — Consolidated gap inventory from PRDs 0001–0003 with 34 identified gaps, 30 test cases, and 8-week timeline
 - CLI integration tests (`cli/tests/integration_test.rs`) — 12 tests covering import, search, list, get, archive/restore, rebuild-index, cross-refs, batch progress
 - Derive integration tests (`core/knowledge-derive/tests/integration_test.rs`) — 12 tests covering views, search pipeline, hybrid RRF fusion
@@ -22,7 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - BDD tests for search (`cli/features/prd-0001/search.feature`) — 11 scenarios covering keyword, type/tag filter, get, list, archive/restore lifecycle
 - BDD tests for traversal (`cli/features/prd-0003/traversal.feature`) — 4 scenarios covering outgoing, bidirectional, depth limit, error handling
 - BDD tests for views (`cli/features/prd-0003/views.feature`) — 8 scenarios covering tree, graph, table, timeline, empty database
-- BDD tests for plugins (`cli/features/prd-0003/plugin.feature`) — 5 scenarios covering list, info, unknown plugin error
+- BDD tests for plugins (`cli/features/prd-0003/plugin.feature`) — 10 scenarios covering list, info, unknown plugin error, install, uninstall, missing manifest, not-found, duplicate detection
 - BDD tests for semantic search (`cli/features/prd-0003/semantic-search.feature`) — 5 scenarios covering keyword default, semantic/hybrid warnings, mutual exclusivity
 - BDD E2E tests (`cli/features/prd-0003/e2e-*.feature`) — 4 feature files, 19 scenarios for cross-cutting integration
 - Storage integration tests for graph traversal (`core/knowledge-storage/tests/integration_test.rs`) — 12 tests covering chain, tree, cycle, diamond, bidirectional, depth limit, type filters
@@ -31,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- PRD-0004 gaps G-024 and G-025 marked as Implemented; test cases T12 and T13 marked as Done
 - README updated with CLI in project layout, technology table (Clap), and status section
 - CHANGELOG updated with comprehensive CLI implementation entries
 - Tutorial `first-import.md` corrected: binary name `kos` (was `knowledge-os`), command `get` (was `inspect`), removed undefined `derived status` command, updated derived data section to reflect actual `rebuild-index` workflow

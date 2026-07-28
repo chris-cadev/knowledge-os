@@ -16,7 +16,7 @@ use knowledge_derive::features::view::{
     tree::TreeViewAdapter,
 };
 use knowledge_storage::adapters::sqlite::SqliteStore;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -405,6 +405,16 @@ enum PluginCommands {
         /// Plugin name
         name: String,
     },
+    /// Install a plugin from a directory containing plugin.toml
+    Install {
+        /// Path to the plugin directory
+        path: PathBuf,
+    },
+    /// Uninstall a plugin by name
+    Uninstall {
+        /// Plugin name
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -502,6 +512,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Plugin { action } => match action {
             PluginCommands::List => cmd_plugin_list().await,
             PluginCommands::Info { name } => cmd_plugin_info(&name).await,
+            PluginCommands::Install { path } => cmd_plugin_install(path).await,
+            PluginCommands::Uninstall { name } => cmd_plugin_uninstall(&name).await,
         },
     }
 }
@@ -1770,9 +1782,20 @@ async fn cmd_collection(
 }
 
 async fn cmd_plugin_list() -> Result<(), Box<dyn std::error::Error>> {
+    use knowledge_plugin::loader::discover_plugins;
     use knowledge_plugin::registry::built_in_plugins;
 
-    let registry = built_in_plugins();
+    let mut registry = built_in_plugins();
+
+    let dir = plugin_dir();
+    if let Ok(discovered) = discover_plugins(&dir) {
+        for d in &discovered {
+            registry.register_plugin(Box::new(StubPlugin {
+                manifest: d.manifest.clone(),
+            }));
+        }
+    }
+
     let plugins = registry.list_plugins();
 
     if plugins.is_empty() {
@@ -1794,10 +1817,37 @@ async fn cmd_plugin_list() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+struct StubPlugin {
+    manifest: knowledge_core::ports::PluginManifest,
+}
+
+impl knowledge_core::ports::Plugin for StubPlugin {
+    fn manifest(&self) -> &knowledge_core::ports::PluginManifest {
+        &self.manifest
+    }
+    fn activate(&self) -> Result<(), knowledge_core::ports::PluginError> {
+        Ok(())
+    }
+    fn deactivate(&self) -> Result<(), knowledge_core::ports::PluginError> {
+        Ok(())
+    }
+}
+
 async fn cmd_plugin_info(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    use knowledge_plugin::loader::discover_plugins;
     use knowledge_plugin::registry::built_in_plugins;
 
-    let registry = built_in_plugins();
+    let mut registry = built_in_plugins();
+
+    let dir = plugin_dir();
+    if let Ok(discovered) = discover_plugins(&dir) {
+        for d in &discovered {
+            registry.register_plugin(Box::new(StubPlugin {
+                manifest: d.manifest.clone(),
+            }));
+        }
+    }
+
     let plugins = registry.list_plugins();
     let plugin = plugins.iter().find(|p| p.name == name);
 
@@ -1819,5 +1869,112 @@ async fn cmd_plugin_info(name: &str) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    Ok(())
+}
+
+fn plugin_dir() -> PathBuf {
+    if let Ok(val) = std::env::var("KOS_PLUGIN_DIR") {
+        PathBuf::from(val)
+    } else {
+        let mut path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        path.push(".knowledge-os");
+        path.push("plugins");
+        path
+    }
+}
+
+async fn cmd_plugin_install(source: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    use knowledge_plugin::manifest::parse_manifest_file;
+
+    let manifest_path = source.join("plugin.toml");
+    if !manifest_path.exists() {
+        eprintln!("Error: No plugin.toml found in '{}'.", source.display());
+        std::process::exit(1);
+    }
+
+    let manifest = parse_manifest_file(&manifest_path).map_err(|e| {
+        eprintln!("Error: Invalid plugin manifest: {}", e);
+        e
+    })?;
+
+    let dest = plugin_dir().join(&manifest.name);
+    if dest.exists() {
+        eprintln!(
+            "Error: Plugin '{}' is already installed. Uninstall it first.",
+            manifest.name
+        );
+        std::process::exit(1);
+    }
+
+    std::fs::create_dir_all(&dest).map_err(|e| {
+        eprintln!(
+            "Error: Could not create plugin directory '{}': {}",
+            dest.display(),
+            e
+        );
+        e
+    })?;
+
+    copy_dir_recursive(&source, &dest).map_err(|e| {
+        eprintln!(
+            "Error: Could not copy plugin to '{}': {}",
+            dest.display(),
+            e
+        );
+        e
+    })?;
+
+    println!(
+        "Plugin '{}' v{} installed to '{}'.",
+        manifest.name,
+        manifest.version,
+        dest.display()
+    );
+
+    Ok(())
+}
+
+async fn cmd_plugin_uninstall(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let dest = plugin_dir().join(name);
+    if !dest.exists() {
+        eprintln!("Error: Plugin '{}' is not installed.", name);
+        std::process::exit(1);
+    }
+
+    let manifest_path = dest.join("plugin.toml");
+    let display_name = if manifest_path.exists() {
+        match knowledge_plugin::manifest::parse_manifest_file(&manifest_path) {
+            Ok(m) => format!("{} v{}", m.name, m.version),
+            Err(_) => name.to_string(),
+        }
+    } else {
+        name.to_string()
+    };
+
+    std::fs::remove_dir_all(&dest).map_err(|e| {
+        eprintln!(
+            "Error: Could not remove plugin directory '{}': {}",
+            dest.display(),
+            e
+        );
+        e
+    })?;
+
+    println!("Plugin '{}' uninstalled.", display_name);
+
+    Ok(())
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_recursive(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
     Ok(())
 }

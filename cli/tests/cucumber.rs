@@ -35,6 +35,18 @@ impl CliWorld {
         self.last_output = Some(cmd.output().unwrap());
     }
 
+    fn run_kos_with_env(&mut self, args: &[&str], env_vars: &[(&str, &str)]) {
+        let path = self.temp_path().to_path_buf();
+        let db_path = path.join("test.db");
+        let mut cmd = assert_cmd::Command::cargo_bin("kos").unwrap();
+        cmd.current_dir(&path)
+            .arg("--db")
+            .arg(&db_path)
+            .envs(env_vars.iter().map(|(k, v)| (*k, *v)))
+            .args(args);
+        self.last_output = Some(cmd.output().unwrap());
+    }
+
     fn stdout(&self) -> String {
         match self.last_output.as_ref() {
             Some(o) => String::from_utf8_lossy(&o.stdout).to_string(),
@@ -600,6 +612,43 @@ async fn set_merge_threshold(_world: &mut CliWorld, entity_type: String, thresho
         "Setting merge threshold for {} to {} (not yet implemented)",
         entity_type, threshold
     );
+}
+
+// =============================================================================
+// Plugin Install/Uninstall Steps
+// =============================================================================
+
+#[given(expr = "a plugin directory {string} with manifest:")]
+async fn create_plugin_dir_with_manifest(world: &mut CliWorld, name: String, step: &Step) {
+    let content = step.docstring.as_ref().unwrap();
+    let plugin_dir = world.temp_path().join("plugins").join(&name);
+    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::write(plugin_dir.join("plugin.toml"), content).unwrap();
+}
+
+#[when(expr = "I run with plugin dir {string}: {string}")]
+async fn run_kos_with_plugin_dir(world: &mut CliWorld, _plugin_dir_name: String, cmd: String) {
+    let installed_dir = world.temp_path().join("installed-plugins");
+    fs::create_dir_all(&installed_dir).unwrap();
+    let plugin_dir_str = installed_dir.to_string_lossy().to_string();
+    let entity_id = world.last_entity_id.clone();
+    let collection_id = world.last_collection_id.clone();
+    let merge_id = world.last_merge_id.clone();
+    let mut expanded = cmd.replace("<directory>", &world.temp_path().to_string_lossy());
+    if let Some(ref id) = entity_id {
+        expanded = expanded.replace("<entity-id>", id);
+    }
+    if let Some(ref id) = collection_id {
+        expanded = expanded.replace("<collection-id>", id);
+    }
+    if let Some(ref id) = merge_id {
+        expanded = expanded.replace("<merge-id>", id);
+    }
+    let mut args: Vec<&str> = expanded.split_whitespace().collect();
+    if args.first() == Some(&"kos") {
+        args.remove(0);
+    }
+    world.run_kos_with_env(&args, &[("KOS_PLUGIN_DIR", &plugin_dir_str)]);
 }
 
 // =============================================================================

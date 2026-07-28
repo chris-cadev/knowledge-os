@@ -20,6 +20,7 @@ serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 indicatif = "0.17"
 async-trait = "0.1"
+dirs = "5"
 
 [[test]]
 name = "cucumber"

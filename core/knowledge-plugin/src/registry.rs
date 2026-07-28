@@ -74,6 +74,24 @@ impl CapabilityRegistry {
         self.plugins.push(plugin);
     }
 
+    /// Deregister an importer adapter by format name.
+    ///
+    /// Returns `true` if an importer was removed, `false` if none was found.
+    pub fn deregister_importer(&mut self, format: &str) -> bool {
+        self.importers.remove(format).is_some()
+    }
+
+    /// Deregister a plugin by name.
+    ///
+    /// Removes the plugin from both the plugins list and the manifests list.
+    /// Returns `true` if a plugin was removed, `false` if none was found.
+    pub fn deregister_plugin(&mut self, name: &str) -> bool {
+        let before = self.plugins.len();
+        self.plugins.retain(|p| p.manifest().name != name);
+        self.manifests.retain(|m| m.name != name);
+        self.plugins.len() < before
+    }
+
     /// Retrieve an importer adapter by format name.
     ///
     /// # Errors
