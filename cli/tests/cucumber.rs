@@ -608,8 +608,9 @@ async fn set_merge_threshold(_world: &mut CliWorld, entity_type: String, thresho
 
 #[tokio::main]
 async fn main() {
+    let features_dir = std::env::var("FEATURES_DIR").unwrap_or_else(|_| "features".to_string());
     CliWorld::cucumber()
         .max_concurrent_scenarios(1)
-        .run_and_exit("features")
+        .run_and_exit(&features_dir)
         .await;
 }

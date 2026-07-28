@@ -1853,14 +1853,18 @@ impl TraversalPort for SqliteStore {
         // Filter out start entity and apply result limit
         let limited: Vec<_> = reachable
             .into_iter()
-            .filter(|(id, _)| *id != query.start_id)
+            .filter(|(id, _, _)| *id != query.start_id)
             .take(max_results)
             .collect();
 
         // Build results: reconstruct paths and edges via BFS on relationship graph
         let mut results = Vec::new();
-        for (node_id, depth) in &limited {
-            let path = Self::reconstruct_path(&conn, query.start_id, *node_id)?;
+        for (node_id, depth, path_str) in &limited {
+            let path: Vec<Uuid> = path_str
+                .split(',')
+                .filter(|s| !s.is_empty())
+                .map(|s| Uuid::parse_str(s).unwrap())
+                .collect();
             let edges = Self::reconstruct_edges(&conn, &path, *node_id, direction_label)?;
             results.push(TraversalResult {
                 path,
@@ -1883,7 +1887,7 @@ impl SqliteStore {
         max_depth: u32,
         rel_type: Option<&knowledge_core::features::relationship::RelationshipType>,
         entity_type: Option<&knowledge_core::features::entity::EntityType>,
-    ) -> Result<Vec<(Uuid, u32)>, StorageError> {
+    ) -> Result<Vec<(Uuid, u32, String)>, StorageError> {
         let rel_type_json = rel_type
             .map(|rt| serde_json::to_string(rt).unwrap())
             .map(|s| format!("AND r.relationship_type = '{}'", s.replace('\'', "''")))
@@ -1911,7 +1915,10 @@ impl SqliteStore {
                   AND (',' || t.path || ',') NOT LIKE ('%,' || e.id || ',%')
                   {rel_filter} {entity_filter}
             )
-            SELECT DISTINCT id, depth FROM traversal ORDER BY depth",
+            SELECT id, depth, path FROM (
+                SELECT id, depth, path, ROW_NUMBER() OVER (PARTITION BY id ORDER BY depth, length(path)) AS rn
+                FROM traversal
+            ) WHERE rn = 1 ORDER BY depth",
             rel_filter = rel_type_json,
             entity_filter = entity_type_json,
         );
@@ -1923,7 +1930,8 @@ impl SqliteStore {
             .query_map(params![start_id.to_string(), max_depth], |row| {
                 let id = Uuid::parse_str(&row.get::<_, String>(0)?).unwrap();
                 let depth: u32 = row.get(1)?;
-                Ok((id, depth))
+                let path: String = row.get(2)?;
+                Ok((id, depth, path))
             })
             .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(rows.filter_map(|r| r.ok()).collect())
@@ -1938,7 +1946,7 @@ impl SqliteStore {
         max_depth: u32,
         rel_type: Option<&knowledge_core::features::relationship::RelationshipType>,
         entity_type: Option<&knowledge_core::features::entity::EntityType>,
-    ) -> Result<Vec<(Uuid, u32)>, StorageError> {
+    ) -> Result<Vec<(Uuid, u32, String)>, StorageError> {
         let rel_type_json = rel_type
             .map(|rt| serde_json::to_string(rt).unwrap())
             .map(|s| format!("AND r.relationship_type = '{}'", s.replace('\'', "''")))
@@ -1966,7 +1974,10 @@ impl SqliteStore {
                   AND (',' || t.path || ',') NOT LIKE ('%,' || e.id || ',%')
                   {rel_filter} {entity_filter}
             )
-            SELECT DISTINCT id, depth FROM traversal ORDER BY depth",
+            SELECT id, depth, path FROM (
+                SELECT id, depth, path, ROW_NUMBER() OVER (PARTITION BY id ORDER BY depth, length(path)) AS rn
+                FROM traversal
+            ) WHERE rn = 1 ORDER BY depth",
             rel_filter = rel_type_json,
             entity_filter = entity_type_json,
         );
@@ -1978,7 +1989,8 @@ impl SqliteStore {
             .query_map(params![start_id.to_string(), max_depth], |row| {
                 let id = Uuid::parse_str(&row.get::<_, String>(0)?).unwrap();
                 let depth: u32 = row.get(1)?;
-                Ok((id, depth))
+                let path: String = row.get(2)?;
+                Ok((id, depth, path))
             })
             .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(rows.filter_map(|r| r.ok()).collect())
@@ -1993,7 +2005,7 @@ impl SqliteStore {
         max_depth: u32,
         rel_type: Option<&knowledge_core::features::relationship::RelationshipType>,
         entity_type: Option<&knowledge_core::features::entity::EntityType>,
-    ) -> Result<Vec<(Uuid, u32)>, StorageError> {
+    ) -> Result<Vec<(Uuid, u32, String)>, StorageError> {
         let rel_type_json = rel_type
             .map(|rt| serde_json::to_string(rt).unwrap())
             .map(|s| format!("AND r.relationship_type = '{}'", s.replace('\'', "''")))
@@ -2031,7 +2043,10 @@ impl SqliteStore {
                   AND (',' || t.path || ',') NOT LIKE ('%,' || e.id || ',%')
                   {rel_filter} {entity_filter}
             )
-            SELECT DISTINCT id, depth FROM traversal ORDER BY depth",
+            SELECT id, depth, path FROM (
+                SELECT id, depth, path, ROW_NUMBER() OVER (PARTITION BY id ORDER BY depth, length(path)) AS rn
+                FROM traversal
+            ) WHERE rn = 1 ORDER BY depth",
             rel_filter = rel_type_json,
             entity_filter = entity_type_json,
         );
@@ -2043,7 +2058,8 @@ impl SqliteStore {
             .query_map(params![start_id.to_string(), max_depth], |row| {
                 let id = Uuid::parse_str(&row.get::<_, String>(0)?).unwrap();
                 let depth: u32 = row.get(1)?;
-                Ok((id, depth))
+                let path: String = row.get(2)?;
+                Ok((id, depth, path))
             })
             .map_err(|e| StorageError::Internal(e.to_string()))?;
         Ok(rows.filter_map(|r| r.ok()).collect())
@@ -2051,6 +2067,7 @@ impl SqliteStore {
 
     /// Reconstruct the shortest path from `start_id` to `target_id` via BFS
     /// on the relationship graph.
+    #[allow(dead_code)]
     fn reconstruct_path(
         conn: &Connection,
         start_id: Uuid,

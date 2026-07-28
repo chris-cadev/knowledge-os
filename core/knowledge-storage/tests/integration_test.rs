@@ -1657,3 +1657,350 @@ async fn test_collection_is_member_nonexistent() {
         .unwrap();
     assert!(!is_member);
 }
+
+// ===========================================================================
+// Cross-plan integration tests (IP-006 D3)
+//
+// Verify that features from different implementation plans work together
+// correctly in realistic workflows.
+// ===========================================================================
+
+/// Import → Traverse → View: Import entities with relationships, traverse the
+/// graph, verify traversal returns the expected subgraph.
+#[tokio::test]
+async fn test_import_then_traverse_subgraph() {
+    let store = test_store();
+
+    // Create a small graph: A -> B -> C, A -> D
+    let entity_a = Entity::new(EntityType::new("Concept"));
+    let entity_b = Entity::new(EntityType::new("Concept"));
+    let entity_c = Entity::new(EntityType::new("Concept"));
+    let entity_d = Entity::new(EntityType::new("Paper"));
+
+    EntityRepository::save(&store, &entity_a).await.unwrap();
+    EntityRepository::save(&store, &entity_b).await.unwrap();
+    EntityRepository::save(&store, &entity_c).await.unwrap();
+    EntityRepository::save(&store, &entity_d).await.unwrap();
+
+    // A -> B
+    let rel_ab = Relationship::new(entity_a.id, entity_b.id, RelationshipType::References);
+    RelationshipRepository::save(&store, &rel_ab).await.unwrap();
+    // B -> C
+    let rel_bc = Relationship::new(entity_b.id, entity_c.id, RelationshipType::References);
+    RelationshipRepository::save(&store, &rel_bc).await.unwrap();
+    // A -> D
+    let rel_ad = Relationship::new(entity_a.id, entity_d.id, RelationshipType::References);
+    RelationshipRepository::save(&store, &rel_ad).await.unwrap();
+
+    // Traverse from A with depth 2
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: entity_a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(2),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+    let result = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    // Should visit B, C, D
+    assert_eq!(result.len(), 3);
+    let ids: Vec<Uuid> = result.iter().map(|r| *r.path.last().unwrap()).collect();
+    assert!(ids.contains(&entity_b.id));
+    assert!(ids.contains(&entity_c.id));
+    assert!(ids.contains(&entity_d.id));
+}
+
+/// Import → Collection → View: Import entities, create a collection, add
+/// members, then verify collection membership and entity listing.
+#[tokio::test]
+async fn test_import_then_collection_then_list() {
+    let store = test_store();
+
+    let e1 = Entity::new(EntityType::new("Paper"));
+    let e2 = Entity::new(EntityType::new("Paper"));
+    let e3 = Entity::new(EntityType::new("Concept"));
+
+    EntityRepository::save(&store, &e1).await.unwrap();
+    EntityRepository::save(&store, &e2).await.unwrap();
+    EntityRepository::save(&store, &e3).await.unwrap();
+
+    // Create a collection and add e1, e2
+    let collection = Collection {
+        id: Uuid::new_v4(),
+        name: "Reading List".to_string(),
+        description: Some("Papers to read".to_string()),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let collection = CollectionRepository::create(&store, collection)
+        .await
+        .unwrap();
+
+    CollectionRepository::add_member(&store, collection.id, e1.id)
+        .await
+        .unwrap();
+    CollectionRepository::add_member(&store, collection.id, e2.id)
+        .await
+        .unwrap();
+
+    // Verify membership
+    assert!(
+        CollectionRepository::is_member(&store, collection.id, e1.id)
+            .await
+            .unwrap()
+    );
+    assert!(
+        CollectionRepository::is_member(&store, collection.id, e2.id)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !CollectionRepository::is_member(&store, collection.id, e3.id)
+            .await
+            .unwrap()
+    );
+
+    // Verify member list
+    let members = CollectionRepository::get_members(&store, collection.id)
+        .await
+        .unwrap();
+    assert_eq!(members.len(), 2);
+
+    // Verify entity list still returns all entities
+    let all = EntityRepository::list(&store).await.unwrap();
+    assert_eq!(all.len(), 3);
+}
+
+/// Traverse → Filter → Collection: Traverse from an entity, filter by
+/// relationship type, then add filtered results to a collection.
+#[tokio::test]
+async fn test_traverse_filter_then_add_to_collection() {
+    let store = test_store();
+
+    let a = Entity::new(EntityType::new("Concept"));
+    let b = Entity::new(EntityType::new("Concept"));
+    let c = Entity::new(EntityType::new("Paper"));
+
+    EntityRepository::save(&store, &a).await.unwrap();
+    EntityRepository::save(&store, &b).await.unwrap();
+    EntityRepository::save(&store, &c).await.unwrap();
+
+    // A -> B (References), A -> C (References)
+    let rel_ab = Relationship::new(a.id, b.id, RelationshipType::References);
+    let rel_ac = Relationship::new(a.id, c.id, RelationshipType::References);
+    RelationshipRepository::save(&store, &rel_ab).await.unwrap();
+    RelationshipRepository::save(&store, &rel_ac).await.unwrap();
+
+    // Traverse A with References filter
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(1),
+        max_results: None,
+        relationship_type: Some(RelationshipType::References),
+        entity_type_filter: None,
+    };
+    let result = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    // Both edges are References, filter matches both
+    assert_eq!(result.len(), 2); // B, C
+    assert_eq!(result.iter().map(|r| r.edges.len()).sum::<usize>(), 2);
+
+    // Add traversed entities to a collection
+    let collection = Collection {
+        id: Uuid::new_v4(),
+        name: "Related Concepts".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let collection = CollectionRepository::create(&store, collection)
+        .await
+        .unwrap();
+
+    for r in &result {
+        CollectionRepository::add_member(&store, collection.id, *r.path.last().unwrap())
+            .await
+            .unwrap();
+    }
+
+    let members = CollectionRepository::get_members(&store, collection.id)
+        .await
+        .unwrap();
+    assert_eq!(members.len(), 2);
+}
+
+/// Entity + Component + Traverse: Create entities with Title components, then
+/// traverse and verify component data is accessible alongside traversal results.
+#[tokio::test]
+async fn test_traverse_with_component_data() {
+    let store = test_store();
+
+    let e1 = Entity::new(EntityType::new("Concept"));
+    let e2 = Entity::new(EntityType::new("Concept"));
+    EntityRepository::save(&store, &e1).await.unwrap();
+    EntityRepository::save(&store, &e2).await.unwrap();
+
+    let title1 = Component::new(
+        e1.id,
+        ComponentType::Title,
+        serde_json::json!("Machine Learning"),
+    );
+    let title2 = Component::new(
+        e2.id,
+        ComponentType::Title,
+        serde_json::json!("Deep Learning"),
+    );
+    ComponentRepository::save(&store, &title1).await.unwrap();
+    ComponentRepository::save(&store, &title2).await.unwrap();
+
+    let rel = Relationship::new(e1.id, e2.id, RelationshipType::References);
+    RelationshipRepository::save(&store, &rel).await.unwrap();
+
+    // Traverse
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: e1.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(1),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+    let result = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+
+    assert_eq!(result.len(), 1);
+
+    // Load components for each traversed entity
+    for r in &result {
+        let components = ComponentRepository::get(&store, *r.path.last().unwrap())
+            .await
+            .unwrap();
+        assert!(!components.is_empty(), "entity should have components");
+        assert_eq!(components[0].component_type, ComponentType::Title);
+    }
+}
+
+/// Event → Entity Lifecycle → Traverse: Create entities, archive one, verify
+/// traversal only returns active entities.
+#[tokio::test]
+async fn test_archived_entity_excluded_from_traversal() {
+    let store = test_store();
+
+    let a = Entity::new(EntityType::new("Concept"));
+    let mut b = Entity::new(EntityType::new("Concept"));
+    let c = Entity::new(EntityType::new("Concept"));
+    EntityRepository::save(&store, &a).await.unwrap();
+    EntityRepository::save(&store, &b).await.unwrap();
+    EntityRepository::save(&store, &c).await.unwrap();
+
+    // A -> B -> C
+    let rel_ab = Relationship::new(a.id, b.id, RelationshipType::References);
+    let rel_bc = Relationship::new(b.id, c.id, RelationshipType::References);
+    RelationshipRepository::save(&store, &rel_ab).await.unwrap();
+    RelationshipRepository::save(&store, &rel_bc).await.unwrap();
+
+    // Archive entity B
+    b.archive();
+    EntityRepository::save(&store, &b).await.unwrap();
+
+    // Traverse from A
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: a.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(2),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+    let result = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+    // B is archived so traversal should find no reachable entities
+    assert_eq!(result.len(), 0);
+}
+
+/// Multi-collection membership: Add an entity to multiple collections, verify
+/// it appears in all of them.
+#[tokio::test]
+async fn test_entity_in_multiple_collections_with_traversal() {
+    let store = test_store();
+
+    let e1 = Entity::new(EntityType::new("Paper"));
+    let e2 = Entity::new(EntityType::new("Paper"));
+    let e3 = Entity::new(EntityType::new("Concept"));
+
+    EntityRepository::save(&store, &e1).await.unwrap();
+    EntityRepository::save(&store, &e2).await.unwrap();
+    EntityRepository::save(&store, &e3).await.unwrap();
+
+    // e1 -> e2 -> e3
+    let rel1 = Relationship::new(e1.id, e2.id, RelationshipType::References);
+    let rel2 = Relationship::new(e2.id, e3.id, RelationshipType::References);
+    RelationshipRepository::save(&store, &rel1).await.unwrap();
+    RelationshipRepository::save(&store, &rel2).await.unwrap();
+
+    // Two collections, both contain e2
+    let coll_a = Collection {
+        id: Uuid::new_v4(),
+        name: "Collection A".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let coll_b = Collection {
+        id: Uuid::new_v4(),
+        name: "Collection B".to_string(),
+        description: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let coll_a = CollectionRepository::create(&store, coll_a).await.unwrap();
+    let coll_b = CollectionRepository::create(&store, coll_b).await.unwrap();
+
+    CollectionRepository::add_member(&store, coll_a.id, e1.id)
+        .await
+        .unwrap();
+    CollectionRepository::add_member(&store, coll_a.id, e2.id)
+        .await
+        .unwrap();
+    CollectionRepository::add_member(&store, coll_b.id, e2.id)
+        .await
+        .unwrap();
+    CollectionRepository::add_member(&store, coll_b.id, e3.id)
+        .await
+        .unwrap();
+
+    // e2 is in both collections
+    assert!(CollectionRepository::is_member(&store, coll_a.id, e2.id)
+        .await
+        .unwrap());
+    assert!(CollectionRepository::is_member(&store, coll_b.id, e2.id)
+        .await
+        .unwrap());
+
+    // Traverse from e1 — should reach all three
+    let config = test_config();
+    let query = TraversalQuery {
+        start_id: e1.id,
+        direction: TraversalDirection::Outgoing,
+        max_depth: Some(2),
+        max_results: None,
+        relationship_type: None,
+        entity_type_filter: None,
+    };
+    let result = TraversalPort::traverse(&store, &query, &config)
+        .await
+        .unwrap();
+    assert_eq!(result.len(), 2);
+}
