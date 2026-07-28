@@ -3,10 +3,16 @@ members = [
     "core/knowledge-core",
     "core/knowledge-storage",
     "core/knowledge-import",
-    "core/knowledge-derive",
+    "core/knowledge-derivation",
     "core/knowledge-plugin",
     "cli",
     "api",
     "desktop/src-tauri",
 ]
 resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Knowledge OS Contributors"]

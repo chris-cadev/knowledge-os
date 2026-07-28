@@ -11,7 +11,7 @@ use knowledge_core::ports::{
     TraversalDirection, TraversalError, TraversalPort, TraversalQuery, TraversalResult,
     ViewAdapter, ViewFilter, ViewOutput, ViewRegistry,
 };
-use knowledge_derive::features::view::{
+use knowledge_derivation::features::view::{
     graph::GraphViewAdapter, table::TableViewAdapter, timeline::TimelineViewAdapter,
     tree::TreeViewAdapter,
 };
@@ -1094,7 +1094,7 @@ async fn cmd_search(
     let results: Vec<SearchResult> =
         if hybrid && !keyword_results.is_empty() && !semantic_results.is_empty() {
             // Hybrid: use RRF fusion
-            let fused = knowledge_derive::features::search::hybrid::reciprocal_rank_fusion(
+            let fused = knowledge_derivation::features::search::hybrid::reciprocal_rank_fusion(
                 &keyword_results,
                 &semantic_results,
                 60,

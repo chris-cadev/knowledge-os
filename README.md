@@ -93,8 +93,8 @@ This distinction is the foundation of every architectural decision in the system
 | DB (local)    | SQLite               | Embedded, zero-config                    |
 | DB (cloud)    | PostgreSQL           | Production multi-user                    |
 | Search        | Tantivy              | Rust-native, embeddable                  |
-| CLI            | Clap                 | Derive-based, type-safe argument parsing  |
-| Serialization  | Serde                | Already used in all code examples         |
+| CLI           | Clap                 | Derive-based, type-safe argument parsing |
+| Serialization | Serde                | Already used in all code examples        |
 
 ---
 
@@ -110,7 +110,7 @@ knowledge-os/
 │   ├── knowledge-core/           # Domain model, entity types, ports
 │   ├── knowledge-storage/        # Storage adapters (SQLite, Postgres, etc.)
 │   ├── knowledge-import/         # Import + parsing + normalization
-│   ├── knowledge-derive/         # Search indexes, embeddings, graph projection
+│   ├── knowledge-derivation/     # Search indexes, embeddings, graph projection
 │   └── knowledge-plugin/         # Plugin manifest, registry, and loader
 ├── cli/                          # `kos` CLI binary
 │   ├── Cargo.toml

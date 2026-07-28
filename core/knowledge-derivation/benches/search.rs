@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use knowledge_core::ports::*;
-use knowledge_derive::features::search::vector_store::InMemoryVectorStore;
+use knowledge_derivation::features::search::vector_store::InMemoryVectorStore;
 
 // ---------------------------------------------------------------------------
 // Inline deterministic embedder (mirrors mock_embedder for benchmark use)
@@ -165,7 +165,7 @@ fn bench_hybrid_rrf_fusion(c: &mut Criterion) {
 
     c.bench_function("hybrid_rrf_fusion_50_50", |b| {
         b.iter(|| {
-            knowledge_derive::features::search::hybrid::reciprocal_rank_fusion(
+            knowledge_derivation::features::search::hybrid::reciprocal_rank_fusion(
                 black_box(&keyword_results),
                 black_box(&semantic_results),
                 60,
@@ -180,7 +180,7 @@ fn bench_cosine_similarity(c: &mut Criterion) {
 
     c.bench_function("cosine_similarity_128d", |bench| {
         bench.iter(|| {
-            knowledge_derive::features::search::vector_store::cosine_similarity(
+            knowledge_derivation::features::search::vector_store::cosine_similarity(
                 black_box(&vec_a),
                 black_box(&vec_b),
             )

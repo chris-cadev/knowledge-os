@@ -1,17 +1,20 @@
 [package]
 name = "knowledge-plugin"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Plugin system for extending Knowledge OS"
 
 [dependencies]
 knowledge-core = { path = "../knowledge-core" }
 knowledge-import = { path = "../knowledge-import" }
-toml = "0.8"
+log = "0.4"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 tokio = { version = "1", features = ["time"] }
-log = "0.4"
+toml = "0.8"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }

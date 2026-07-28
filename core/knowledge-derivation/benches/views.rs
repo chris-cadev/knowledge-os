@@ -222,7 +222,7 @@ fn setup_bench_data(
 
 fn bench_tree_view(c: &mut Criterion) {
     let (entity_repo, component_repo, _) = setup_bench_data(1000);
-    let adapter = knowledge_derive::features::view::tree::TreeViewAdapter::new(
+    let adapter = knowledge_derivation::features::view::tree::TreeViewAdapter::new(
         Box::new(entity_repo),
         Box::new(component_repo),
         None,
@@ -239,7 +239,7 @@ fn bench_tree_view(c: &mut Criterion) {
 
 fn bench_tree_view_filtered(c: &mut Criterion) {
     let (entity_repo, component_repo, _) = setup_bench_data(1000);
-    let adapter = knowledge_derive::features::view::tree::TreeViewAdapter::new(
+    let adapter = knowledge_derivation::features::view::tree::TreeViewAdapter::new(
         Box::new(entity_repo),
         Box::new(component_repo),
         None,
@@ -261,7 +261,7 @@ fn bench_tree_view_filtered(c: &mut Criterion) {
 fn bench_graph_view(c: &mut Criterion) {
     let (entity_repo, component_repo, relationship_repo) = setup_bench_data(1000);
     let traversal_port = BenchTraversalPort;
-    let adapter = knowledge_derive::features::view::graph::GraphViewAdapter::new(
+    let adapter = knowledge_derivation::features::view::graph::GraphViewAdapter::new(
         Box::new(entity_repo),
         Box::new(component_repo),
         Box::new(relationship_repo),
@@ -279,7 +279,7 @@ fn bench_graph_view(c: &mut Criterion) {
 
 fn bench_table_view(c: &mut Criterion) {
     let (entity_repo, component_repo, _) = setup_bench_data(1000);
-    let adapter = knowledge_derive::features::view::table::TableViewAdapter::new(
+    let adapter = knowledge_derivation::features::view::table::TableViewAdapter::new(
         Box::new(entity_repo),
         Box::new(component_repo),
     );
@@ -295,7 +295,7 @@ fn bench_table_view(c: &mut Criterion) {
 
 fn bench_table_view_sorted(c: &mut Criterion) {
     let (entity_repo, component_repo, _) = setup_bench_data(1000);
-    let adapter = knowledge_derive::features::view::table::TableViewAdapter::new(
+    let adapter = knowledge_derivation::features::view::table::TableViewAdapter::new(
         Box::new(entity_repo),
         Box::new(component_repo),
     );
@@ -316,7 +316,7 @@ fn bench_table_view_sorted(c: &mut Criterion) {
 
 fn bench_timeline_view(c: &mut Criterion) {
     let (entity_repo, component_repo, _) = setup_bench_data(1000);
-    let adapter = knowledge_derive::features::view::timeline::TimelineViewAdapter::new(
+    let adapter = knowledge_derivation::features::view::timeline::TimelineViewAdapter::new(
         Box::new(entity_repo),
         Box::new(component_repo),
     );

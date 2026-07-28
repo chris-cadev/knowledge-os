@@ -319,10 +319,12 @@ fn extract_cross_references(content: &str, source_path: &Path) -> Vec<CrossRefer
 
 /// Simple regex helper that finds all captures of a pattern in a line.
 fn regex_captures<'a>(pattern: &'a str, text: &'a str) -> Vec<regex::Captures<'a>> {
-    lazy_static::lazy_static! {
-        static ref WIKILINK_RE: regex::Regex = regex::Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
-        static ref MENTION_RE: regex::Regex = regex::Regex::new(r"@([a-zA-Z_][a-zA-Z0-9_]*)").unwrap();
-    }
+    use std::sync::LazyLock;
+
+    static WIKILINK_RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"\[\[([^\]]+)\]\]").unwrap());
+    static MENTION_RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"@([a-zA-Z_][a-zA-Z0-9_]*)").unwrap());
 
     let re = if pattern.contains("\\[\\[") {
         &*WIKILINK_RE

@@ -48,9 +48,9 @@ run = "cargo bench --workspace"
 description = "Run knowledge-storage benchmarks (traversal)"
 run = "cargo bench -p knowledge-storage"
 
-[tasks.bench-derive]
-description = "Run knowledge-derive benchmarks (views + search)"
-run = "cargo bench -p knowledge-derive"
+[tasks.bench-derivation]
+description = "Run knowledge-derivation benchmarks (views + search)"
+run = "cargo bench -p knowledge-derivation"
 
 [tasks.fmt]
 description = "Format all Rust code"

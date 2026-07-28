@@ -1,17 +1,20 @@
 [package]
-name = "knowledge-derive"
-version = "0.1.0"
-edition = "2021"
+name = "knowledge-derivation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Derivation layer — generates search indexes, embeddings, views"
 
 [dependencies]
 knowledge-core = { path = "../knowledge-core" }
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-async-trait = "0.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
 
 [[bench]]
 name = "views"

@@ -151,7 +151,7 @@ async fn test_registry_renders_named_view() {
 
     let mut registry = ViewRegistry::new();
     registry.register(Box::new(
-        knowledge_derive::features::view::tree::TreeViewAdapter::new(
+        knowledge_derivation::features::view::tree::TreeViewAdapter::new(
             Box::new(entity_repo),
             Box::new(component_repo),
             None,
@@ -184,7 +184,7 @@ async fn test_registry_dispatches_on_event_to_all_views() {
 
     let mut registry = ViewRegistry::new();
     registry.register(Box::new(
-        knowledge_derive::features::view::tree::TreeViewAdapter::new(
+        knowledge_derivation::features::view::tree::TreeViewAdapter::new(
             Box::new(entity_repo),
             Box::new(component_repo),
             None,
@@ -203,7 +203,7 @@ async fn test_registry_list_views() {
 
     let mut registry = ViewRegistry::new();
     registry.register(Box::new(
-        knowledge_derive::features::view::tree::TreeViewAdapter::new(
+        knowledge_derivation::features::view::tree::TreeViewAdapter::new(
             Box::new(entity_repo),
             Box::new(component_repo),
             None,
@@ -238,7 +238,7 @@ async fn test_registry_render_with_filter() {
 
     let mut registry = ViewRegistry::new();
     registry.register(Box::new(
-        knowledge_derive::features::view::tree::TreeViewAdapter::new(
+        knowledge_derivation::features::view::tree::TreeViewAdapter::new(
             Box::new(entity_repo),
             Box::new(component_repo),
             None,
@@ -488,7 +488,7 @@ async fn test_all_view_types_on_same_dataset() {
     // Register tree view (only tree, table, timeline since graph needs extra repos)
     let mut registry = ViewRegistry::new();
     registry.register(Box::new(
-        knowledge_derive::features::view::tree::TreeViewAdapter::new(
+        knowledge_derivation::features::view::tree::TreeViewAdapter::new(
             Box::new(MutableEntityRepo {
                 entities: RwLock::new(entity_data.clone()),
             }),
@@ -499,7 +499,7 @@ async fn test_all_view_types_on_same_dataset() {
         ),
     ));
     registry.register(Box::new(
-        knowledge_derive::features::view::table::TableViewAdapter::new(
+        knowledge_derivation::features::view::table::TableViewAdapter::new(
             Box::new(MutableEntityRepo {
                 entities: RwLock::new(entity_data.clone()),
             }),
@@ -509,7 +509,7 @@ async fn test_all_view_types_on_same_dataset() {
         ),
     ));
     registry.register(Box::new(
-        knowledge_derive::features::view::timeline::TimelineViewAdapter::new(
+        knowledge_derivation::features::view::timeline::TimelineViewAdapter::new(
             Box::new(MutableEntityRepo {
                 entities: RwLock::new(entity_data.clone()),
             }),
@@ -536,7 +536,7 @@ async fn test_all_view_types_on_same_dataset() {
 async fn test_event_notification_updates_tree_view() {
     let mut registry = ViewRegistry::new();
     registry.register(Box::new(
-        knowledge_derive::features::view::tree::TreeViewAdapter::new(
+        knowledge_derivation::features::view::tree::TreeViewAdapter::new(
             Box::new(MutableEntityRepo::default()),
             Box::new(MutableComponentRepo::default()),
             None,
@@ -560,8 +560,8 @@ async fn test_event_notification_updates_tree_view() {
 /// then verify vector search returns relevant results.
 #[tokio::test]
 async fn test_embedding_pipeline_then_search() {
-    use knowledge_derive::features::search::pipeline::EmbeddingPipeline;
-    use knowledge_derive::features::search::vector_store::InMemoryVectorStore;
+    use knowledge_derivation::features::search::pipeline::EmbeddingPipeline;
+    use knowledge_derivation::features::search::vector_store::InMemoryVectorStore;
 
     let e1 = make_entity("Concept");
     let e2 = make_entity("Concept");
@@ -634,7 +634,7 @@ async fn test_table_view_content() {
 
     let mut registry = ViewRegistry::new();
     registry.register(Box::new(
-        knowledge_derive::features::view::table::TableViewAdapter::new(
+        knowledge_derivation::features::view::table::TableViewAdapter::new(
             Box::new(entity_repo),
             Box::new(component_repo),
         ),
@@ -678,7 +678,7 @@ async fn test_timeline_view_content() {
 
     let mut registry = ViewRegistry::new();
     registry.register(Box::new(
-        knowledge_derive::features::view::timeline::TimelineViewAdapter::new(
+        knowledge_derivation::features::view::timeline::TimelineViewAdapter::new(
             Box::new(entity_repo),
             Box::new(component_repo),
         ),
@@ -721,7 +721,7 @@ async fn test_hybrid_search_rrf_fusion() {
         })
         .collect();
 
-    let fused = knowledge_derive::features::search::hybrid::reciprocal_rank_fusion(
+    let fused = knowledge_derivation::features::search::hybrid::reciprocal_rank_fusion(
         &keyword_results,
         &semantic_results,
         60,
@@ -756,7 +756,7 @@ async fn test_graph_view_content() {
 
     let mut registry = ViewRegistry::new();
     registry.register(Box::new(
-        knowledge_derive::features::view::graph::GraphViewAdapter::new(
+        knowledge_derivation::features::view::graph::GraphViewAdapter::new(
             Box::new(entity_repo),
             Box::new(component_repo),
             Box::new(MockRelationshipRepo::default()),
