@@ -89,11 +89,13 @@ Proposed --> Accepted --> [Deprecated | Superseded]
 | ADR-0011 | [BinaryContent Component](adr-0011.md)                           | Accepted | 2026-07-22 | —                                                                                     |
 | ADR-0012 | [PDF Parser Selection](adr-0012.md)                              | Accepted | 2026-07-24 | —                                                                                     |
 | ADR-0013 | [Composite Entity Resolution with Weighted Signals](adr-0013.md) | Accepted | 2026-07-24 | —                                                                                     |
-| ADR-0014 | [Bounded Graph Traversal via Recursive CTE](adr-0014.md)         | Proposed | 2026-07-24 | [IP-001](../../engineering/implementation-plans/IP-001-graph-traversal.md) (Complete) |
+| ADR-0014 | [Bounded Graph Traversal via Recursive CTE](adr-0014.md)         | Superseded by ADR-0019 | 2026-07-24 | [IP-001](../../engineering/implementation-plans/IP-001-graph-traversal.md) (Complete) |
 | ADR-0015 | [View Projection System](adr-0015.md)                            | Proposed | 2026-07-24 | [IP-002](../../engineering/implementation-plans/IP-002-view-projections.md)           |
 | ADR-0016 | [Plugin System Architecture](adr-0016.md)                        | Proposed | 2026-07-24 | [IP-003](../../engineering/implementation-plans/IP-003-plugin-system.md)              |
 | ADR-0017 | [Semantic Search via Embeddings](adr-0017.md)                    | Proposed | 2026-07-24 | [IP-004](../../engineering/implementation-plans/IP-004-semantic-search.md)            |
 | ADR-0018 | [Collection Entity for Curated Groups](adr-0018.md)              | Proposed | 2026-07-24 | [IP-005](../../engineering/implementation-plans/IP-005-collections.md)                |
+| ADR-0019 | [Level-by-Level BFS for Graph Traversal](adr-0019.md)            | Proposed | 2026-07-28 | PRD-0005                                                                              |
+| ADR-0020 | [Composite Indexes for Relationship Traversal](adr-0020.md)      | Proposed | 2026-07-28 | PRD-0005                                                                              |
 
 ---
 

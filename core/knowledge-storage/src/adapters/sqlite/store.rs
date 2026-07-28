@@ -117,6 +117,15 @@ impl SqliteStore {
         )
         .map_err(|e| StorageError::Internal(e.to_string()))?;
 
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_relationships_source_active
+                ON relationships(source_id, is_active);
+
+             CREATE INDEX IF NOT EXISTS idx_relationships_target_active
+                ON relationships(target_id, is_active);",
+        )
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
         Ok(Self {
             conn: Mutex::new(conn),
         })
