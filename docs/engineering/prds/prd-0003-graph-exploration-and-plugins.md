@@ -529,7 +529,7 @@ kos view timeline
 kos plugin list
 kos plugin info <plugin-name>
 kos plugin install <path-to-plugin>
-kos plugin卸载 <plugin-name>
+kos plugin uninstall <plugin-name>
 
 # Semantic search
 kos search "machine learning" --semantic

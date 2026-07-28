@@ -93,7 +93,8 @@ This distinction is the foundation of every architectural decision in the system
 | DB (local)    | SQLite               | Embedded, zero-config                    |
 | DB (cloud)    | PostgreSQL           | Production multi-user                    |
 | Search        | Tantivy              | Rust-native, embeddable                  |
-| Serialization | Serde                | Already used in all code examples        |
+| CLI            | Clap                 | Derive-based, type-safe argument parsing  |
+| Serialization  | Serde                | Already used in all code examples         |
 
 ---
 
@@ -109,7 +110,12 @@ knowledge-os/
 │   ├── knowledge-core/           # Domain model, entity types, ports
 │   ├── knowledge-storage/        # Storage adapters (SQLite, Postgres, etc.)
 │   ├── knowledge-import/         # Import + parsing + normalization
-│   └── knowledge-derive/         # Search indexes, embeddings, graph projection
+│   ├── knowledge-derive/         # Search indexes, embeddings, graph projection
+│   └── knowledge-plugin/         # Plugin manifest, registry, and loader
+├── cli/                          # `kos` CLI binary
+│   ├── Cargo.toml
+│   ├── src/main.rs
+│   └── features/                 # BDD test scenarios (Cucumber)
 ├── api/                          # Axum REST + MCP server
 │   ├── Cargo.toml
 │   └── src/
@@ -147,6 +153,11 @@ Current status:
 - [x] First implementation milestone
 - [x] 2026 landscape research (landscape-2026.md)
 - [x] PRD-0001: Core Entity Model
+- [x] PRD-0002: Rich Import and Entity Resolution
+- [x] PRD-0003: Graph Exploration, Views, and Plugin System
+- [x] CLI: `kos` binary with 12 commands (import, search, get, list, archive, restore, rebuild-index, traverse, view, collection, plugin, resolution)
+- [x] Collection entity and repository (PRD-0003)
+- [x] BDD test suite (~110 scenarios across 15 feature files)
 - [x] Open infrastructure philosophy
 
 ---

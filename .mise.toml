@@ -20,9 +20,37 @@ run = "cargo test"
 description = "Run BDD cucumber tests for the kos CLI"
 run = "cargo test --test cucumber -p knowledge-cli"
 
+[tasks.test-features]
+description = "Run all CLI feature tests"
+run = "FEATURES_DIR=features cargo test --test cucumber -p knowledge-cli"
+
+[tasks.test-features-prd-0001]
+description = "Run PRD-0001 features (entity-management, import, search)"
+run = "FEATURES_DIR=features/prd-0001 cargo test --test cucumber -p knowledge-cli"
+
+[tasks.test-features-prd-0002]
+description = "Run PRD-0002 features (extended-import, resolution, pdf-import)"
+run = "FEATURES_DIR=features/prd-0002 cargo test --test cucumber -p knowledge-cli"
+
+[tasks.test-features-prd-0003]
+description = "Run PRD-0003 features (views, plugin, collections, traversal)"
+run = "FEATURES_DIR=features/prd-0003 cargo test --test cucumber -p knowledge-cli"
+
 [tasks.lint]
 description = "Lint all Rust code (clippy + fmt check)"
 run = "cargo clippy -- -D warnings && cargo fmt --check"
+
+[tasks.bench]
+description = "Run all benchmarks"
+run = "cargo bench --workspace"
+
+[tasks.bench-storage]
+description = "Run knowledge-storage benchmarks (traversal)"
+run = "cargo bench -p knowledge-storage"
+
+[tasks.bench-derive]
+description = "Run knowledge-derive benchmarks (views + search)"
+run = "cargo bench -p knowledge-derive"
 
 [tasks.fmt]
 description = "Format all Rust code"

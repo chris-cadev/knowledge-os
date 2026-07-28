@@ -63,6 +63,8 @@ docs/
     prds/                     Product Requirements Documents
       prd-0001-core-entity-model.md Core entity model and markdown import pipeline
       prd-0002-rich-import-and-resolution.md Rich import and resolution
+      prd-0003-graph-exploration-and-plugins.md Graph exploration, views, and plugin system
+      prd-0004-implementation-gaps.md Cross-PRD audit and remaining work
   guides/                     How-to guides
     plugin-development.md     How to build plugins
     ai-agent-guidelines.md    How AI agents work
