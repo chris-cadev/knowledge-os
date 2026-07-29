@@ -118,8 +118,7 @@ mod tests {
 
     #[test]
     fn factory_ollama_with_custom_url() {
-        let backend =
-            create_ocr_backend("ollama://llama-vision?url=http://custom:11434").unwrap();
+        let backend = create_ocr_backend("ollama://llama-vision?url=http://custom:11434").unwrap();
         assert_eq!(backend.name(), "ollama");
     }
 

@@ -67,7 +67,10 @@ impl OcrBackend for ApiOcrBackend {
                 .pointer("/error/message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
-            return Err(OcrError::Provider(format!("API returned {}: {}", status, msg)));
+            return Err(OcrError::Provider(format!(
+                "API returned {}: {}",
+                status, msg
+            )));
         }
 
         let text = json

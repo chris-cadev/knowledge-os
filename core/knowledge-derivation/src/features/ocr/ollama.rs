@@ -53,7 +53,9 @@ impl OcrBackend for OllamaOcrBackend {
             return Err(OcrError::Provider(format!(
                 "Ollama returned {}: {}",
                 status,
-                json.get("error").and_then(|v| v.as_str()).unwrap_or("unknown")
+                json.get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
             )));
         }
 
@@ -90,10 +92,11 @@ mod tests {
     async fn ollama_recognize_sends_base64_image() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
-            when.method(POST)
-                .path("/api/generate")
-                .json_body_partial(serde_json::to_string(&json!({"model": "deepseek-ocr"})).unwrap());
-            then.status(200).json_body(json!({"response": "Hello world"}));
+            when.method(POST).path("/api/generate").json_body_partial(
+                serde_json::to_string(&json!({"model": "deepseek-ocr"})).unwrap(),
+            );
+            then.status(200)
+                .json_body(json!({"response": "Hello world"}));
         });
 
         let backend = OllamaOcrBackend::new("deepseek-ocr").with_endpoint(server.base_url());
@@ -113,7 +116,8 @@ mod tests {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST).path("/api/generate");
-            then.status(200).json_body(json!({"response": "Hello world"}));
+            then.status(200)
+                .json_body(json!({"response": "Hello world"}));
         });
 
         let backend = OllamaOcrBackend::new("deepseek-ocr").with_endpoint(server.base_url());
@@ -137,8 +141,7 @@ mod tests {
             then.status(200).json_body(json!({"response": "test"}));
         });
 
-        let backend =
-            OllamaOcrBackend::new("llama-vision").with_endpoint(server.base_url());
+        let backend = OllamaOcrBackend::new("llama-vision").with_endpoint(server.base_url());
         assert_eq!(backend.endpoint, server.base_url());
 
         let image = ImageInput {

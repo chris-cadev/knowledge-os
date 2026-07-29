@@ -72,10 +72,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl ComponentRepository for MockComponentRepo {
-        async fn get(
-            &self,
-            _entity_id: Uuid,
-        ) -> Result<Vec<Component>, StorageError> {
+        async fn get(&self, _entity_id: Uuid) -> Result<Vec<Component>, StorageError> {
             Ok(vec![])
         }
 
