@@ -1012,6 +1012,52 @@ mod tests {
         assert!(done_received, "should emit Done event");
     }
 
+    #[test]
+    fn chat_request_serializes() {
+        let req = ChatRequest {
+            system_prompt: "You are a helpful assistant.".into(),
+            messages: vec![Message {
+                role: MessageRole::User,
+                content: "Hello".into(),
+                entity_refs: vec![],
+            }],
+            context_entities: vec![],
+            mode: ResponseMode::Fast,
+            source_toggles: SourceToggles::default(),
+            config: ChatConfig::default(),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let parsed: ChatRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.system_prompt, req.system_prompt);
+        assert_eq!(parsed.messages.len(), 1);
+    }
+
+    #[test]
+    fn chat_response_serializes() {
+        let resp = ChatResponse {
+            message: "Test response".into(),
+            citations: vec![],
+            referenced_entities: vec![],
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let parsed: ChatResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.message, "Test response");
+    }
+
+    #[test]
+    fn chat_delta_serializes() {
+        let delta = ChatDelta {
+            delta: "Hello".into(),
+            citation: Some(1),
+            status: Some(ProcessingStatus::Generating),
+            finished: false,
+        };
+        let json = serde_json::to_string(&delta).unwrap();
+        let parsed: ChatDelta = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.delta, "Hello");
+        assert_eq!(parsed.citation, Some(1));
+    }
+
     #[tokio::test]
     async fn cancel_stops_stream() {
         let (pipeline, _, _, _) = setup_pipeline();

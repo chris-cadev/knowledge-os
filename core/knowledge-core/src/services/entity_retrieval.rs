@@ -624,4 +624,82 @@ mod tests {
         assert_eq!(result.start_id, start);
         assert!(result.results.is_empty());
     }
+
+    #[test]
+    fn entity_summary_serializes() {
+        let s = EntitySummary {
+            id: Uuid::new_v4(),
+            entity_type: "Paper".into(),
+            title: "Test".into(),
+            preview: "Preview".into(),
+            tags: vec!["a".into(), "b".into()],
+            updated_at: Utc::now(),
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let parsed: EntitySummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.id, s.id);
+        assert_eq!(parsed.tags.len(), 2);
+    }
+
+    #[test]
+    fn entity_detail_serializes_with_components() {
+        let mut components = BTreeMap::new();
+        components.insert("Title".to_string(), serde_json::json!({"name": "Test"}));
+        let d = EntityDetail {
+            id: Uuid::new_v4(),
+            entity_type: "Paper".into(),
+            components,
+            relationships: vec![],
+            events: vec![],
+            version: 1,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            is_active: true,
+        };
+        let json = serde_json::to_string(&d).unwrap();
+        let parsed: EntityDetail = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.components.len(), 1);
+        assert!(parsed.is_active);
+    }
+
+    #[test]
+    fn retrieval_filter_serializes() {
+        let f = RetrievalFilter {
+            entity_types: Some(vec!["Paper".into(), "Concept".into()]),
+            tags: Some(vec!["ai".into()]),
+            limit: Some(10),
+        };
+        let json = serde_json::to_string(&f).unwrap();
+        let parsed: RetrievalFilter = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.entity_types.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn relationship_summary_serializes() {
+        let rs = RelationshipSummary {
+            id: Uuid::new_v4(),
+            relationship_type: "References".into(),
+            direction: RelationshipDirection::Outgoing,
+            peer_id: Uuid::new_v4(),
+            peer_type: "Paper".into(),
+            peer_title: "Test Paper".into(),
+            is_active: true,
+        };
+        let json = serde_json::to_string(&rs).unwrap();
+        let parsed: RelationshipSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.relationship_type, "References");
+        assert_eq!(parsed.direction, RelationshipDirection::Outgoing);
+    }
+
+    #[test]
+    fn traversal_result_serializes() {
+        let tr = TraversalResult {
+            start_id: Uuid::new_v4(),
+            results: vec![vec![Uuid::new_v4(), Uuid::new_v4()]],
+        };
+        let json = serde_json::to_string(&tr).unwrap();
+        let parsed: TraversalResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.start_id, tr.start_id);
+        assert_eq!(parsed.results.len(), 1);
+    }
 }
