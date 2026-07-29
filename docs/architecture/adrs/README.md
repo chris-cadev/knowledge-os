@@ -96,6 +96,8 @@ Proposed --> Accepted --> [Deprecated | Superseded]
 | ADR-0018 | [Collection Entity for Curated Groups](adr-0018.md)              | Proposed | 2026-07-24 | [IP-005](../../engineering/implementation-plans/IP-005-collections.md)                |
 | ADR-0019 | [Level-by-Level BFS for Graph Traversal](adr-0019.md)            | Proposed | 2026-07-28 | PRD-0005                                                                              |
 | ADR-0020 | [Composite Indexes for Relationship Traversal](adr-0020.md)      | Proposed | 2026-07-28 | PRD-0005                                                                              |
+| ADR-0021 | [Tauri as Desktop Application Framework](adr-0021.md)            | Proposed | 2026-07-28 | PRD-0006                                                                              |
+| ADR-0022 | [Stateless Tauri IPC Bridge](adr-0022.md)                        | Proposed | 2026-07-28 | PRD-0006                                                                              |
 
 ---
 
