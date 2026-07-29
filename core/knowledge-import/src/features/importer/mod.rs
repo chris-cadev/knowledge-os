@@ -1,8 +1,11 @@
 pub mod adapter;
+pub mod calendar_contact;
 pub mod docx;
+pub mod email;
 pub mod legacy_office;
 pub mod magic_bytes;
 pub mod markdown;
+pub mod mbox;
 pub mod opendocument;
 pub mod pdf;
 pub mod plugins;
@@ -12,10 +15,13 @@ pub mod xlsm;
 pub mod xlsx;
 
 pub use adapter::{CrossReference, ImportAdapter, ImportError, ImportResult};
+pub use calendar_contact::{IcsImporter, VcfImporter};
 pub use docx::DocxImporter;
+pub use email::{EmlImporter, MsgImporter};
 pub use legacy_office::{DocImporter, PpsImporter, PptImporter, XlsImporter};
 pub use magic_bytes::{detect_format, DetectedFormat};
 pub use markdown::MarkdownImporter;
+pub use mbox::MboxImporter;
 pub use opendocument::{OdgImporter, OdpImporter, OdsImporter, OdtImporter, OtpImporter, OtsImporter, OttImporter};
 pub use pdf::PdfImporter;
 pub use plugins::{markdown_plugin, pdf_plugin, url_plugin, PluginAdapter};

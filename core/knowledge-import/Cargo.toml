@@ -24,6 +24,7 @@ docx-rs = "0.4"
 calamine = "0.30"
 zip = "2"
 quick-xml = "0.36"
+mailparse = "0.15"
 
 [dev-dependencies]
 knowledge-plugin = { path = "../knowledge-plugin" }
