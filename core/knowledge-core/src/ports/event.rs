@@ -25,6 +25,10 @@ pub enum EventType {
     ComponentRemoved,
     RelationshipCreated,
     RelationshipArchived,
+    ConversationCreated,
+    MessageCreated,
+    EntityReferenced,
+    ChatContextRetrieved,
 }
 
 #[async_trait]
