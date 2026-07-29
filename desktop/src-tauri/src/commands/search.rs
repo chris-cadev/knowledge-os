@@ -1,5 +1,4 @@
-use knowledge_core::features::component::ComponentType;
-use knowledge_core::ports::{ComponentRepository, EntityRepository, SearchIndex, SearchQuery};
+use knowledge_core::services::entity_retrieval::RetrievalFilter;
 use tauri::State;
 
 use super::response::*;
@@ -13,54 +12,28 @@ pub async fn search_entities(
     entity_type: Option<String>,
     tag: Option<String>,
 ) -> Result<Vec<SearchResultResponse>, String> {
-    let store = &*state.store;
-
-    let search_query = SearchQuery {
-        query,
-        entity_type,
-        tag,
+    let filter = RetrievalFilter {
+        entity_types: entity_type.map(|t| vec![t]),
+        tags: tag.map(|t| vec![t]),
+        limit: Some(50),
     };
 
-    let results = SearchIndex::search(store, &search_query)
+    let results = state
+        .entity_retrieval
+        .search(&query, &filter)
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut response = Vec::with_capacity(results.len());
-    for result in results {
-        let entity = EntityRepository::get(store, result.entity_id)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let (title, snippet) = if let Some(ref entity) = entity {
-            let components = ComponentRepository::get(store, entity.id)
-                .await
-                .map_err(|e| e.to_string())?;
-            let t = components
-                .iter()
-                .find(|c| c.component_type == ComponentType::Title)
-                .and_then(|c| c.data.as_str().map(String::from))
-                .unwrap_or_else(|| "Untitled".to_string());
-            let s = components
-                .iter()
-                .find(|c| c.component_type == ComponentType::Content)
-                .and_then(|c| c.data.as_str().map(String::from))
-                .unwrap_or_default();
-            (t, s)
-        } else {
-            ("Deleted".to_string(), String::new())
-        };
-
-        response.push(SearchResultResponse {
-            entity_id: result.entity_id.to_string(),
-            title,
-            entity_type: entity
-                .as_ref()
-                .map(|e| e.entity_type.to_string())
-                .unwrap_or_default(),
-            snippet: snippet.chars().take(200).collect(),
-            score: result.score,
-        });
-    }
+    let response: Vec<SearchResultResponse> = results
+        .into_iter()
+        .map(|s| SearchResultResponse {
+            entity_id: s.id.to_string(),
+            title: s.title,
+            entity_type: s.entity_type,
+            snippet: s.preview,
+            score: 0.0,
+        })
+        .collect();
 
     Ok(response)
 }
