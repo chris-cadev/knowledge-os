@@ -3,10 +3,11 @@ use knowledge_core::features::component::Component;
 use knowledge_core::features::entity::Entity;
 use knowledge_core::features::relationship::Relationship;
 use knowledge_core::ports::{
-    Collection, CollectionRepository, ComponentRepository, EntityRepository, EntityVersion,
-    RelationshipRepository, SearchIndex, SearchQuery, SearchResult, StorageError, TraversalConfig,
-    TraversalError, TraversalPort, TraversalQuery, TraversalResult,
+    Collection, CollectionRepository, ComponentRepository, EntityRepository,
+    EntityVersion, RelationshipRepository, SearchIndex, SearchQuery, SearchResult, StorageError,
+    TraversalConfig, TraversalError, TraversalPort, TraversalQuery, TraversalResult,
 };
+use knowledge_derivation::features::chat::pipeline::ChatPipeline;
 use knowledge_storage::adapters::sqlite::SqliteStore;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -17,6 +18,8 @@ use uuid::Uuid;
 /// so no additional synchronization is needed around the `Arc`.
 pub struct AppState {
     pub store: Arc<SqliteStore>,
+    pub chat_pipeline: Arc<ChatPipeline>,
+    pub chat_provider_kind: String,
 }
 
 /// Wraps `Arc<SqliteStore>` to implement port traits for view adapter

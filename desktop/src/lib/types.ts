@@ -125,6 +125,58 @@ export interface TimelineOutput {
   items: TimelineItem[];
 }
 
+export interface EntitySearchResult {
+  id: string;
+  entity_type: string;
+  title: string;
+  preview: string;
+}
+
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+  entity_refs: string[];
+}
+
+export interface Citation {
+  number: number;
+  entity_id: string;
+  entity_type: string;
+  title: string;
+  snippet: string;
+}
+
+export interface ChatSendResult {
+  conversation_id: string;
+  message_id: string;
+  message: string;
+  citations: Citation[];
+  referenced_entities: string[];
+}
+
+export interface ChatDelta {
+  delta: string;
+  citation?: number;
+  status?: ProcessingStatus;
+  finished: boolean;
+}
+
+export interface ProcessingStatus {
+  Searching?: { detail: string };
+  ReadingEntities?: { count: number };
+  Generating?: null;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  message_count: number;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type View =
   | "dashboard"
   | "browse"

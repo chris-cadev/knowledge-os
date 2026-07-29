@@ -9,6 +9,7 @@
 mod response;
 mod store;
 
+pub mod chat;
 pub mod entity;
 pub mod file;
 pub mod import;
@@ -18,3 +19,4 @@ pub mod view;
 #[allow(unused_imports)]
 pub use response::*;
 pub use store::AppState;
+pub use store::StoreWrapper;
