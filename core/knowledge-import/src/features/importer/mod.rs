@@ -11,6 +11,7 @@ pub mod opendocument;
 pub mod pdf;
 pub mod plugins;
 pub mod pptx;
+pub mod structured;
 pub mod url;
 pub mod xlsm;
 pub mod xlsx;
@@ -28,6 +29,7 @@ pub use opendocument::{OdgImporter, OdpImporter, OdsImporter, OdtImporter, OtpIm
 pub use pdf::PdfImporter;
 pub use plugins::{markdown_plugin, pdf_plugin, url_plugin, PluginAdapter};
 pub use pptx::PptxImporter;
+pub use structured::{CsvImporter, JsonImporter, XmlImporter, YamlImporter};
 pub use url::UrlImporter;
 pub use xlsm::XlsmImporter;
 pub use xlsx::XlsxImporter;
