@@ -12,12 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        # ponytail: third-party action; if compromised or deprecated, replace with raw actions/cache keyed on Cargo.lock hash
       - uses: actions/setup-node@v4
         with:
           node-version: '26'
           cache: npm
           cache-dependency-path: desktop/package-lock.json
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - run: sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+        # ponytail: assumes GitHub runner apt indexes are fresh; if a dep version is missing, add apt-get update back
       - run: npm ci && npm run build
         working-directory: desktop
       - run: cargo build -p knowledge-cli --release
@@ -38,9 +41,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-13
-            target: macos-x86_64
-            ext: ''
           - os: macos-latest
             target: macos-aarch64
             ext: ''
@@ -51,6 +51,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        # ponytail: third-party action; if compromised or deprecated, replace with raw actions/cache keyed on Cargo.lock hash
       - uses: actions/setup-node@v4
         with:
           node-version: '26'
