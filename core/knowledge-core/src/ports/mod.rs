@@ -15,7 +15,7 @@ pub use vector::*;
 pub use view::*;
 
 mod ai;
-mod chat;
+pub mod chat;
 mod collection;
 mod component;
 mod entity;
