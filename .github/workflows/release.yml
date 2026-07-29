@@ -28,6 +28,7 @@ jobs:
         working-directory: desktop
       - run: cp target/release/kos kos-linux-x86_64
       - run: tar czf kos-linux-x86_64.tar.gz kos-linux-x86_64
+      - run: sha256sum kos-linux-x86_64 > kos-linux-x86_64.sha256
       - run: sha256sum kos-linux-x86_64.tar.gz > kos-linux-x86_64.tar.gz.sha256
       - uses: actions/upload-artifact@v4
         with:
@@ -69,7 +70,12 @@ jobs:
       - if: runner.os == 'Windows'
         run: 7z a kos-${{ matrix.target }}.zip kos-${{ matrix.target }}${{ matrix.ext }}
       - if: runner.os != 'Windows'
+        run: sha256sum kos-${{ matrix.target }} > kos-${{ matrix.target }}.sha256
+      - if: runner.os != 'Windows'
         run: sha256sum kos-${{ matrix.target }}.tar.gz > kos-${{ matrix.target }}.tar.gz.sha256
+      - if: runner.os == 'Windows'
+        shell: bash
+        run: sha256sum kos-${{ matrix.target }}.exe > kos-${{ matrix.target }}.exe.sha256
       - if: runner.os == 'Windows'
         shell: bash
         run: sha256sum kos-${{ matrix.target }}.zip > kos-${{ matrix.target }}.zip.sha256
@@ -105,7 +111,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes-file notes.md \
-            kos-*.tar.gz kos-*.zip *.sha256
+            kos-linux-x86_64 kos-macos-aarch64 kos-windows-x86_64.exe *.sha256
           # ponytail: bundle formats may not exist depending on platform/tooling
           if [ -d desktop/src-tauri/target/release/bundle ]; then
             find desktop/src-tauri/target/release/bundle -type f -exec \
