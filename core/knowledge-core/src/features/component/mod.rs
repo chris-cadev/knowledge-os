@@ -1,6 +1,10 @@
+pub mod payloads;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+pub use payloads::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ComponentType {
