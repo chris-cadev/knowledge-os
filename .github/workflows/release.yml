@@ -21,14 +21,17 @@ jobs:
       - run: npm ci && npm run build
         working-directory: desktop
       - run: cargo build -p knowledge-cli --release
-      - run: cargo tauri build
+      - run: npx tauri build
         working-directory: desktop
       - run: cp target/release/kos kos-linux-x86_64
+      - run: tar czf kos-linux-x86_64.tar.gz kos-linux-x86_64
+      - run: sha256sum kos-linux-x86_64.tar.gz > kos-linux-x86_64.tar.gz.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64
           path: |
             kos-linux-x86_64
+            kos-linux-x86_64.*
             desktop/src-tauri/target/release/bundle/
 
   build-other:
@@ -56,14 +59,23 @@ jobs:
       - run: npm ci && npm run build
         working-directory: desktop
       - run: cargo build -p knowledge-cli --release
-      - run: cargo tauri build
+      - run: npx tauri build
         working-directory: desktop
       - run: cp target/release/kos${{ matrix.ext }} kos-${{ matrix.target }}${{ matrix.ext }}
+      - if: runner.os != 'Windows'
+        run: tar czf kos-${{ matrix.target }}.tar.gz kos-${{ matrix.target }}${{ matrix.ext }}
+      - if: runner.os == 'Windows'
+        run: 7z a kos-${{ matrix.target }}.zip kos-${{ matrix.target }}${{ matrix.ext }}
+      - if: runner.os != 'Windows'
+        run: sha256sum kos-${{ matrix.target }}.tar.gz > kos-${{ matrix.target }}.tar.gz.sha256
+      - if: runner.os == 'Windows'
+        run: powershell -Command "$h=(Get-FileHash kos-${{ matrix.target }}.zip).Hash.ToLower(); \"$h  kos-${{ matrix.target }}.zip\" | Out-File kos-${{ matrix.target }}.zip.sha256 -Encoding ascii"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
           path: |
             kos-${{ matrix.target }}${{ matrix.ext }}
+            kos-${{ matrix.target }}.*
             desktop/src-tauri/target/release/bundle/
 
   release:
@@ -88,4 +100,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME"
           --title "$GITHUB_REF_NAME"
           --notes-file ../notes.md
-          kos-* *.deb *.AppImage *.dmg *.msi *.tar.gz *.sig
+          kos-*.tar.gz kos-*.zip *.deb *.AppImage *.dmg *.msi *.rpm *.sha256
