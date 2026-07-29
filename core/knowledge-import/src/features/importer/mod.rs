@@ -1,11 +1,23 @@
 pub mod adapter;
+pub mod docx;
+pub mod legacy_office;
+pub mod magic_bytes;
 pub mod markdown;
 pub mod pdf;
 pub mod plugins;
+pub mod pptx;
 pub mod url;
+pub mod xlsm;
+pub mod xlsx;
 
 pub use adapter::{CrossReference, ImportAdapter, ImportError, ImportResult};
+pub use docx::DocxImporter;
+pub use legacy_office::{DocImporter, PpsImporter, PptImporter, XlsImporter};
+pub use magic_bytes::{detect_format, DetectedFormat};
 pub use markdown::MarkdownImporter;
 pub use pdf::PdfImporter;
 pub use plugins::{markdown_plugin, pdf_plugin, url_plugin, PluginAdapter};
+pub use pptx::PptxImporter;
 pub use url::UrlImporter;
+pub use xlsm::XlsmImporter;
+pub use xlsx::XlsxImporter;
