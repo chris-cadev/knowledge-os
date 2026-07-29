@@ -101,6 +101,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         working-directory: artifacts
         run: |
+          gh release delete "$GITHUB_REF_NAME" -y 2>/dev/null || true
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes-file notes.md \
