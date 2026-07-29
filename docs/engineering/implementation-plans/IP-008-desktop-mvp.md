@@ -1,6 +1,6 @@
 # IP-008: Desktop MVP — Tauri IPC Backend and Frontend Views
 
-**Status:** Draft
+**Status:** Accepted
 **ADR(s):** [ADR-0021](../../architecture/adrs/adr-0021.md) (Tauri as Desktop Application Framework), [ADR-0022](../../architecture/adrs/adr-0022.md) (Stateless Tauri IPC Bridge)
 **PRD(s):** [PRD-0006](../prds/prd-0006-desktop-mvp.md)
 **Estimated effort:** ~8 weeks
@@ -13,10 +13,10 @@ Knowledge OS has a fully functional CLI (`kos`) and seven-layer pipeline but no 
 
 **Current state:**
 - `desktop/src-tauri/` — minimal Tauri 2.11.3 skeleton (`lib.rs`, `main.rs`), no IPC commands
-- `desktop/src-tauri/Cargo.toml` — depends on `knowledge-core`, `knowledge-storage`, but missing `knowledge-derivation`, `knowledge-import`, `knowledge-plugin`, `chrono`, `uuid`
+- `desktop/src-tauri/Cargo.toml` — depends on `knowledge-core`, `knowledge-storage`, but missing `knowledge-derivation`, `knowledge-import`, `knowledge-plugin`, `chrono`, `uuid`, `tauri-plugin-shell`
 - `desktop/src/` — Svelte 5 + Vite 6 + TypeScript scaffolding exists with:
   - `App.svelte`, `Sidebar.svelte`, `Dashboard.svelte`, `Browser.svelte` (basic implementations)
-  - `api.ts` (typed Tauri invoke wrappers — already has all 8 function stubs)
+  - `api.ts` (typed Tauri invoke wrappers — has function stubs for list, detail, graph, tree, table, timeline, import, search)
   - `types.ts` (all TypeScript interfaces mirroring Rust types)
   - `state.svelte.ts` (Svelte 5 runes state management)
   - `router.svelte.ts` (hash-based router)
@@ -46,25 +46,28 @@ All adapters rebuild from canonical data on every `render()` call. The CLI patte
 
 ## Deliverables
 
+All features are delivered as a single consolidated scope — no phased rollout. The implementation covers: backend IPC commands (including source file access and file-opening), design system integration, import + browse + search views, entity detail panel with file actions, graph view, tree/table/timeline views, dashboard refinement, and polish.
+
 ### D1: Backend IPC Commands (Rust)
 
-**Purpose:** Implement the 8 Tauri IPC commands defined in ADR-0022, update Cargo.toml dependencies, and wire AppState.
+**Purpose:** Implement all Tauri IPC commands defined in PRD-0006 and ADR-0022, update Cargo.toml dependencies, and wire AppState.
 
-**ADR-0021** specifies `AppState { store: Arc<Mutex<SqliteStore>> }`. **ADR-0022** specifies the 8 stateless command signatures.
+**ADR-0021** specifies `AppState { store: Arc<Mutex<SqliteStore>> }`. **ADR-0022** specifies the stateless command pattern.
 
 **Files:**
 
-| File                                          | Action  | Description                                                                                                                 |
-| --------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `desktop/src-tauri/Cargo.toml`                | Modify  | Add `knowledge-derivation`, `knowledge-import`, `knowledge-plugin`, `chrono`, `uuid`, `serde`, `tauri-plugin-dialog`        |
-| `desktop/src-tauri/src/lib.rs`                | Rewrite | Add `AppState`, import `commands` module, register commands with `tauri::Builder::invoke_handler()`, register dialog plugin |
-| `desktop/src-tauri/src/commands.rs`           | Create  | 8 IPC command functions + `StoreWrapper` + response types                                                                   |
-| `desktop/src-tauri/src/commands/import.rs`    | Create  | `import_files` command delegating to import pipeline                                                                        |
-| `desktop/src-tauri/src/commands/entity.rs`    | Create  | `list_entities`, `get_entity_detail` commands                                                                               |
-| `desktop/src-tauri/src/commands/view.rs`      | Create  | `get_graph_view`, `get_tree_view`, `get_table_view`, `get_timeline_view` commands                                           |
-| `desktop/src-tauri/src/commands/search.rs`    | Create  | `search_entities` command                                                                                                   |
-| `desktop/src-tauri/src/commands/mod.rs`       | Create  | Re-export module                                                                                                            |
-| `desktop/src-tauri/capabilities/default.json` | Modify  | Add `dialog:default` and `fs:default` permissions                                                                           |
+| File                                          | Action  | Description                                                                                                                      |
+| --------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `desktop/src-tauri/Cargo.toml`                | Modify  | Add `knowledge-derivation`, `knowledge-import`, `knowledge-plugin`, `chrono`, `uuid`, `serde`, `tauri-plugin-dialog`, `tauri-plugin-shell` |
+| `desktop/src-tauri/src/lib.rs`                | Rewrite | Add `AppState`, import `commands` module, register commands with `tauri::Builder::invoke_handler()`, register dialog + shell plugins |
+| `desktop/src-tauri/src/commands.rs`           | Create  | 11 IPC command functions + `StoreWrapper` + response types                                                                       |
+| `desktop/src-tauri/src/commands/import.rs`    | Create  | `import_files` command delegating to import pipeline                                                                             |
+| `desktop/src-tauri/src/commands/entity.rs`    | Create  | `list_entities`, `get_entity_detail`, `get_entity_source` commands                                                               |
+| `desktop/src-tauri/src/commands/view.rs`      | Create  | `get_graph_view`, `get_tree_view`, `get_table_view`, `get_timeline_view` commands                                                |
+| `desktop/src-tauri/src/commands/search.rs`    | Create  | `search_entities` command                                                                                                        |
+| `desktop/src-tauri/src/commands/file.rs`      | Create  | `open_in_default_app`, `open_source_folder` commands via `tauri-plugin-shell`                                                    |
+| `desktop/src-tauri/src/commands/mod.rs`       | Create  | Re-export module                                                                                                                 |
+| `desktop/src-tauri/capabilities/default.json` | Modify  | Add `dialog:default`, `shell:default`, and `fs:default` permissions                                                              |
 
 **New Rust types (in `commands.rs` or response module):**
 
@@ -79,9 +82,6 @@ struct StoreWrapper(Arc<SqliteStore>);
 
 #[async_trait]
 impl EntityRepository for StoreWrapper {
-    async fn get(&self, id: Uuid) -> Result<Option<Entity>, StorageError> {
-        EntityRepository::get(self.0.as_ref(), id).await
-    }
     // ... delegate all EntityRepository methods
 }
 #[async_trait]
@@ -154,6 +154,29 @@ async fn get_entity_detail(
 ) -> Result<EntityDetailResponse, String> { /* ... */ }
 
 #[tauri::command]
+async fn get_entity_source(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Option<String>, String> {
+    // Extract source file path from Provenance or BinaryContent component
+    // Returns None if the entity has no source file
+}
+
+#[tauri::command]
+async fn open_in_default_app(
+    path: String,
+) -> Result<(), String> {
+    // Open file in OS default application via tauri-plugin-shell
+}
+
+#[tauri::command]
+async fn open_source_folder(
+    path: String,
+) -> Result<(), String> {
+    // Reveal file in OS file manager via tauri-plugin-shell
+}
+
+#[tauri::command]
 async fn get_graph_view(
     state: tauri::State<'_, AppState>,
     start_id: Option<String>,
@@ -189,7 +212,7 @@ async fn get_timeline_view(
 - `cargo test -p knowledge-derivation` still passes (view adapter tests)
 - Verify `tauri dev` launches window without crash
 
-**Exit criteria:** All 8 IPC commands compile, `cargo check` succeeds, existing tests pass across all workspace crates.
+**Exit criteria:** All 11 IPC commands compile, `cargo check` succeeds, existing tests pass across all workspace crates.
 
 ---
 
@@ -237,27 +260,28 @@ radius xl (0.5rem)      → --radius-lg
 
 ---
 
-### D3: Import + Browser Views (Frontend)
+### D3: Import + Browse + Search Views (Frontend)
 
-**Purpose:** Implement the Import view (drag-drop, file picker, progress) and refine the Browser view (type filter dropdown, sort, pagination) per `design/entity_browser/` mockup.
+**Purpose:** Implement the Import view (drag-drop, file picker, directory picker, progress), Browser view (type filter, sort, pagination), and Search view (debounced search, filters).
 
 **Files:**
 
 | File                               | Action  | Description                                                                                                                                                                                             |
 | ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `desktop/src/views/Import.svelte`  | Create  | Drag-drop zone (on:drop                                                                                                                                                                                 | dragover), file picker button (invoking Tauri dialog), progress indicator, import results summary (created/merged/errors), per `design/knowledge_os_dashboard/` quick actions |
-| `desktop/src/views/Browser.svelte` | Rewrite | Type filter dropdown (matching design: `Entity Type: All` with `expand_more` icon), sort button, entity count label, table with type badge / title / created date / status columns, pagination controls |
-| `desktop/src/views/Search.svelte`  | Create  | Search bar with debounced input (300ms), results list showing entity title/type/snippet, type and tag filter controls, per PRD-0006 F9                                                                  |
+| `desktop/src/views/Import.svelte`  | Create  | Drag-drop zone, file picker button (invoking Tauri dialog), directory picker, progress indicator, import results summary (created/merged/errors)                                                         |
+| `desktop/src/views/Browser.svelte` | Rewrite | Type filter dropdown, sort button, entity count label, table with type badge / title / created date columns, pagination controls                                                                        |
+| `desktop/src/views/Search.svelte`  | Create  | Search bar with debounced input (300ms), results list showing entity title/type/snippet, type and tag filter controls                                                                                   |
 | `desktop/src/lib/drag-drop.ts`     | Create  | Utility for handling file drop events, extracting file paths, filtering for .md/.pdf                                                                                                                    |
 
 **Key behaviors:**
-- Import: drag-drop fires `importFiles([...paths])`, shows spinner during import, shows result summary
-- Browser: type filter dropdown calls `listEntities(type)` immediately on selection, sort click toggles asc/desc, clicking row navigates to detail view
-- Search: typeahead debounced at 300ms, results clickable to open entity detail
+- Import: drag-drop fires `importFiles([...paths])`, also supports directory import via recursive file discovery. Shows spinner during import, shows result summary.
+- Browser: type filter dropdown calls `listEntities(type)` immediately on selection, sort click toggles asc/desc, clicking row navigates to detail view.
+- Search: typeahead debounced at 300ms, results clickable to open entity detail.
 
 **Verification:**
 - `npm run check` passes
 - Manual: drag file onto import zone → file appears in entity list within 2s
+- Manual: drag directory onto import zone → all .md/.pdf files imported recursively
 - Manual: type filter dropdown updates list immediately
 - Manual: search typeahead returns results within 300ms of stopping typing
 - `cargo test -p knowledge-storage` still passes (import pipeline tests)
@@ -266,30 +290,37 @@ radius xl (0.5rem)      → --radius-lg
 
 ---
 
-### D4: Entity Detail Panel
+### D4: Entity Detail Panel with File Actions
 
-**Purpose:** Implement the entity detail panel per `design/entity_browser/` mockup (400px side panel showing components, relationships, events, versions).
+**Purpose:** Implement the entity detail panel per `design/entity_browser/` mockup (400px side panel showing components, relationships, events, versions) with source file actions.
 
 **Files:**
 
-| File                              | Action | Description                                                                                                                                                                                                                                                                                    |
-| --------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `desktop/src/views/Detail.svelte` | Create | Detail panel with: entity header (type badge, ID, title, active status), components grouped by type (Content rendered as readable text), outgoing/incoming relationships lists (clickable → navigate to entity), event log, version history, "View in Graph" button, close/slide-over behavior |
+| File                              | Action | Description                                                                                                                                                                                                                                    |
+| --------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `desktop/src/views/Detail.svelte` | Create | Detail panel with: entity header (type badge, ID, title, active status), components grouped by type (Content rendered as readable text), outgoing/incoming relationships lists grouped by direction with clickable targets, event log, version history, source file path display, "Open File" button, "Show in Folder" button, "View in Graph" button, close/slide-over behavior |
+| `desktop/src/lib/api.ts`          | Modify | Add `getEntitySource`, `openInDefaultApp`, `openSourceFolder` function wrappers                                                                                                                                                                |
 
 **Key behaviors:**
 - Panel opens via `router.svelte.ts` hash routing: `#/entity/{id}` → sets `selectedEntityId` and switches to `detail` view
+- Source file path extracted via `getEntitySource(id)` IPC call — looks up Provenance component (Markdown) or BinaryContent component (PDF)
+- "Open File" button calls `openInDefaultApp(path)` IPC → `tauri-plugin-shell` opens file in OS default app
+- "Show in Folder" button calls `openSourceFolder(path)` IPC → `tauri-plugin-shell` reveals file in OS file manager
 - "View in Graph" button: navigates to graph tab with `selectedEntityId` as start entity
 - Clicking relationship target: navigates to that entity's detail panel (same component, new data)
 - Loading state while `getEntityDetail()` is in flight
 - Error state if entity not found or backend error
+- File action buttons disabled/hidden when entity has no source file
 
 **Data flow:**
 ```
 Detail.svelte mounts
   → reads state.selectedEntityId (from URL hash)
-  → calls getEntityDetail(id)
+  → calls getEntityDetail(id) AND getEntitySource(id) in parallel
   → displays EntityDetailResponse (components, relationships, events, versions)
-  → caches in state.selectedEntityDetail for fast re-entry
+  → displays source path if present
+  → "Open File" → calls openInDefaultApp(path)
+  → "Show in Folder" → calls openSourceFolder(path)
 ```
 
 **Verification:**
@@ -297,8 +328,11 @@ Detail.svelte mounts
 - Manual: click entity in Browser → detail panel opens with correct data
 - Manual: click relationship target → detail switches to that entity
 - Manual: click "View in Graph" → navigates to graph view with entity selected
+- Manual: click "Open File" → file opens in OS default application
+- Manual: click "Show in Folder" → file manager opens to containing directory
+- Manual: entity imported via CLI shows source path; entity created without file has no actions
 
-**Exit criteria:** Entity detail panel shows all components, relationships (grouped by direction), events, versions; "View in Graph" navigates to Graph tab.
+**Exit criteria:** Entity detail panel shows all components, relationships (grouped by direction), events, versions; source file actions work correctly; "View in Graph" navigates to Graph tab.
 
 ---
 
@@ -368,13 +402,12 @@ Detail.svelte mounts
 
 **Key behaviors for Table:**
 - Calls `getTableView(sort, filter, entityType)` on mount
-- Sort indicators: `active-sort-asc::after { content: ' ↑' }`, `active-sort-desc::after { content: ' ↓' }`
-- Click column header to toggle sort direction
+- Sort indicators on clickable column headers
 - Rows clickable → navigate to entity detail
 
 **Key behaviors for Timeline:**
 - Calls `getTimelineView(entityType)` on mount
-- Vertical line via `linear-gradient(to bottom, transparent, ...)` (per `design/timeline_view/code.html`)
+- Vertical line via CSS (per `design/timeline_view/code.html`)
 - Grouping control (day/week/month/year) as buttons or dropdown
 - Cards show title, type badge, date
 
@@ -396,11 +429,10 @@ Detail.svelte mounts
 
 | File                                 | Action  | Description                                                                                                                                                                                                                               |
 | ------------------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `desktop/src/views/Dashboard.svelte` | Rewrite | Bento-grid layout with: welcome message, stats cards (Total Entities, Indexed Pages, Relationships with progress bars), Recent Activity feed (last 10 events), Quick Actions cards (Import, New Entry, Explore Graph), System Health card |
-| `desktop/src/views/StatusBar.svelte` | Create  | Fixed bottom footer bar: system status indicator (green dot + "Operational"), entity count, database path, "Local Engine Active" / "Sync: Enabled" labels per design mockups                                                              |
+| `desktop/src/views/Dashboard.svelte` | Rewrite | Bento-grid layout with: welcome message, stats cards (Total Entities, Indexed Pages, Relationships), Recent Activity feed (last 10 events), Quick Actions cards (Import, New Entry, Explore Graph), System Health card |
+| `desktop/src/views/StatusBar.svelte` | Create  | Fixed bottom footer bar: system status indicator (green dot + "Operational"), entity count, database path                                                                                                                                |
 | `desktop/src/App.svelte`             | Modify  | Integrate StatusBar, add keyboard shortcut handler (Ctrl+K → focus search, Escape → close detail)                                                                                                                                         |
 | `desktop/src-tauri/tauri.conf.json`  | Modify  | Update window config: default size 1280x800, min size 900x600, title "Knowledge OS"                                                                                                                                                       |
-| `desktop/src-tauri/src/commands.rs`  | Modify  | Add `get_dashboard_stats` command returning entity count, relationship count, recent events                                                                                                                                               |
 
 **Keyboard shortcuts (from PRD-0006 NF2.3 and `design/knowledge_os_dashboard/code.html`):**
 - `Ctrl+K` or `Cmd+K` — focus global search bar
@@ -429,26 +461,6 @@ Detail.svelte mounts
 
 ---
 
-## Execution Order
-
-```
-D1 (Backend IPC) → D2 (Design System) → D3 (Import + Browse) → D4 (Entity Detail)
-                                                                    ↓
-D5 (Graph View) ←────────────────────────────────────────────────── D4 "View in Graph"
-       ↓
-D6 (Tree, Table, Timeline) ── all consume view IPC commands from D1
-       ↓
-D7 (Dashboard + Polish) ── consumes data from D1 commands, builds on D2 layout
-```
-
-D1 must be first — no IPC commands means no backend data for any view.
-D2 must be before D3-D7 — design tokens provide consistent styling.
-D3-D6 are parallelizable after D1+D2 are complete (each view is independent).
-D4 must precede D5 (graph view's "View in Graph" button depends on detail panel).
-D7 builds on all prior deliverables.
-
----
-
 ## Verification Strategy
 
 | Level             | Command                                            | Coverage                                                                          |
@@ -459,20 +471,21 @@ D7 builds on all prior deliverables.
 | BDD               | `cargo test --test cucumber -p knowledge-cli`      | 68 BDD scenarios, CLI commands still work                                         |
 | Svelte type-check | `npm run check`                                    | No TypeScript / Svelte errors                                                     |
 | Lint              | `cargo clippy -- -D warnings && cargo fmt --check` | Code quality                                                                      |
-| Manual (MVP)      | See PRD-0006 §Test Cases                           | 7 test cases for cold start, import, search, graph, views, detail, cross-database |
+| Manual (MVP)      | See PRD-0006 §Test Cases                           | 8 test cases for cold start, import, search, graph, views, detail, file-open, cross-database |
 
 ---
 
 ## Exit Criteria
 
-- [ ] All 8 IPC commands implemented and tested
-- [ ] All 9 view components render and interact correctly
+- [ ] All 11 IPC commands implemented and tested (list, import, search, detail, source, open_in_app, open_folder, graph, tree, table, timeline)
+- [ ] All view components render and interact correctly (Dashboard, Import, Browser, Detail, Graph, Tree, Table, Timeline, Search)
+- [ ] Entity detail panel shows source file path and provides "Open File" / "Show in Folder" actions
 - [ ] Design system tokens match `design/knowledge_os/DESIGN.md`
 - [ ] All existing Rust tests pass (81 storage, 27 derivation, 68 BDD)
 - [ ] `npm run check` passes with no type errors
 - [ ] `cargo clippy` passes with no warnings
 - [ ] `cargo tauri build` produces valid binary on target platform
-- [ ] PRD-0006 acceptance criteria met: launch, import, search, detail, graph, views, CLI compatibility
+- [ ] PRD-0006 acceptance criteria met: launch, import, search, detail, graph, views, file opening, CLI compatibility
 
 ---
 
@@ -483,12 +496,13 @@ D7 builds on all prior deliverables.
 | Change                             | Direct Consumers                | Transitive Consumers                     |
 | ---------------------------------- | ------------------------------- | ---------------------------------------- |
 | `commands.rs` (new)                | `lib.rs` (registers handlers)   | Frontend `api.ts` (invoke calls)         |
-| `StoreWrapper` in commands         | All 8 command functions         | N/A (encapsulated in commands module)    |
+| `file.rs` (new)                    | `commands/mod.rs`               | `tauri-plugin-shell` (open in app/folder)|
+| `StoreWrapper` in commands         | All 11 command functions        | N/A (encapsulated in commands module)    |
 | `app.css` rewrite                  | All Svelte components           | All view styles                          |
 | `Graph.svelte` (new)               | `App.svelte` (route mapping)    | `graph-layout.ts` (D3-force worker)      |
 | `Detail.svelte` (new)              | `App.svelte` + `Browser.svelte` | `state.svelte.ts` (selectedEntityDetail) |
 | `Import.svelte` (new)              | `App.svelte`                    | `api.ts` importFiles call                |
-| `capabilities/default.json` modify | Tauri security config           | Window permissions for dialog            |
+| `capabilities/default.json` modify | Tauri security config           | Window permissions for dialog + shell    |
 
 ### Risk Surface
 
@@ -498,7 +512,11 @@ D7 builds on all prior deliverables.
 
 3. **Graph performance at >500 nodes:** D3-force on main thread causes UI jank. **Mitigation:** Deferred to Web Worker for larger graphs (using comlink). The initial implementation runs on main thread with `requestAnimationFrame` throttling.
 
-4. **Cross-database compatibility:** Desktop app and CLI sharing `SqliteStore` requires identical schema. **Mitigation:** D1 tests verify `cargo test -p knowledge-storage` passes unchanged.
+4. **File path resolution:** Source file paths stored in Provenance/BinaryContent components may refer to files that have been moved or deleted since import. **Mitigation:** `get_entity_source` returns the stored path as-is; frontend handles file-not-found errors gracefully from `open_in_default_app`.
+
+5. **Cross-platform file opening:** Opening files and revealing in folder behaves differently per OS. **Mitigation:** Use `tauri-plugin-shell` which provides consistent `open` and `reveal` APIs across platforms.
+
+6. **Cross-database compatibility:** Desktop app and CLI sharing `SqliteStore` requires identical schema. **Mitigation:** D1 tests verify `cargo test -p knowledge-storage` passes unchanged.
 
 ---
 

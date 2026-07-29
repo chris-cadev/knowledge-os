@@ -10,6 +10,7 @@ How-to guides, tutorials, and AI agent workflows. These documents are task-orien
 
 | Document                                         | Purpose                                                                                                |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| [desktop-dev.md](desktop-dev.md)                 | How to set up, run, and develop the Knowledge OS desktop application -- Tauri + Svelte 5 |
 | [plugin-development.md](plugin-development.md)   | How to build plugins -- plugin types, manifest format, development workflow, testing, and distribution |
 | [ai-agent-guidelines.md](ai-agent-guidelines.md) | How AI agents work -- agent principles, agent types, context construction rules, and safety boundaries |
 | [bdd-testing.md](bdd-testing.md)                 | How to write and maintain BDD tests -- step definitions, feature file conventions, debugging failures  |

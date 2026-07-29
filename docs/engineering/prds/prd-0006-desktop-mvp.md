@@ -1,6 +1,6 @@
 # PRD-0006: Desktop MVP — Knowledge OS Desktop Application
 
-**Status:** Draft
+**Status:** Accepted
 **Date:** 2026-07-28
 **Author:** Core maintainers
 **Priority:** P0 — Experience Layer
@@ -28,16 +28,20 @@ Without this, the system remains a library, not a product. Users cannot evaluate
 
 ### In Scope
 
-- **Desktop shell** — Tauri application window with menu bar, keyboard shortcuts, and native file dialogs
-- **File import** — Drag-and-drop and file-picker import of Markdown and PDF files, reusing existing importers from `knowledge-import`
-- **Entity browser** — List view of all entities with type-based filtering, search bar, and sort
-- **Entity detail panel** — Side panel showing entity components, relationships (incoming/outgoing), event history, and version history
-- **Graph view** — Interactive graph visualization rendering entities as nodes and relationships as edges, using the existing `GraphViewAdapter` from `knowledge-derivation`
-- **Tree view** — Hierarchical tree of entities grouped by type, using the existing `TreeViewAdapter`
+- **Desktop shell** — Tauri application window with navigation sidebar, keyboard shortcuts, native file dialogs, and status bar
+- **Dashboard** — Landing page showing entity count, recent activity, quick actions, and system status
+- **File import** — Drag-and-drop and file-picker import of Markdown and PDF files (single files and entire directories), reusing existing importers from `knowledge-import`. Progress indicator and results summary with created/merged/error counts.
+- **Entity browser** — List view of all entities with type-based filtering, sortable columns, and clickable rows
+- **Entity detail panel** — Full side panel showing entity components, all relationships (incoming/outgoing grouped by direction), event history, version history, and source file metadata
+- **Open in default app** — Open an entity's source file in the system's default application (e.g., PDF reader, Markdown editor)
+- **Open source folder** — Reveal the entity's source file in the system file manager (Finder, Explorer, Nautilus)
+- **Graph view** — Interactive graph visualization rendering entities as nodes and relationships as edges, using the existing `GraphViewAdapter` from `knowledge-derivation`. Pan/zoom, node selection, traversal controls, entity inspector panel.
+- **Tree view** — Hierarchical tree of entities grouped by type, using the existing `TreeViewAdapter`. Collapsible branches with type-based grouping.
 - **Table view** — Sortable table with columns for entity type, title, tags, created/updated dates, using the existing `TableViewAdapter`
 - **Timeline view** — Chronological view of entities by creation time, using the existing `TimelineViewAdapter`
-- **Search** — Keyword search with type and tag filters, reusing the existing `SearchIndex`
+- **Search** — Global keyword search with type and tag filters, debounced results, reusing the existing `SearchIndex`
 - **Local SQLite database** — All data stored locally in the user's data directory, no cloud sync
+- **Design system** — Full implementation of `design/knowledge_os/DESIGN.md` design tokens (colors, typography, spacing, elevation, shape). Light/dark mode via OS theme detection.
 
 ### Out of Scope
 
@@ -183,6 +187,39 @@ The pipeline extension introduces no new layers. It adds one new component — t
 | F9.3 | User can filter search by entity type and tag                              | P1       | Filter controls next to search bar             |
 | F9.4 | Clicking a search result opens the entity detail panel                     | P0       | Same panel as F4                               |
 
+### F10: Open Source File in Default Application
+
+| ID    | Requirement                                                              | Priority | Acceptance Criteria                                                     |
+| ----- | ------------------------------------------------------------------------ | -------- | ----------------------------------------------------------------------- |
+| F10.1 | Entity detail panel shows source file path when a source file exists     | P0       | Path displayed from Provenance or BinaryContent component data          |
+| F10.2 | User can click "Open File" to open the source file in the OS default app | P0       | Click triggers `open_in_default_app` IPC; system opens file externally  |
+| F10.3 | File opens in the default application for its type (.md → editor, .pdf → PDF reader) | P0       | System file association determines the handler |
+| F10.4 | Button is disabled or hidden when entity has no source file (e.g., CLI-created) | P1       | Entities without Provenance/BinaryContent show no file action |
+
+### F11: Open Source Folder
+
+| ID    | Requirement                                                              | Priority | Acceptance Criteria                                                     |
+| ----- | ------------------------------------------------------------------------ | -------- | ----------------------------------------------------------------------- |
+| F11.1 | Entity detail panel shows "Show in Folder" action                         | P0       | Opens the containing folder in OS file manager (Finder, Explorer, Nautilus) |
+| F11.2 | Button is disabled or hidden when entity has no source file               | P1       | Same guard as F10.4                                                     |
+
+### F12: Dashboard Refinement
+
+| ID    | Requirement                                                              | Priority | Acceptance Criteria                                                     |
+| ----- | ------------------------------------------------------------------------ | -------- | ----------------------------------------------------------------------- |
+| F12.1 | Dashboard shows entity count, relationship count, and recent activity     | P0       | Stats cards match `design/knowledge_os_dashboard/` mockup               |
+| F12.2 | Dashboard shows quick action buttons (Import Files, Explore Graph)       | P1       | Buttons navigate to corresponding views                                 |
+| F12.3 | Dashboard shows a system health card (memory, status)                     | P2       | Health card with basic status indicator                                 |
+
+### F13: Design System Integration
+
+| ID    | Requirement                                                              | Priority | Acceptance Criteria                                                     |
+| ----- | ------------------------------------------------------------------------ | -------- | ----------------------------------------------------------------------- |
+| F13.1 | All views use design tokens from `design/knowledge_os/DESIGN.md`         | P0       | CSS custom properties match design token spec                           |
+| F13.2 | App respects OS dark/light mode preference                               | P0       | System theme detection via `prefers-color-scheme`                       |
+| F13.3 | Typography uses Inter (UI) and JetBrains Mono (data)                      | P0       | Fonts loaded and applied per design spec                                |
+| F13.4 | Layout follows fluid-fixed hybrid model (260px sidebar, fluid workspace)  | P0       | Sidebar width fixed at 260px; workspace fills remaining space           |
+
 ---
 
 ## Non-Functional Requirements
@@ -266,6 +303,30 @@ The pipeline extension introduces no new layers. It adds one new component — t
 4. Click a result to open entity detail
 5. Search finds entities by title and content
 
+### US5: Open Source Files from the Knowledge Graph
+
+**As a** researcher reviewing imported papers,
+**I want to** open the original PDF or Markdown file from the entity detail panel,
+**So that** I can read the full document without leaving my workflow.
+
+**Acceptance criteria:**
+1. Navigate to any entity imported from a file
+2. Entity detail shows the source file path
+3. Click "Open File" → the PDF opens in the system PDF reader, or the .md file opens in the default editor
+4. Click "Show in Folder" → the file manager opens to the containing directory
+
+### US6: Import an Entire Folder
+
+**As a** user migrating from a folder of notes,
+**I want to** drag an entire directory onto the app,
+**So that** all my Markdown and PDF files are imported at once.
+
+**Acceptance criteria:**
+1. Drop a directory onto the import zone
+2. All `.md` and `.pdf` files under that directory are imported recursively
+3. Entity browser populates with all imported entities
+4. Success/failure summary displayed after import completes
+
 ---
 
 ## Architecture
@@ -274,7 +335,7 @@ The pipeline extension introduces no new layers. It adds one new component — t
 
 | Crate / Package                     | Change                                                                                                      |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `desktop/src-tauri/Cargo.toml`      | Add dependencies: `knowledge-derivation`, `knowledge-import`, `knowledge-plugin`, `chrono`, `uuid`, `serde` |
+| `desktop/src-tauri/Cargo.toml`      | Add dependencies: `knowledge-derivation`, `knowledge-import`, `knowledge-plugin`, `chrono`, `uuid`, `serde`, `tauri-plugin-shell` |
 | `desktop/src-tauri/src/lib.rs`      | Rewrite — add Tauri commands exposing core operations                                                       |
 | `desktop/src-tauri/src/commands.rs` | New — Tauri IPC command handlers                                                                            |
 | `desktop/package.json`              | New — Svelte 5 + Vite 6 + TypeScript project definition                                                     |
@@ -348,6 +409,29 @@ async fn get_entity_detail(
     id: String,
 ) -> Result<EntityDetail, String> {
     // Aggregate entity + components + relationships + events + versions
+}
+
+#[tauri::command]
+async fn get_entity_source(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Option<String>, String> {
+    // Extract source file path from Provenance or BinaryContent component
+    // Returns None if the entity has no source file
+}
+
+#[tauri::command]
+async fn open_in_default_app(
+    path: String,
+) -> Result<(), String> {
+    // Open file in OS default application via tauri-plugin-shell
+}
+
+#[tauri::command]
+async fn open_source_folder(
+    path: String,
+) -> Result<(), String> {
+    // Reveal file in OS file manager via tauri-plugin-shell
 }
 
 #[tauri::command]
@@ -496,6 +580,9 @@ invoke('list_entities', { entity_type: "Paper" })       -> EntitySummary[]
 invoke('import_files', { paths: ["/path/to/file.md"] }) -> ImportResult
 invoke('search_entities', { query: "machine learning" }) -> SearchResult[]
 invoke('get_entity_detail', { id: "uuid" })             -> EntityDetail
+invoke('get_entity_source', { id: "uuid" })             -> Option<String>  (source file path)
+invoke('open_in_default_app', { path: "/path/to/file.md" }) -> ()
+invoke('open_source_folder', { path: "/path/to/file.md" })  -> ()
 invoke('get_graph_view', { start_id: "uuid", depth: 2 }) -> GraphOutput
 invoke('get_tree_view', { entity_type: null })           -> TreeOutput
 invoke('get_table_view', { sort: "title" })              -> TableOutput
@@ -510,11 +597,16 @@ invoke('get_timeline_view', { entity_type: null })       -> TimelineOutput
 
 - [ ] User can launch the desktop app on macOS, Windows, and Linux
 - [ ] User can import a Markdown file via drag-and-drop and see it in the entity browser
+- [ ] User can import an entire directory of Markdown/PDF files recursively
 - [ ] User can search entities by keyword and filter by type
-- [ ] User can click an entity to view its details (components, relationships, events)
+- [ ] User can click an entity to view its details (components, relationships, events, versions)
+- [ ] User can click a relationship target to navigate to that entity's detail panel
+- [ ] User can open an entity's source file in the default OS application
+- [ ] User can reveal an entity's source file in the OS file manager
 - [ ] User can explore the graph view starting from an entity
 - [ ] User can view entities in tree, table, and timeline projections
 - [ ] All view adapters render correctly through the frontend
+- [ ] Design system tokens match `design/knowledge_os/DESIGN.md` with light/dark mode
 - [ ] Existing CLI commands continue to work with the same database
 - [ ] All 81 existing `knowledge-storage` tests pass
 - [ ] All integration tests pass
@@ -527,7 +619,8 @@ invoke('get_timeline_view', { entity_type: null })       -> TimelineOutput
 4. **Graph navigation**: Import files with cross-references. Open graph view from entity A at depth 2. Verify referenced entities appear as connected nodes.
 5. **View switching**: Navigate between all 5 view tabs without error. Verify each view renders data without crashing.
 6. **Entity detail**: Click entity in browser. Verify detail panel shows title, type, components. Click a relationship target. Verify detail panel switches to that entity.
-7. **Cross-database compatibility**: Run `kos import` CLI commands on the same database. Verify entities appear in desktop app on relaunch.
+7. **File opening**: Import a Markdown file and a PDF file. Navigate to each entity's detail panel. Verify "Open File" opens each in the correct default application. Verify "Show in Folder" opens the containing directory.
+8. **Cross-database compatibility**: Run `kos import` CLI commands on the same database. Verify entities appear in desktop app on relaunch.
 
 ---
 
@@ -554,6 +647,7 @@ E2E tests are deferred post-MVP. The initial testing strategy relies on:
 | **Tauri API changes between versions**                  | Build breakage           | Medium     | Pin Tauri version in Cargo.toml; upgrade on a defined schedule                       |
 | **Frontend bundle size grows large with graph library** | Slow startup             | Low        | Use D3-force + SVG (lightweight); defer heavy layout to Web Worker                   |
 | **Cross-platform file dialog differences**              | UX inconsistency         | Medium     | Use Tauri's built-in dialog API (handles platform differences)                       |
+| **Cross-platform file opening differences**              | Feature broken on some OS  | Medium     | Use `tauri-plugin-shell` which normalizes open/reveal across macOS, Windows, Linux    |
 | **Database locked across CLI and desktop**              | Concurrent access errors | Medium     | Single-process app (no concurrent CLI + desktop); document limitation                |
 | **Graph layout performance at >1000 nodes**             | UI jank                  | Medium     | Limit graph to depth 3 by default; show loading indicator; use Web Worker for layout |
 | **Import of 10K+ files blocks UI**                      | App becomes unresponsive | Medium     | Run import in async Tauri command; show progress; allow cancellation                 |
@@ -570,6 +664,7 @@ E2E tests are deferred post-MVP. The initial testing strategy relies on:
 | --------------------- | ------- | ----------------------------- | ------------------------------------------------------- |
 | `tauri`               | 2.11.x  | Desktop application framework | Cross-platform native window with webview; Rust backend |
 | `tauri-plugin-dialog` | 2.x     | Native file picker dialogs    | Cross-platform open/save dialogs                        |
+| `tauri-plugin-shell`  | 2.x     | OS shell commands             | Open files in default app, reveal in folder             |
 
 #### Frontend (npm)
 
@@ -592,17 +687,3 @@ E2E tests are deferred post-MVP. The initial testing strategy relies on:
 - PRD-0005 — Traversal performance (BFS graph traversal used by graph view)
 
 ---
-
-## Timeline
-
-| Phase                     | Duration | Deliverables                                                                             |
-| ------------------------- | -------- | ---------------------------------------------------------------------------------------- |
-| Phase 1: Backend IPC      | 1 week   | Tauri commands for list, get, search, import; AppState wiring; database path resolution  |
-| Phase 2: Frontend shell   | 1 week   | SPA router; navigation sidebar; theme support; global search bar                         |
-| Phase 3: Import + Browse  | 1 week   | Import view (drag-drop, file picker, progress); entity browser view (list, filter, sort) |
-| Phase 4: Entity Detail    | 1 week   | Detail panel (components, relationships, events, versions); relationship navigation      |
-| Phase 5: Graph View       | 2 weeks  | SVG + D3-force graph renderer; interactive layout; traversal controls; node selection    |
-| Phase 6: View Projections | 1 week   | Tree, table, and timeline views wired to existing ViewAdapters                           |
-| Phase 7: Polish           | 1 week   | Error handling, loading states, keyboard shortcuts, window state persistence, README     |
-
-**Total: ~8 weeks**
