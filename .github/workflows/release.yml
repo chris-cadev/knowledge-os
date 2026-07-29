@@ -69,7 +69,8 @@ jobs:
       - if: runner.os != 'Windows'
         run: sha256sum kos-${{ matrix.target }}.tar.gz > kos-${{ matrix.target }}.tar.gz.sha256
       - if: runner.os == 'Windows'
-        run: powershell -Command "$h=(Get-FileHash kos-${{ matrix.target }}.zip).Hash.ToLower(); \"$h  kos-${{ matrix.target }}.zip\" | Out-File kos-${{ matrix.target }}.zip.sha256 -Encoding ascii"
+        shell: bash
+        run: sha256sum kos-${{ matrix.target }}.zip > kos-${{ matrix.target }}.zip.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
