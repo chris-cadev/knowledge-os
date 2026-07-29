@@ -15,6 +15,8 @@ pub enum ComponentType {
     Timeline,
     Language,
     Provenance,
+    MessageContent,
+    EntityRefs,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

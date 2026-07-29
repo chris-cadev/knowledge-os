@@ -1,4 +1,5 @@
 pub use ai::*;
+pub use chat::*;
 pub use collection::*;
 pub use component::*;
 pub use entity::*;
@@ -14,6 +15,7 @@ pub use vector::*;
 pub use view::*;
 
 mod ai;
+mod chat;
 mod collection;
 mod component;
 mod entity;

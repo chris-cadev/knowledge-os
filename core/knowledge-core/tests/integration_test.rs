@@ -43,8 +43,10 @@ fn test_component_types_cover_all_variants() {
         ComponentType::Timeline,
         ComponentType::Language,
         ComponentType::Provenance,
+        ComponentType::MessageContent,
+        ComponentType::EntityRefs,
     ];
-    assert_eq!(types.len(), 10);
+    assert_eq!(types.len(), 12);
 }
 
 #[test]

@@ -10,6 +10,7 @@ description = "Derivation layer — generates search indexes, embeddings, views"
 knowledge-core = { path = "../knowledge-core" }
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
