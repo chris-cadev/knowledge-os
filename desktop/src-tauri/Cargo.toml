@@ -13,14 +13,23 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.3" }
+tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 knowledge-core = { path = "../../core/knowledge-core" }
 knowledge-storage = { path = "../../core/knowledge-storage" }
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
+knowledge-derivation = { path = "../../core/knowledge-derivation" }
+knowledge-import = { path = "../../core/knowledge-import" }
+knowledge-plugin = { path = "../../core/knowledge-plugin" }
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+dunce = "1"
 log = "0.4"
-tauri = { version = "2.11.3" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = { version = "2.11.3", features = [] }
+tauri-plugin-dialog = "2"
 tauri-plugin-log = "2"
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tauri-plugin-opener = "2"

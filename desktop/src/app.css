@@ -1,0 +1,214 @@
+/* === Knowledge OS — Design System (DESIGN.md) === */
+
+:root {
+  /* ===== Colors — Light ===== */
+  --color-primary: #004ac6;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #2563eb;
+  --color-on-primary-container: #eeefff;
+  --color-primary-fixed: #dbe1ff;
+  --color-primary-fixed-dim: #b4c5ff;
+  --color-on-primary-fixed: #00174b;
+  --color-on-primary-fixed-variant: #003ea8;
+  --color-secondary: #505f76;
+  --color-on-secondary: #ffffff;
+  --color-tertiary: #4d556b;
+  --color-on-tertiary: #ffffff;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-surface: #f7f9fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4f6;
+  --color-surface-container: #eceef0;
+  --color-surface-container-high: #e6e8ea;
+  --color-surface-container-highest: #e0e3e5;
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #434655;
+  --color-outline: #737686;
+  --color-outline-variant: #c3c6d7;
+  --color-inverse-surface: #2d3133;
+  --color-inverse-on-surface: #eff1f3;
+  --color-inverse-primary: #b4c5ff;
+  --color-background: #f7f9fb;
+  --color-on-background: #191c1e;
+
+  /* Sidebar — always dark in light mode */
+  --color-sidebar-bg: #2d3133;
+  --color-sidebar-border: rgba(195, 198, 215, 0.3);
+  --color-sidebar-text: #c3c6d7;
+  --color-sidebar-text-hover: #ffffff;
+  --color-sidebar-text-active: #ffffff;
+  --color-sidebar-active-bg: rgba(0, 74, 198, 0.1);
+  --color-sidebar-active-stripe: #004ac6;
+  --color-sidebar-logo: #b4c5ff;
+  --color-sidebar-subtitle: rgba(195, 198, 215, 0.5);
+  --color-sidebar-divider: rgba(195, 198, 215, 0.1);
+  --color-sidebar-hover-bg: rgba(255, 255, 255, 0.05);
+
+  /* ===== Typography ===== */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+  --font-size-display-lg: 32px;
+  --font-size-headline-md: 24px;
+  --font-size-title-sm: 18px;
+  --font-size-body-md: 14px;
+  --font-size-body-sm: 13px;
+  --font-size-code-md: 13px;
+  --font-size-label-caps: 11px;
+
+  /* ===== Spacing (4px grid) ===== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --sidebar-width: 260px;
+
+  /* ===== Border Radius ===== */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* ===== Elevation ===== */
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --elevation-2: 0 2px 4px rgba(0, 0, 0, 0.07);
+
+  /* ===== Transitions ===== */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+
+  /* ===== Backward-Compatible Aliases ===== */
+  --bg-primary: var(--color-surface);
+  --bg-secondary: var(--color-surface-container-high);
+  --bg-sidebar: var(--color-sidebar-bg);
+  --bg-card: var(--color-surface-container);
+  --text-primary: var(--color-on-surface);
+  --text-secondary: var(--color-on-surface-variant);
+  --text-sidebar: var(--color-sidebar-text);
+  --text-sidebar-active: var(--color-sidebar-text-active);
+  --border: var(--color-outline-variant);
+  --accent: var(--color-primary);
+  --accent-hover: #003ea8;
+  --danger: #ba1a1a;
+  --success: #22c55e;
+  --warning: #f59e0b;
+
+  --spacing-xs: var(--space-1);
+  --spacing-sm: var(--space-2);
+  --spacing-md: var(--space-4);
+  --spacing-lg: var(--space-6);
+  --spacing-xl: var(--space-8);
+
+  --font-size-sm: var(--font-size-body-sm);
+  --font-size-md: var(--font-size-body-md);
+  --font-size-lg: var(--font-size-title-sm);
+  --font-size-xl: 20px;
+  --font-size-2xl: var(--font-size-headline-md);
+
+  --shadow-sm: var(--elevation-1);
+  --shadow-md: var(--elevation-2);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== Dark Theme ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: #1a1d21;
+    --color-surface-container-lowest: #0f1114;
+    --color-surface-container-low: #202327;
+    --color-surface-container: #25282d;
+    --color-surface-container-high: #303338;
+    --color-surface-container-highest: #3b3e44;
+    --color-on-surface: #e0e3e5;
+    --color-on-surface-variant: #a6a8b0;
+    --color-outline: #8b8e99;
+    --color-outline-variant: #43464e;
+    --color-inverse-surface: #e0e3e5;
+    --color-inverse-on-surface: #2d3133;
+    --color-inverse-primary: #004ac6;
+    --color-background: #0f1114;
+    --color-on-background: #e0e3e5;
+
+    --color-sidebar-bg: #0f172a;
+    --color-sidebar-border: rgba(67, 70, 78, 0.5);
+    --color-sidebar-text: #a6a8b0;
+    --color-sidebar-text-hover: #ffffff;
+    --color-sidebar-text-active: #ffffff;
+    --color-sidebar-logo: #b4c5ff;
+    --color-sidebar-subtitle: rgba(166, 168, 176, 0.5);
+    --color-sidebar-divider: rgba(255, 255, 255, 0.08);
+    --color-sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+
+    --bg-primary: var(--color-surface);
+    --bg-secondary: var(--color-surface-container-high);
+    --bg-sidebar: var(--color-sidebar-bg);
+    --bg-card: var(--color-surface-container);
+    --text-primary: var(--color-on-surface);
+    --text-secondary: var(--color-on-surface-variant);
+    --border: var(--color-outline-variant);
+  }
+}
+
+/* ===== Global Reset ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body-md);
+  line-height: 1.5;
+  color: var(--color-on-surface);
+  background: var(--color-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-primary-container);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: inherit;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ===== Utility Classes ===== */
+.text-muted {
+  color: var(--color-on-surface-variant);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
