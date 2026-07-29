@@ -31,3 +31,4 @@ node_modules/
 
 # Tauri
 desktop/src-tauri/target/
+desktop/dist/
