@@ -144,7 +144,7 @@ Current status:
 - [x] Engineering architecture constitution
 - [x] Documentation structure
 - [x] Complete documentation (manifesto parts I-XV covered)
-- [x] Architecture Decision Records (6 accepted)
+- [x] Architecture Decision Records (22+ covering storage, import, search, chat, OCR, plugin system, view projections, desktop)
 - [x] Engineering practices (testing, security, deployment)
 - [x] Guides (plugin development, AI agents)
 - [x] Tutorials (first import, custom importer)
@@ -155,10 +155,16 @@ Current status:
 - [x] PRD-0001: Core Entity Model
 - [x] PRD-0002: Rich Import and Entity Resolution
 - [x] PRD-0003: Graph Exploration, Views, and Plugin System
+- [x] PRD-0004: Implementation Gaps & Remaining Work
+- [x] PRD-0005: Graph Traversal Performance
+- [x] PRD-0006: Desktop MVP
+- [x] PRD-0007: Knowledge Chat and Universal Import
 - [x] CLI: `kos` binary with 12 commands (import, search, get, list, archive, restore, rebuild-index, traverse, view, collection, plugin, resolution)
 - [x] Collection entity and repository (PRD-0003)
 - [x] BDD test suite (~110 scenarios across 15 feature files)
 - [x] Open infrastructure philosophy
+- [x] Desktop MVP (IPC backend, 9 views, design system integration)
+- [x] Chat pipeline with RAG, streaming, citations (in progress)
 
 ---
 

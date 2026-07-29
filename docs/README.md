@@ -56,10 +56,29 @@ docs/
 │   ├── ui-design-system.md
 │   ├── api-specification.md
 │   ├── infrastructure-handbook.md
-│   └── prds/
-│       ├── prd-0001-core-entity-model.md
-│       ├── prd-0002-rich-import-and-resolution.md
-│       └── prd-0003-graph-exploration-and-plugins.md
+│       ├── implementation-plans/
+│       │       ├── IP-001-graph-traversal.md
+│       │       ├── IP-002-view-projections.md
+│       │       ├── IP-003-plugin-system.md
+│       │       ├── IP-004-semantic-search.md
+│       │       ├── IP-005-collections.md
+│       │       ├── IP-006-integration-and-testing.md
+│       │       ├── IP-007-traversal-performance-optimization.md
+│       │       ├── IP-008-desktop-mvp.md
+│       │       ├── IP-009-chat-completion-port.md
+│       │       ├── IP-010-conversation-message-entities.md
+│       │       ├── IP-011-chat-pipeline.md
+│       │       ├── IP-012-ocr-backend.md
+│       │       ├── IP-013-universal-import.md
+│       │       └── IP-014-mcp-service-architecture.md
+│       └── prds/
+│           ├── prd-0001-core-entity-model.md
+│           ├── prd-0002-rich-import-and-resolution.md
+│           ├── prd-0003-graph-exploration-and-plugins.md
+│           ├── prd-0004-implementation-gaps.md
+│           ├── prd-0005-graph-traversal.md
+│           ├── prd-0006-desktop-mvp.md
+│           └── prd-0007-knowledge-chat-and-universal-import.md
 │
 ├── guides/
 │   ├── plugin-development.md
@@ -104,24 +123,30 @@ For **architects and engineers**, also read:
 22. [ADR-0009: Extended Cross-References](architecture/adrs/adr-0009.md) -- Wikilinks, URLs, @mentions
 23. [ADR-0010: Entity Type Inference](architecture/adrs/adr-0010.md) -- Frontmatter type field
 24. [ADR-0011: BinaryContent Component](architecture/adrs/adr-0011.md) -- Binary data references
+25. [ADR-0023: ChatCompletion Port Trait](architecture/adrs/adr-0023.md) -- LLM provider abstraction
+26. [ADR-0024: Conversation & Message Entities](architecture/adrs/adr-0024.md) -- Chat as canonical entities
+27. [ADR-0025: Chat Context Assembly](architecture/adrs/adr-0025.md) -- Derivation layer chat pipeline
+28. [ADR-0026: Pluggable OCR Backend](architecture/adrs/adr-0026.md) -- OCR with derived text
+29. [ADR-0027: Universal Import](architecture/adrs/adr-0027.md) -- Database connectors, column mapping
+30. [ADR-0028: MCP Service Architecture](architecture/adrs/adr-0028.md) -- Framework-agnostic services
 
 For **product managers and stakeholders**, also read:
 
-25. [Product Vision](philosophy/product-vision.md) -- Long-term direction
-26. [Governance](philosophy/governance.md) -- Decision-making process
-27. [Engineering Principles](philosophy/engineering-principles.md) -- How code is developed
-28. [Landscape 2026](research/landscape-2026.md) -- 2026 knowledge management landscape
+31. [Product Vision](philosophy/product-vision.md) -- Long-term direction
+32. [Governance](philosophy/governance.md) -- Decision-making process
+33. [Engineering Principles](philosophy/engineering-principles.md) -- How code is developed
+34. [Landscape 2026](research/landscape-2026.md) -- 2026 knowledge management landscape
 
 For **plugin developers**, also read:
 
-29. [Extensibility](architecture/extensibility.md) -- Plugin system
-30. [Plugin Development Guide](guides/plugin-development.md) -- How to build plugins
-31. [AI Agent Guidelines](guides/ai-agent-guidelines.md) -- How AI agents work
+35. [Extensibility](architecture/extensibility.md) -- Plugin system
+36. [Plugin Development Guide](guides/plugin-development.md) -- How to build plugins
+37. [AI Agent Guidelines](guides/ai-agent-guidelines.md) -- How AI agents work
 
 For **learners**, start with:
 
-32. [Tutorial: First Import](guides/tutorials/first-import.md) -- Import your first document
-33. [Tutorial: Build a Custom Importer](guides/tutorials/build-custom-importer.md) -- Extend the system
+38. [Tutorial: First Import](guides/tutorials/first-import.md) -- Import your first document
+39. [Tutorial: Build a Custom Importer](guides/tutorials/build-custom-importer.md) -- Extend the system
 
 ---
 

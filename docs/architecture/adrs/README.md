@@ -98,6 +98,12 @@ Proposed --> Accepted --> [Deprecated | Superseded]
 | ADR-0020 | [Composite Indexes for Relationship Traversal](adr-0020.md)      | Proposed | 2026-07-28 | PRD-0005                                                                              |
 | ADR-0021 | [Tauri as Desktop Application Framework](adr-0021.md)            | Proposed | 2026-07-28 | PRD-0006                                                                              |
 | ADR-0022 | [Stateless Tauri IPC Bridge](adr-0022.md)                        | Proposed | 2026-07-28 | PRD-0006                                                                              |
+| ADR-0023 | [ChatCompletion Port Trait for LLM Provider Abstraction](adr-0023.md) | Proposed | 2026-07-29 | PRD-0007                                                                              |
+| ADR-0024 | [Conversation and Message as Canonical Entities](adr-0024.md)     | Proposed | 2026-07-29 | PRD-0007                                                                              |
+| ADR-0025 | [Chat Context Assembly as a Derivation Layer Pipeline](adr-0025.md) | Proposed | 2026-07-29 | PRD-0007                                                                              |
+| ADR-0026 | [Pluggable OCR Backend with Image Blobs as Canonical and OCR Text as Derived](adr-0026.md) | Proposed | 2026-07-29 | PRD-0007                                                                              |
+| ADR-0027 | [Universal Import with Database Connectors and Column Mapping](adr-0027.md) | Proposed | 2026-07-29 | PRD-0007                                                                              |
+| ADR-0028 | [MCP-Compatible Service Architecture for Chat and Entity Retrieval](adr-0028.md) | Proposed | 2026-07-29 | PRD-0007                                                                              |
 
 ---
 
@@ -125,6 +131,34 @@ IP-001 (Complete)  ────────────────────�
 - **IP-004** depends on IP-003 D1 (refines `AiAdapter`/`VectorStore` traits).
 - **IP-005** depends on IP-002 D2 (`TreeViewAdapter` with `collection_repo`).
 - **IP-006** depends on all IPs being complete.
+
+### PRD-0007 Plans
+
+The PRD-0007 implementation plans have the following dependency chain:
+
+```mermaid
+flowchart TD
+    IP009[IP-009 ChatCompletion Port]
+    IP010[IP-010 Conversation Entities]
+    IP011[IP-011 Chat Pipeline]
+    IP012[IP-012 OCR Backend]
+    IP013[IP-013 Universal Import]
+    IP014[IP-014 MCP Service Architecture]
+
+    IP009 --> IP010
+    IP009 --> IP011
+    IP010 --> IP011
+    IP012 --> IP013
+    IP011 --> IP014
+    IP013 --> IP014
+```
+
+- **IP-009** is the foundation. Defines the `ChatCompletion` trait.
+- **IP-010** depends on IP-009 (uses trait in `ConversationRepository` extensions). Adds canonical entity types.
+- **IP-011** depends on IP-009 and IP-010. Implements the chat pipeline.
+- **IP-012** is independent (OCR is a parallel concern).
+- **IP-013** depends on IP-012 (D8 image extraction uses `OcrBackend`). Universal import.
+- **IP-014** depends on IP-011 (verifies framework-agnosticism) and reuses the service layer from existing plans.
 
 ---
 

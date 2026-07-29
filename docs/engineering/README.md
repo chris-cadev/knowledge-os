@@ -41,6 +41,15 @@ Testing, security, deployment, and practices. These documents define how the sys
 | [IP-003](implementation-plans/IP-003-plugin-system.md)      | 3     | ADR-0016                              | Plugin infrastructure, manifest parsing, capability registry, sandboxing |
 | [IP-004](implementation-plans/IP-004-semantic-search.md)    | 4     | ADR-0017                              | Embedding generation, in-memory vector store, hybrid search via RRF      |
 | [IP-005](implementation-plans/IP-005-collections.md)        | 5     | ADR-0018                              | Collection entity, membership, tree view integration                     |
+| [IP-006](implementation-plans/IP-006-integration-and-testing.md) | 6 | ADR-0014–0018                     | Cross-plan integration tests and BDD scenarios                           |
+| [IP-007](implementation-plans/IP-007-traversal-performance-optimization.md) | — | ADR-0019–0020            | Composite indexes and BFS optimization for graph traversal               |
+| [IP-008](implementation-plans/IP-008-desktop-mvp.md)        | 7     | ADR-0021–0022                         | Tauri desktop MVP: IPC backend, 11 commands, 9 views, design system      |
+| [IP-009](implementation-plans/IP-009-chat-completion-port.md) | 8   | ADR-0023                              | ChatCompletion port trait and built-in LLM adapters (Mock, OpenAI, Ollama) |
+| [IP-010](implementation-plans/IP-010-conversation-message-entities.md) | 8 | ADR-0024                          | Conversation and Message as canonical entities with typed components     |
+| [IP-011](implementation-plans/IP-011-chat-pipeline.md)      | 8     | ADR-0023, ADR-0025                   | Chat pipeline with RAG, streaming, citations, status emission           |
+| [IP-012](implementation-plans/IP-012-ocr-backend.md)        | 8     | ADR-0026                              | Pluggable OCR backend (Tesseract, Ollama, API, Mock)                     |
+| [IP-013](implementation-plans/IP-013-universal-import.md)   | 8     | ADR-0027                              | Universal import: office, email, databases, URL, clipboard, column mapping |
+| [IP-014](implementation-plans/IP-014-mcp-service-architecture.md) | 8 | ADR-0028                          | MCP-compatible EntityRetrievalService and framework-agnostic chat pipeline |
 
 ---
 
