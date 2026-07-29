@@ -1,5 +1,6 @@
 pub mod adapter;
 pub mod calendar_contact;
+pub mod database;
 pub mod docx;
 pub mod email;
 pub mod iwork;
@@ -18,6 +19,7 @@ pub mod xlsx;
 
 pub use adapter::{CrossReference, ImportAdapter, ImportError, ImportResult};
 pub use calendar_contact::{IcsImporter, VcfImporter};
+pub use database::{MySqlDatabaseSource, PostgresDatabaseSource, SqliteDatabaseSource};
 pub use docx::DocxImporter;
 pub use email::{EmlImporter, MsgImporter};
 pub use iwork::{KeynoteImporter, NumbersImporter, PagesImporter};
