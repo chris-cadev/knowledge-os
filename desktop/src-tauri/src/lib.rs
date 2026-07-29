@@ -20,13 +20,32 @@ pub fn run() {
                 )?;
             }
 
-            // Open (or create) the SQLite database.
-            let store = Arc::new(SqliteStore::new("knowledge.db").map_err(|e| {
+            let data_dir = app.path().app_data_dir().map_err(|e| {
                 Box::new(std::io::Error::other(format!(
-                    "failed to open database: {}",
+                    "failed to resolve app data dir: {}",
                     e
                 ))) as Box<dyn std::error::Error>
-            })?);
+            })?;
+            std::fs::create_dir_all(&data_dir).map_err(|e| {
+                Box::new(std::io::Error::other(format!(
+                    "failed to create app data dir: {}",
+                    e
+                ))) as Box<dyn std::error::Error>
+            })?;
+            let db_path = data_dir.join("knowledge.db");
+
+            let store = Arc::new(
+                SqliteStore::new(db_path.to_str().ok_or_else(|| {
+                    Box::new(std::io::Error::other("invalid database path"))
+                        as Box<dyn std::error::Error>
+                })?)
+                .map_err(|e| {
+                    Box::new(std::io::Error::other(format!(
+                        "failed to open database: {}",
+                        e
+                    ))) as Box<dyn std::error::Error>
+                })?,
+            );
 
             app.manage(AppState { store });
             Ok(())
