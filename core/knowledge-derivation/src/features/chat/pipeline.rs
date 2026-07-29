@@ -8,6 +8,7 @@ use knowledge_core::ports::*;
 use uuid::Uuid;
 
 use super::prompt::build_system_prompt;
+use super::status::{ChatStreamEvent, ChatStreamHandle};
 
 #[allow(dead_code)]
 pub struct ChatPipeline {
@@ -106,6 +107,125 @@ impl ChatPipeline {
             message: response.message,
             citations: response.citations,
             referenced_entities: response.referenced_entities,
+        })
+    }
+
+    pub async fn chat_stream(
+        &self,
+        conversation_id: Option<Uuid>,
+        user_message: &str,
+        entity_refs: &[Uuid],
+        source_toggles: &SourceToggles,
+        mode: ResponseMode,
+    ) -> Result<ChatStreamHandle, ChatError> {
+        let conv_id = match conversation_id {
+            Some(id) => id,
+            None => self
+                .create_conversation()
+                .await
+                .map_err(|e| ChatError::Provider(e.to_string()))?,
+        };
+
+        let user_msg_id = self
+            .persist_message(conv_id, MessageRole::User, user_message, entity_refs)
+            .await
+            .map_err(|e| ChatError::Provider(e.to_string()))?;
+
+        let context_entities = if source_toggles.knowledge_graph {
+            if !entity_refs.is_empty() {
+                self.build_context_for_entities(entity_refs).await
+            } else {
+                self.search_context(user_message, 10).await
+            }
+        } else {
+            vec![]
+        };
+
+        let system_prompt = build_system_prompt(&context_entities, source_toggles);
+
+        let request = ChatRequest {
+            system_prompt,
+            messages: vec![Message {
+                role: MessageRole::User,
+                content: user_message.to_string(),
+                entity_refs: entity_refs.to_vec(),
+            }],
+            context_entities: context_entities.clone(),
+            mode,
+            source_toggles: source_toggles.clone(),
+            config: ChatConfig::default(),
+        };
+
+        let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+        let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel::<ChatStreamEvent>();
+
+        let provider = self.chat_provider.clone();
+
+        tokio::spawn(async move {
+            let mut cancel_rx = cancel_rx;
+
+            if *cancel_rx.borrow_and_update() {
+                return;
+            }
+
+            let _ = event_tx.send(ChatStreamEvent::Status(ProcessingStatus::Searching {
+                detail: "Searching knowledge graph...".into(),
+            }));
+
+            if *cancel_rx.borrow_and_update() {
+                return;
+            }
+
+            let count = context_entities.len() as u32;
+            let _ = event_tx.send(ChatStreamEvent::Status(
+                ProcessingStatus::ReadingEntities { count },
+            ));
+
+            if *cancel_rx.borrow_and_update() {
+                return;
+            }
+
+            let _ = event_tx.send(ChatStreamEvent::Status(ProcessingStatus::Generating));
+
+            if *cancel_rx.borrow_and_update() {
+                return;
+            }
+
+            match provider.chat_stream(request).await {
+                Ok(mut provider_stream) => {
+                    use futures::StreamExt;
+                    let mut message_buffer = String::new();
+                    let mut citations = vec![];
+
+                    while let Some(delta) = provider_stream.next().await {
+                        if *cancel_rx.borrow_and_update() {
+                            return;
+                        }
+                        message_buffer.push_str(&delta.delta);
+                        let _ = event_tx.send(ChatStreamEvent::Delta(delta));
+                    }
+
+                    citations =
+                        super::citations::extract_citations(&message_buffer, &context_entities);
+
+                    let _ = event_tx.send(ChatStreamEvent::Done {
+                        assistant_message_id: uuid::Uuid::new_v4(),
+                        citations,
+                    });
+                }
+                Err(e) => {
+                    let _ = event_tx.send(ChatStreamEvent::Error(e));
+                }
+            }
+        });
+
+        let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(event_rx);
+
+        Ok(ChatStreamHandle {
+            conversation_id: conv_id,
+            user_message_id: user_msg_id,
+            stream: Box::new(stream),
+            cancel: cancel_tx,
         })
     }
 
@@ -766,5 +886,159 @@ mod tests {
             content_str.contains("don't have any entities"),
             "with no entities, should return no-entities response"
         );
+    }
+
+    #[tokio::test]
+    async fn stream_emits_status_before_delta() {
+        let (pipeline, _, _, _) = setup_pipeline();
+        let handle = pipeline
+            .chat_stream(
+                None,
+                "Hello",
+                &[],
+                &SourceToggles {
+                    knowledge_graph: false,
+                    web_search: false,
+                },
+                ResponseMode::Fast,
+            )
+            .await
+            .unwrap();
+
+        use futures::StreamExt;
+        let mut stream = handle.stream;
+        let first = stream.next().await;
+        match first {
+            Some(ChatStreamEvent::Status(_)) => {}
+            other => panic!("expected Status as first event, got {:?}", std::mem::discriminant(&other.unwrap())),
+        }
+    }
+
+    #[tokio::test]
+    async fn stream_emits_generating_status_before_first_delta() {
+        let (pipeline, _, _, _) = setup_pipeline();
+        let handle = pipeline
+            .chat_stream(
+                None,
+                "Hello",
+                &[],
+                &SourceToggles {
+                    knowledge_graph: false,
+                    web_search: false,
+                },
+                ResponseMode::Fast,
+            )
+            .await
+            .unwrap();
+
+        use futures::StreamExt;
+        let mut stream = handle.stream;
+        let mut found_generating = false;
+        let mut found_delta = false;
+        while let Some(event) = stream.next().await {
+            match event {
+                ChatStreamEvent::Status(ProcessingStatus::Generating) => {
+                    found_generating = true;
+                }
+                ChatStreamEvent::Delta(_) => {
+                    found_delta = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+        assert!(found_generating, "should emit Generating before first Delta");
+        assert!(found_delta, "should eventually emit a Delta");
+    }
+
+    #[tokio::test]
+    async fn stream_finished_flag_on_last_delta() {
+        let (pipeline, _, _, _) = setup_pipeline();
+        let handle = pipeline
+            .chat_stream(
+                None,
+                "Hello",
+                &[],
+                &SourceToggles {
+                    knowledge_graph: false,
+                    web_search: false,
+                },
+                ResponseMode::Fast,
+            )
+            .await
+            .unwrap();
+
+        use futures::StreamExt;
+        let mut stream = handle.stream;
+        let mut last_delta_finished = false;
+        while let Some(event) = stream.next().await {
+            if let ChatStreamEvent::Delta(d) = event {
+                last_delta_finished = d.finished;
+            }
+        }
+        assert!(last_delta_finished, "last Delta should have finished: true");
+    }
+
+    #[tokio::test]
+    async fn stream_done_includes_message_id_and_citations() {
+        let (pipeline, _, _, _) = setup_pipeline();
+        let handle = pipeline
+            .chat_stream(
+                None,
+                "Hello",
+                &[],
+                &SourceToggles {
+                    knowledge_graph: false,
+                    web_search: false,
+                },
+                ResponseMode::Fast,
+            )
+            .await
+            .unwrap();
+
+        use futures::StreamExt;
+        let mut stream = handle.stream;
+        let mut done_received = false;
+        while let Some(event) = stream.next().await {
+            if let ChatStreamEvent::Done {
+                assistant_message_id,
+                citations: _,
+            } = event
+            {
+                done_received = true;
+                assert_ne!(assistant_message_id, uuid::Uuid::nil());
+            }
+        }
+        assert!(done_received, "should emit Done event");
+    }
+
+    #[tokio::test]
+    async fn cancel_stops_stream() {
+        let (pipeline, _, _, _) = setup_pipeline();
+        let handle = pipeline
+            .chat_stream(
+                None,
+                "Hello",
+                &[],
+                &SourceToggles {
+                    knowledge_graph: false,
+                    web_search: false,
+                },
+                ResponseMode::Fast,
+            )
+            .await
+            .unwrap();
+
+        let _ = handle.cancel.send(true);
+        use futures::StreamExt;
+        let mut stream = handle.stream;
+        let mut count = 0;
+        while let Some(_event) = stream.next().await {
+            count += 1;
+            if count > 10 {
+                break;
+            }
+        }
+        assert!(count < 10, "stream should stop early after cancel");
     }
 }
