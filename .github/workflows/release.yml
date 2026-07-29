@@ -1,0 +1,91 @@
+name: Release
+on:
+  push:
+    tags: [v*]
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    container: ghcr.io/${{ github.repository }}/linux-builder:latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: desktop
+      - run: cargo build -p knowledge-cli --release
+      - run: cargo tauri build
+        working-directory: desktop
+      - run: cp target/release/kos kos-linux-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: |
+            kos-linux-x86_64
+            desktop/src-tauri/target/release/bundle/
+
+  build-other:
+    strategy:
+      matrix:
+        include:
+          - os: macos-13
+            target: macos-x86_64
+            ext: ''
+          - os: macos-latest
+            target: macos-aarch64
+            ext: ''
+          - os: windows-latest
+            target: windows-x86_64
+            ext: .exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: desktop
+      - run: cargo build -p knowledge-cli --release
+      - run: cargo tauri build
+        working-directory: desktop
+      - run: cp target/release/kos${{ matrix.ext }} kos-${{ matrix.target }}${{ matrix.ext }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            kos-${{ matrix.target }}${{ matrix.ext }}
+            desktop/src-tauri/target/release/bundle/
+
+  release:
+    needs: [build-linux, build-other]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          merge-multiple: true
+          path: artifacts
+
+      - run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk "/^## \\[$v\\]/{p=1; next} /^## \\[/{p=0} p" CHANGELOG.md > ../notes.md
+
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: artifacts
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          --title "$GITHUB_REF_NAME"
+          --notes-file ../notes.md
+          kos-* *.deb *.AppImage *.dmg *.msi *.tar.gz *.sig

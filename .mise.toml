@@ -86,6 +86,16 @@ run = "cargo build -p knowledge-api"
 description = "Build knowledge-desktop"
 run = "cargo build -p knowledge-desktop"
 
+[tasks.build-desktop-host]
+description = "Build the desktop host app to build/"
+dir = "desktop"
+run = [
+    "npm install",
+    "npm run build",
+    "cargo tauri build --no-bundle",
+    "mkdir -p ../build && cp ../target/release/knowledge-desktop ../build/knowledge-desktop",
+]
+
 [tasks.build-cli]
 description = "Build the kos CLI binary to build/"
 run = ["cargo build -p knowledge-cli", "mkdir -p build && cp target/debug/kos build/"]
