@@ -27,23 +27,26 @@ jobs:
       - run: npx tauri build
         working-directory: desktop
       - run: cp target/release/kos kos-linux-x86_64
-      - run: tar czf kos-linux-x86_64.tar.gz kos-linux-x86_64
       - run: sha256sum kos-linux-x86_64 > kos-linux-x86_64.sha256
-      - run: sha256sum kos-linux-x86_64.tar.gz > kos-linux-x86_64.tar.gz.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64
           path: |
-            kos-linux-x86_64
-            kos-linux-x86_64.*
-            desktop/src-tauri/target/release/bundle/
+            kos-*
+            target/release/bundle/
 
   build-other:
     strategy:
       matrix:
         include:
+          - os: macos-13
+            target: macos-x86_64
+            ext: ''
           - os: macos-latest
             target: macos-aarch64
+            ext: ''
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
             ext: ''
           - os: windows-latest
             target: windows-x86_64
@@ -59,6 +62,8 @@ jobs:
           node-version: '26'
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
       - run: npm ci && npm run build
         working-directory: desktop
       - run: cargo build -p knowledge-cli --release
@@ -66,26 +71,16 @@ jobs:
         working-directory: desktop
       - run: cp target/release/kos${{ matrix.ext }} kos-${{ matrix.target }}${{ matrix.ext }}
       - if: runner.os != 'Windows'
-        run: tar czf kos-${{ matrix.target }}.tar.gz kos-${{ matrix.target }}${{ matrix.ext }}
-      - if: runner.os == 'Windows'
-        run: 7z a kos-${{ matrix.target }}.zip kos-${{ matrix.target }}${{ matrix.ext }}
-      - if: runner.os != 'Windows'
         run: sha256sum kos-${{ matrix.target }} > kos-${{ matrix.target }}.sha256
-      - if: runner.os != 'Windows'
-        run: sha256sum kos-${{ matrix.target }}.tar.gz > kos-${{ matrix.target }}.tar.gz.sha256
       - if: runner.os == 'Windows'
         shell: bash
         run: sha256sum kos-${{ matrix.target }}.exe > kos-${{ matrix.target }}.exe.sha256
-      - if: runner.os == 'Windows'
-        shell: bash
-        run: sha256sum kos-${{ matrix.target }}.zip > kos-${{ matrix.target }}.zip.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
           path: |
-            kos-${{ matrix.target }}${{ matrix.ext }}
-            kos-${{ matrix.target }}.*
-            desktop/src-tauri/target/release/bundle/
+            kos-*
+            target/release/bundle/
 
   release:
     needs: [build-linux, build-other]
@@ -111,9 +106,9 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes-file notes.md \
-            kos-linux-x86_64 kos-macos-aarch64 kos-windows-x86_64.exe *.sha256
+            kos-linux-x86_64 kos-linux-aarch64 kos-macos-x86_64 kos-macos-aarch64 kos-windows-x86_64.exe *.sha256
           # ponytail: bundle formats may not exist depending on platform/tooling
-          if [ -d desktop/src-tauri/target/release/bundle ]; then
-            find desktop/src-tauri/target/release/bundle -type f -exec \
+          if [ -d target/release/bundle ]; then
+            find target/release/bundle -type f -exec \
               gh release upload "$GITHUB_REF_NAME" {} \;
           fi
