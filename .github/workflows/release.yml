@@ -99,8 +99,13 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         working-directory: artifacts
-        run: >
-          gh release create "$GITHUB_REF_NAME"
-          --title "$GITHUB_REF_NAME"
-          --notes-file ../notes.md
-          kos-*.tar.gz kos-*.zip *.deb *.AppImage *.dmg *.msi *.rpm *.sha256
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file ../notes.md \
+            kos-*.tar.gz kos-*.zip *.sha256
+          # ponytail: bundle formats may not exist depending on platform/tooling
+          if [ -d desktop/src-tauri/target/release/bundle ]; then
+            find desktop/src-tauri/target/release/bundle -type f -exec \
+              gh release upload "$GITHUB_REF_NAME" {} \;
+          fi
