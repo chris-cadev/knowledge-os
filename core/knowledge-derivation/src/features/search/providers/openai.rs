@@ -149,19 +149,23 @@ mod tests {
 
     #[test]
     fn test_model_dimensions() {
-        let adapter = OpenAiAdapter::new("test-key".to_string(), "text-embedding-3-small".to_string());
+        let adapter =
+            OpenAiAdapter::new("test-key".to_string(), "text-embedding-3-small".to_string());
         assert_eq!(adapter.dimensions(), 1536);
 
-        let adapter = OpenAiAdapter::new("test-key".to_string(), "text-embedding-3-large".to_string());
+        let adapter =
+            OpenAiAdapter::new("test-key".to_string(), "text-embedding-3-large".to_string());
         assert_eq!(adapter.dimensions(), 3072);
 
-        let adapter = OpenAiAdapter::new("test-key".to_string(), "text-embedding-ada-002".to_string());
+        let adapter =
+            OpenAiAdapter::new("test-key".to_string(), "text-embedding-ada-002".to_string());
         assert_eq!(adapter.dimensions(), 1536);
     }
 
     #[test]
     fn test_model_name() {
-        let adapter = OpenAiAdapter::new("test-key".to_string(), "text-embedding-3-small".to_string());
+        let adapter =
+            OpenAiAdapter::new("test-key".to_string(), "text-embedding-3-small".to_string());
         assert_eq!(adapter.model_name(), "text-embedding-3-small");
     }
 }

@@ -123,7 +123,12 @@ pub async fn get_entity_detail(
     let outgoing_info: Vec<RelationshipInfo> = detail
         .relationships
         .iter()
-        .filter(|r| matches!(r.direction, knowledge_core::services::entity_retrieval::RelationshipDirection::Outgoing))
+        .filter(|r| {
+            matches!(
+                r.direction,
+                knowledge_core::services::entity_retrieval::RelationshipDirection::Outgoing
+            )
+        })
         .map(|r| RelationshipInfo {
             id: r.id.to_string(),
             relationship_type: r.relationship_type.clone(),
@@ -138,7 +143,12 @@ pub async fn get_entity_detail(
     let incoming_info: Vec<RelationshipInfo> = detail
         .relationships
         .iter()
-        .filter(|r| matches!(r.direction, knowledge_core::services::entity_retrieval::RelationshipDirection::Incoming))
+        .filter(|r| {
+            matches!(
+                r.direction,
+                knowledge_core::services::entity_retrieval::RelationshipDirection::Incoming
+            )
+        })
         .map(|r| RelationshipInfo {
             id: r.id.to_string(),
             relationship_type: r.relationship_type.clone(),

@@ -2,14 +2,9 @@ use async_trait::async_trait;
 use futures::stream::{self, Stream};
 use knowledge_core::ports::*;
 
+#[derive(Default)]
 pub struct MockChatAdapter {
     pub stream_delay_ms: u64,
-}
-
-impl Default for MockChatAdapter {
-    fn default() -> Self {
-        Self { stream_delay_ms: 0 }
-    }
 }
 
 #[async_trait]
@@ -69,8 +64,7 @@ impl ChatCompletion for MockChatAdapter {
 
 fn build_mock_response(request: &ChatRequest) -> String {
     if request.context_entities.is_empty() {
-        return "I don't have any entities to reference. Ask me about your knowledge graph."
-            .into();
+        return "I don't have any entities to reference. Ask me about your knowledge graph.".into();
     }
     let first = &request.context_entities[0];
     format!(

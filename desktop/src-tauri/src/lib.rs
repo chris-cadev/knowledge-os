@@ -67,8 +67,7 @@ pub fn run() {
             let component_repo: Arc<dyn ComponentRepository> = wrapper.clone();
             let relationship_repo: Arc<dyn RelationshipRepository> = wrapper.clone();
             let search_index: Arc<dyn SearchIndex> = wrapper.clone();
-            let vector_store: Arc<dyn VectorStore> =
-                Arc::new(InMemoryVectorStore::new(128));
+            let vector_store: Arc<dyn VectorStore> = Arc::new(InMemoryVectorStore::new(128));
             let traversal_port: Arc<dyn TraversalPort> = wrapper.clone();
 
             let chat_provider = create_chat_provider()?;

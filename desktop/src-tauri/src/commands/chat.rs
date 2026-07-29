@@ -141,8 +141,7 @@ pub async fn chat_search_entities(
             let title = components
                 .iter()
                 .find(|c| {
-                    c.component_type
-                        == knowledge_core::features::component::ComponentType::Title
+                    c.component_type == knowledge_core::features::component::ComponentType::Title
                 })
                 .and_then(|c| c.data.get("name").and_then(|v| v.as_str()))
                 .unwrap_or("Untitled")
@@ -150,8 +149,7 @@ pub async fn chat_search_entities(
             let preview = components
                 .iter()
                 .find(|c| {
-                    c.component_type
-                        == knowledge_core::features::component::ComponentType::Content
+                    c.component_type == knowledge_core::features::component::ComponentType::Content
                 })
                 .and_then(|c| c.data.as_str())
                 .unwrap_or("")
@@ -195,9 +193,7 @@ pub async fn chat_list_conversations(
             .map_err(|e| e.to_string())?;
         let title = components
             .iter()
-            .find(|c| {
-                c.component_type == knowledge_core::features::component::ComponentType::Title
-            })
+            .find(|c| c.component_type == knowledge_core::features::component::ComponentType::Title)
             .and_then(|c| c.data.get("name").and_then(|v| v.as_str()))
             .unwrap_or("Untitled")
             .to_string();
@@ -271,17 +267,11 @@ pub async fn chat_rename_conversation(
         .map_err(|e| e.to_string())?;
     if let Some(title_comp) = components
         .iter()
-        .find(|c| {
-            c.component_type == knowledge_core::features::component::ComponentType::Title
-        })
+        .find(|c| c.component_type == knowledge_core::features::component::ComponentType::Title)
     {
-        ComponentRepository::update_data(
-            store,
-            title_comp.id,
-            serde_json::json!({"name": title}),
-        )
-        .await
-        .map_err(|e| e.to_string())?;
+        ComponentRepository::update_data(store, title_comp.id, serde_json::json!({"name": title}))
+            .await
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }

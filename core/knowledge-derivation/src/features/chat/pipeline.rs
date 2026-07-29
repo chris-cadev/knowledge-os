@@ -177,9 +177,9 @@ impl ChatPipeline {
             }
 
             let count = context_entities.len() as u32;
-            let _ = event_tx.send(ChatStreamEvent::Status(
-                ProcessingStatus::ReadingEntities { count },
-            ));
+            let _ = event_tx.send(ChatStreamEvent::Status(ProcessingStatus::ReadingEntities {
+                count,
+            }));
 
             if *cancel_rx.borrow_and_update() {
                 return;
@@ -286,8 +286,7 @@ impl ChatPipeline {
         self.component_repo.save(&content_component).await?;
         self.component_repo.save(&refs_component).await?;
 
-        let relationship =
-            Relationship::new(conversation_id, msg_id, RelationshipType::HasMessage);
+        let relationship = Relationship::new(conversation_id, msg_id, RelationshipType::HasMessage);
         self.relationship_repo.save(&relationship).await?;
 
         Ok(msg_id)
@@ -324,8 +323,7 @@ impl ChatPipeline {
         self.component_repo.save(&content_component).await?;
         self.component_repo.save(&refs_component).await?;
 
-        let relationship =
-            Relationship::new(conversation_id, msg_id, RelationshipType::HasMessage);
+        let relationship = Relationship::new(conversation_id, msg_id, RelationshipType::HasMessage);
         self.relationship_repo.save(&relationship).await?;
 
         Ok(msg_id)
@@ -363,8 +361,11 @@ impl ChatPipeline {
                 if let Ok(outgoing) = self.relationship_repo.by_source(*id).await {
                     for rel in outgoing {
                         if let Ok(Some(target)) = self.entity_repo.get(rel.target_id).await {
-                            let target_comps =
-                                self.component_repo.get(rel.target_id).await.unwrap_or_default();
+                            let target_comps = self
+                                .component_repo
+                                .get(rel.target_id)
+                                .await
+                                .unwrap_or_default();
                             let target_title = target_comps
                                 .iter()
                                 .find(|c| c.component_type == ComponentType::Title)
@@ -400,7 +401,11 @@ impl ChatPipeline {
             entity_type: None,
             tag: None,
         };
-        let results = self.search_index.search(&search_query).await.unwrap_or_default();
+        let results = self
+            .search_index
+            .search(&search_query)
+            .await
+            .unwrap_or_default();
         let ids: Vec<Uuid> = results
             .into_iter()
             .take(limit)
@@ -598,10 +603,7 @@ mod tests {
             Ok(())
         }
         async fn delete(&self, id: Uuid) -> Result<(), StorageError> {
-            self.relationships
-                .write()
-                .unwrap()
-                .retain(|r| r.id != id);
+            self.relationships.write().unwrap().retain(|r| r.id != id);
             Ok(())
         }
         async fn by_source(&self, source_id: Uuid) -> Result<Vec<Relationship>, StorageError> {
@@ -659,7 +661,10 @@ mod tests {
         async fn remove_entity(&self, _entity_id: Uuid) -> Result<(), StorageError> {
             Ok(())
         }
-        async fn search(&self, _query: &SearchQuery) -> Result<Vec<knowledge_core::ports::SearchResult>, StorageError> {
+        async fn search(
+            &self,
+            _query: &SearchQuery,
+        ) -> Result<Vec<knowledge_core::ports::SearchResult>, StorageError> {
             Ok(vec![])
         }
         async fn rebuild(
@@ -687,7 +692,8 @@ mod tests {
             _query: &[f32],
             _k: usize,
             _filter: Option<knowledge_core::ports::VectorFilter>,
-        ) -> Result<Vec<knowledge_core::ports::VectorResult>, knowledge_core::ports::VectorError> {
+        ) -> Result<Vec<knowledge_core::ports::VectorResult>, knowledge_core::ports::VectorError>
+        {
             Ok(vec![])
         }
         async fn delete(&self, _entity_id: &str) -> Result<(), knowledge_core::ports::VectorError> {
@@ -798,7 +804,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(!result.message.is_empty(), "provider should return a response");
+        assert!(
+            !result.message.is_empty(),
+            "provider should return a response"
+        );
     }
 
     #[tokio::test]
@@ -910,7 +919,10 @@ mod tests {
         let first = stream.next().await;
         match first {
             Some(ChatStreamEvent::Status(_)) => {}
-            other => panic!("expected Status as first event, got {:?}", std::mem::discriminant(&other.unwrap())),
+            other => panic!(
+                "expected Status as first event, got {:?}",
+                std::mem::discriminant(&other.unwrap())
+            ),
         }
     }
 
@@ -947,7 +959,10 @@ mod tests {
                 _ => {}
             }
         }
-        assert!(found_generating, "should emit Generating before first Delta");
+        assert!(
+            found_generating,
+            "should emit Generating before first Delta"
+        );
         assert!(found_delta, "should eventually emit a Delta");
     }
 

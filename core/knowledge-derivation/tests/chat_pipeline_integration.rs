@@ -235,16 +235,10 @@ impl SearchIndex for MockSearchIndex {
     async fn remove_entity(&self, _entity_id: Uuid) -> Result<(), StorageError> {
         Ok(())
     }
-    async fn search(
-        &self,
-        _query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, StorageError> {
+    async fn search(&self, _query: &SearchQuery) -> Result<Vec<SearchResult>, StorageError> {
         Ok(vec![])
     }
-    async fn rebuild(
-        &self,
-        _entities: &[(Entity, Vec<Component>)],
-    ) -> Result<(), StorageError> {
+    async fn rebuild(&self, _entities: &[(Entity, Vec<Component>)]) -> Result<(), StorageError> {
         Ok(())
     }
 }
@@ -307,8 +301,12 @@ fn make_tags_component(entity_id: Uuid, tags: Vec<&str>) -> Component {
 
 // Pre-imported entity ID used by MockSearchIndex
 
-fn setup(
-) -> (ChatPipeline, Arc<MockEntityRepo>, Arc<MockComponentRepo>, Arc<MockRelationshipRepo>) {
+fn setup() -> (
+    ChatPipeline,
+    Arc<MockEntityRepo>,
+    Arc<MockComponentRepo>,
+    Arc<MockRelationshipRepo>,
+) {
     let chat_provider = Arc::new(MockChatAdapter::default());
     let entity_repo = Arc::new(MockEntityRepo::new());
     let component_repo = Arc::new(MockComponentRepo::new());
@@ -555,8 +553,7 @@ async fn chat_response_citations_persisted_in_message_entity() {
         .map(|arr| {
             arr.iter()
                 .filter_map(|v| v.as_str())
-                .map(|s| Uuid::parse_str(s).ok())
-                .flatten()
+                .filter_map(|s| Uuid::parse_str(s).ok())
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();

@@ -35,19 +35,13 @@ impl EntityRepository for DummyEntityRepo {
     async fn increment_version(&self, _id: Uuid) -> Result<(), StorageError> {
         Ok(())
     }
-    async fn find_by_component_type(
-        &self,
-        _ct: &str,
-    ) -> Result<Vec<Entity>, StorageError> {
+    async fn find_by_component_type(&self, _ct: &str) -> Result<Vec<Entity>, StorageError> {
         Ok(vec![])
     }
     async fn find_by_tag(&self, _tag: &str) -> Result<Vec<Entity>, StorageError> {
         Ok(vec![])
     }
-    async fn get_version_history(
-        &self,
-        _eid: Uuid,
-    ) -> Result<Vec<EntityVersion>, StorageError> {
+    async fn get_version_history(&self, _eid: Uuid) -> Result<Vec<EntityVersion>, StorageError> {
         Ok(vec![])
     }
 }
@@ -65,11 +59,7 @@ impl ComponentRepository for DummyComponentRepo {
     async fn delete(&self, _id: Uuid) -> Result<(), StorageError> {
         Ok(())
     }
-    async fn find_by_type(
-        &self,
-        _eid: Uuid,
-        _ct: &str,
-    ) -> Result<Vec<Component>, StorageError> {
+    async fn find_by_type(&self, _eid: Uuid, _ct: &str) -> Result<Vec<Component>, StorageError> {
         Ok(vec![])
     }
     async fn update_data(&self, _id: Uuid, _data: serde_json::Value) -> Result<(), StorageError> {
@@ -92,22 +82,37 @@ struct DummyRelRepo;
 
 #[async_trait]
 impl RelationshipRepository for DummyRelRepo {
-    async fn get(&self, _id: Uuid) -> Result<Option<knowledge_core::features::relationship::Relationship>, StorageError> {
+    async fn get(
+        &self,
+        _id: Uuid,
+    ) -> Result<Option<knowledge_core::features::relationship::Relationship>, StorageError> {
         Ok(None)
     }
-    async fn save(&self, _r: &knowledge_core::features::relationship::Relationship) -> Result<(), StorageError> {
+    async fn save(
+        &self,
+        _r: &knowledge_core::features::relationship::Relationship,
+    ) -> Result<(), StorageError> {
         Ok(())
     }
-    async fn update(&self, _r: &knowledge_core::features::relationship::Relationship) -> Result<(), StorageError> {
+    async fn update(
+        &self,
+        _r: &knowledge_core::features::relationship::Relationship,
+    ) -> Result<(), StorageError> {
         Ok(())
     }
     async fn delete(&self, _id: Uuid) -> Result<(), StorageError> {
         Ok(())
     }
-    async fn by_source(&self, _sid: Uuid) -> Result<Vec<knowledge_core::features::relationship::Relationship>, StorageError> {
+    async fn by_source(
+        &self,
+        _sid: Uuid,
+    ) -> Result<Vec<knowledge_core::features::relationship::Relationship>, StorageError> {
         Ok(vec![])
     }
-    async fn by_target(&self, _tid: Uuid) -> Result<Vec<knowledge_core::features::relationship::Relationship>, StorageError> {
+    async fn by_target(
+        &self,
+        _tid: Uuid,
+    ) -> Result<Vec<knowledge_core::features::relationship::Relationship>, StorageError> {
         Ok(vec![])
     }
     async fn find_by_source_and_target(
@@ -117,7 +122,10 @@ impl RelationshipRepository for DummyRelRepo {
     ) -> Result<Option<knowledge_core::features::relationship::Relationship>, StorageError> {
         Ok(None)
     }
-    async fn find_by_type(&self, _rt: &str) -> Result<Vec<knowledge_core::features::relationship::Relationship>, StorageError> {
+    async fn find_by_type(
+        &self,
+        _rt: &str,
+    ) -> Result<Vec<knowledge_core::features::relationship::Relationship>, StorageError> {
         Ok(vec![])
     }
 }
@@ -144,10 +152,20 @@ struct DummyVectorStore;
 
 #[async_trait]
 impl VectorStore for DummyVectorStore {
-    async fn upsert(&self, _eid: &str, _v: &[f32], _m: Option<VectorMetadata>) -> Result<(), VectorError> {
+    async fn upsert(
+        &self,
+        _eid: &str,
+        _v: &[f32],
+        _m: Option<VectorMetadata>,
+    ) -> Result<(), VectorError> {
         Ok(())
     }
-    async fn search(&self, _q: &[f32], _k: usize, _f: Option<VectorFilter>) -> Result<Vec<VectorResult>, VectorError> {
+    async fn search(
+        &self,
+        _q: &[f32],
+        _k: usize,
+        _f: Option<VectorFilter>,
+    ) -> Result<Vec<VectorResult>, VectorError> {
         Ok(vec![])
     }
     async fn delete(&self, _eid: &str) -> Result<(), VectorError> {

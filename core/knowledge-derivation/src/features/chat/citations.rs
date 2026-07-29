@@ -34,7 +34,10 @@ mod tests {
 
     #[test]
     fn citations_extracts_all_marked_entities() {
-        let ctx = vec![make_entity_context("Entity A"), make_entity_context("Entity B")];
+        let ctx = vec![
+            make_entity_context("Entity A"),
+            make_entity_context("Entity B"),
+        ];
         let response = "As shown in [1] and [2], this is correct.";
         let citations = extract_citations(response, &ctx);
         assert_eq!(citations.len(), 2);

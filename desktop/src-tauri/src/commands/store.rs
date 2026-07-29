@@ -3,9 +3,9 @@ use knowledge_core::features::component::Component;
 use knowledge_core::features::entity::Entity;
 use knowledge_core::features::relationship::Relationship;
 use knowledge_core::ports::{
-    Collection, CollectionRepository, ComponentRepository, EntityRepository,
-    EntityVersion, RelationshipRepository, SearchIndex, SearchQuery, SearchResult, StorageError,
-    TraversalConfig, TraversalError, TraversalPort, TraversalQuery, TraversalResult,
+    Collection, CollectionRepository, ComponentRepository, EntityRepository, EntityVersion,
+    RelationshipRepository, SearchIndex, SearchQuery, SearchResult, StorageError, TraversalConfig,
+    TraversalError, TraversalPort, TraversalQuery, TraversalResult,
 };
 use knowledge_core::services::entity_retrieval::EntityRetrievalService;
 use knowledge_derivation::features::chat::pipeline::ChatPipeline;
@@ -17,6 +17,7 @@ use uuid::Uuid;
 ///
 /// The inner `SqliteStore` already uses `Mutex<Connection>` for thread safety,
 /// so no additional synchronization is needed around the `Arc`.
+#[allow(dead_code)]
 pub struct AppState {
     pub store: Arc<SqliteStore>,
     pub chat_pipeline: Arc<ChatPipeline>,

@@ -169,7 +169,10 @@ impl EntityRetrievalService {
     ) -> Result<Vec<EntitySummary>, StorageError> {
         let search_query = SearchQuery {
             query: query.to_string(),
-            entity_type: filter.entity_types.as_ref().and_then(|t| t.first().cloned()),
+            entity_type: filter
+                .entity_types
+                .as_ref()
+                .and_then(|t| t.first().cloned()),
             tag: filter.tags.as_ref().and_then(|t| t.first().cloned()),
         };
         let results = self.search_index.search(&search_query).await?;
@@ -252,9 +255,7 @@ async fn extract_title(
     }
 }
 
-fn extract_title_from_components(
-    components: &[crate::features::component::Component],
-) -> String {
+fn extract_title_from_components(components: &[crate::features::component::Component]) -> String {
     components
         .iter()
         .find(|c| {
@@ -268,9 +269,7 @@ fn extract_title_from_components(
         .to_string()
 }
 
-fn extract_preview_from_components(
-    components: &[crate::features::component::Component],
-) -> String {
+fn extract_preview_from_components(components: &[crate::features::component::Component]) -> String {
     components
         .iter()
         .find(|c| {
@@ -356,10 +355,7 @@ mod tests {
         async fn increment_version(&self, _id: Uuid) -> Result<(), StorageError> {
             Ok(())
         }
-        async fn find_by_component_type(
-            &self,
-            _ct: &str,
-        ) -> Result<Vec<Entity>, StorageError> {
+        async fn find_by_component_type(&self, _ct: &str) -> Result<Vec<Entity>, StorageError> {
             Ok(vec![])
         }
         async fn find_by_tag(&self, _tag: &str) -> Result<Vec<Entity>, StorageError> {
@@ -412,7 +408,11 @@ mod tests {
         ) -> Result<Vec<Component>, StorageError> {
             Ok(vec![])
         }
-        async fn update_data(&self, _id: Uuid, _data: serde_json::Value) -> Result<(), StorageError> {
+        async fn update_data(
+            &self,
+            _id: Uuid,
+            _data: serde_json::Value,
+        ) -> Result<(), StorageError> {
             Ok(())
         }
         async fn find_by_component_data(
@@ -508,11 +508,7 @@ mod tests {
 
     #[async_trait]
     impl SearchIndex for MockSearchIndex {
-        async fn index_entity(
-            &self,
-            _e: &Entity,
-            _c: &[Component],
-        ) -> Result<(), StorageError> {
+        async fn index_entity(&self, _e: &Entity, _c: &[Component]) -> Result<(), StorageError> {
             Ok(())
         }
         async fn remove_entity(&self, _eid: Uuid) -> Result<(), StorageError> {
@@ -524,10 +520,7 @@ mod tests {
         ) -> Result<Vec<crate::ports::SearchResult>, StorageError> {
             Ok(vec![])
         }
-        async fn rebuild(
-            &self,
-            _e: &[(Entity, Vec<Component>)],
-        ) -> Result<(), StorageError> {
+        async fn rebuild(&self, _e: &[(Entity, Vec<Component>)]) -> Result<(), StorageError> {
             Ok(())
         }
     }
