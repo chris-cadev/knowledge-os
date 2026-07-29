@@ -94,7 +94,8 @@ jobs:
 
       - run: |
           v="${GITHUB_REF_NAME#v}"
-          awk "/^## \\[$v\\]/{p=1; next} /^## \\[/{p=0} p" CHANGELOG.md > ../notes.md
+          mkdir -p artifacts
+          awk "/^## \\[$v\\]/{p=1; next} /^## \\[/{p=0} p" CHANGELOG.md > artifacts/notes.md
 
       - env:
           GH_TOKEN: ${{ github.token }}
@@ -102,7 +103,7 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
-            --notes-file ../notes.md \
+            --notes-file notes.md \
             kos-*.tar.gz kos-*.zip *.sha256
           # ponytail: bundle formats may not exist depending on platform/tooling
           if [ -d desktop/src-tauri/target/release/bundle ]; then
