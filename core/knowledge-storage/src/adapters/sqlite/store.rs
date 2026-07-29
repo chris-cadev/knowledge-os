@@ -113,6 +113,16 @@ impl SqliteStore {
                 PRIMARY KEY (collection_id, entity_id),
                 FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
                 FOREIGN KEY (entity_id) REFERENCES entities(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS embeddings (
+                entity_id TEXT NOT NULL,
+                model TEXT NOT NULL,
+                vector BLOB NOT NULL,
+                dimensions INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (entity_id, model),
+                FOREIGN KEY (entity_id) REFERENCES entities(id)
             );",
         )
         .map_err(|e| StorageError::Internal(e.to_string()))?;

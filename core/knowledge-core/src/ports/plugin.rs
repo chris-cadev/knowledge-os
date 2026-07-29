@@ -44,4 +44,6 @@ pub enum PluginError {
     ExecutionFailed(String),
     #[error("Plugin timeout: {0}")]
     Timeout(String),
+    #[error("Plugin load failed: {0}")]
+    LoadFailed(String),
 }

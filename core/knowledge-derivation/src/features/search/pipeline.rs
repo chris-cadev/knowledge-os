@@ -172,7 +172,7 @@ impl EventNotifier for EmbeddingPipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::features::search::mock_embedder::MockAiAdapter;
+    use crate::features::search::providers::MockAiAdapter;
     use crate::features::search::vector_store::InMemoryVectorStore;
     use knowledge_core::features::entity::{Entity, EntityType};
     use knowledge_core::ports::ComponentRepository;

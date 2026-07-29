@@ -10,6 +10,7 @@ pub(crate) mod search;
 mod store;
 pub(crate) mod transaction;
 pub(crate) mod traversal;
+pub mod vector_store;
 
 #[cfg(test)]
 mod tests;

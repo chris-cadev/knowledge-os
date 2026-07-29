@@ -5,12 +5,19 @@ use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::{Entity, EntityType};
 use knowledge_core::features::relationship::{Relationship, RelationshipType};
 use knowledge_core::ports::{
-    Collection, CollectionRepository, ComponentRepository, EntityRepository, EntityResolver,
-    EntityVersion, Event, EventLog, EventNotifier, RelationshipRepository, SearchIndex,
-    SearchQuery, SearchResult, StorageError, TransactionalWrite, TraversalConfig,
+    AiAdapter, Collection, CollectionRepository, ComponentRepository, EntityRepository,
+    EntityResolver, EntityVersion, Event, EventLog, EventNotifier, Plugin, RelationshipRepository,
+    SearchIndex, SearchQuery, SearchResult, StorageError, TransactionalWrite, TraversalConfig,
     TraversalDirection, TraversalError, TraversalPort, TraversalQuery, TraversalResult,
     ViewAdapter, ViewFilter, ViewOutput, ViewRegistry,
 };
+use knowledge_derivation::features::search::{
+    providers::create_from_config, AiConfig,
+};
+use knowledge_storage::adapters::sqlite::vector_store::SqliteVectorStore;
+use knowledge_import::features::importer::ImportAdapter;
+use knowledge_plugin::dynamic::load_plugins_from;
+use knowledge_plugin::registry::built_in_plugins;
 use knowledge_derivation::features::view::{
     graph::GraphViewAdapter, table::TableViewAdapter, timeline::TimelineViewAdapter,
     tree::TreeViewAdapter,
@@ -248,6 +255,12 @@ struct Cli {
     #[arg(short, long, default_value = "knowledge.db", global = true)]
     db: String,
 
+    /// AI provider for embeddings and semantic search
+    /// Formats: mock://128, openai://text-embedding-3-small?api_key=KEY
+    /// Defaults to mock if OPENAI_API_KEY is not set
+    #[arg(long, global = true)]
+    ai_provider: Option<String>,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -261,6 +274,12 @@ enum Commands {
         /// Output progress as JSON lines (machine-readable)
         #[arg(long)]
         json: bool,
+        /// Auto-merge confidence threshold (0.0-1.0, default: 0.92)
+        #[arg(long, default_value = "0.92")]
+        auto_merge_threshold: f64,
+        /// Review confidence threshold (0.0-1.0, default: 0.78)
+        #[arg(long, default_value = "0.78")]
+        review_threshold: f64,
     },
     /// Search entities
     Search {
@@ -460,8 +479,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let store = Arc::new(SqliteStore::new(&cli.db)?);
 
+    // Initialize AI provider and vector store for semantic search
+    let ai_config = match &cli.ai_provider {
+        Some(provider) => AiConfig::from_provider(provider),
+        None => AiConfig::from_env(),
+    };
+    let ai_adapter: Arc<dyn AiAdapter> = Arc::from(create_from_config(&ai_config.provider)?);
+    let vector_dimensions = ai_adapter.dimensions();
+    let vector_store = Arc::new(SqliteVectorStore::new(
+        SqliteStore::new(&cli.db)?,
+        vector_dimensions,
+    ));
+
     match cli.command {
-        Commands::Import { path, json } => cmd_import(store, path, json).await,
+        Commands::Import {
+            path,
+            json,
+            auto_merge_threshold,
+            review_threshold,
+        } => {
+            cmd_import(
+                store.clone(),
+                path,
+                json,
+                Some(ai_adapter.as_ref()),
+                Some(vector_store.as_ref()),
+                auto_merge_threshold,
+                review_threshold,
+            )
+            .await
+        }
         Commands::Search {
             query,
             r#type,
@@ -471,6 +518,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             cmd_search(
                 store,
+                vector_store,
+                ai_adapter.as_ref(),
                 &query,
                 r#type.as_deref(),
                 tag.as_deref(),
@@ -522,10 +571,22 @@ async fn cmd_import(
     store: Arc<SqliteStore>,
     path: PathBuf,
     json_mode: bool,
+    ai_adapter: Option<&dyn AiAdapter>,
+    vector_store: Option<&SqliteVectorStore>,
+    auto_merge_threshold: f64,
+    review_threshold: f64,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let markdown_importer = knowledge_import::features::importer::MarkdownImporter::new();
-    let pdf_importer = knowledge_import::features::importer::PdfImporter::new();
-    let url_importer = knowledge_import::features::importer::UrlImporter::new();
+    // Build plugin registry with all known importers
+    let mut registry = built_in_plugins();
+
+    // Load dynamic plugins from the plugin directory
+    let plugin_dir = plugin_dir();
+    let dynamic_plugins = load_plugins_from(&plugin_dir);
+    for plugin in &dynamic_plugins {
+        registry.register_plugin(Box::new(StubPlugin {
+            manifest: plugin.manifest().clone(),
+        }));
+    }
 
     // Check if path is a URL
     let path_str = path.to_string_lossy();
@@ -539,13 +600,20 @@ async fn cmd_import(
         );
         pb.set_message(path_str.to_string());
 
-        match import_with_adapter(&store, &url_importer, &path).await {
-            Ok(_) => {
-                println!("\nImported URL: {}", path_str);
-                pb.inc(1);
+        match registry.get_importer("url") {
+            Ok(importer) => {
+                match import_with_adapter(&store, importer, &path, ai_adapter, vector_store, auto_merge_threshold, review_threshold).await {
+                    Ok(_) => {
+                        println!("\nImported URL: {}", path_str);
+                        pb.inc(1);
+                    }
+                    Err(e) => {
+                        eprintln!("\nERROR: {}: {}", path_str, e);
+                    }
+                }
             }
-            Err(e) => {
-                eprintln!("\nERROR: {}: {}", path_str, e);
+            Err(_) => {
+                eprintln!("\nERROR: {}: no URL importer available", path_str);
             }
         }
         pb.finish_and_clear();
@@ -590,12 +658,23 @@ async fn cmd_import(
             pb.set_message(fname.to_string());
         }
 
-        // Select adapter based on file extension
+        // Look up importer from registry by extension
         let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        let action = if ext.eq_ignore_ascii_case("pdf") {
-            import_with_adapter(&store, &pdf_importer, file_path).await
+        let importer_key = if ext.eq_ignore_ascii_case("pdf") {
+            "pdf"
+        } else if ext.eq_ignore_ascii_case("md") {
+            "markdown"
         } else {
-            import_with_adapter(&store, &markdown_importer, file_path).await
+            ext
+        };
+
+        let action = match registry.get_importer(importer_key) {
+            Ok(importer) => {
+                import_with_adapter(&store, importer, file_path, ai_adapter, vector_store, auto_merge_threshold, review_threshold).await
+            }
+            Err(_) => {
+                Err(format!("No importer available for .{} files. Supported formats: markdown, pdf", ext).into())
+            }
         };
 
         match action {
@@ -705,8 +784,12 @@ enum ImportAction {
 
 async fn import_with_adapter(
     store: &SqliteStore,
-    importer: &impl knowledge_import::features::importer::ImportAdapter,
+    importer: &dyn ImportAdapter,
     path: &std::path::Path,
+    ai_adapter: Option<&dyn AiAdapter>,
+    vector_store: Option<&SqliteVectorStore>,
+    auto_merge_threshold: f64,
+    review_threshold: f64,
 ) -> Result<ImportAction, Box<dyn std::error::Error>> {
     let result = importer.import(path).await?;
 
@@ -728,11 +811,8 @@ async fn import_with_adapter(
         EntityResolver::find_candidates(store, &result.entity, &title, content.as_deref()).await?;
 
     // PONYTAIL: Three-zone decision model.
-    // >= 0.92: auto-merge, 0.78-0.92: review (skip merge, log), < 0.78: reject (create new)
+    // >= auto_merge_threshold: auto-merge, review_threshold-auto_merge_threshold: review (skip merge, log), < review_threshold: reject (create new)
     // Exact title matches always merge (same file re-import).
-    let auto_merge_threshold = 0.92;
-    let review_threshold = 0.78;
-
     let best_candidate = candidates
         .into_iter()
         .find(|c| c.confidence >= review_threshold)
@@ -1032,6 +1112,25 @@ async fn import_with_adapter(
         })
         .unwrap_or_default();
 
+    // Generate embedding if AI provider is configured and entity has content
+    if let (Some(ai), Some(vs)) = (ai_adapter, vector_store) {
+        if !content.is_empty() {
+            match ai.embed(&content).await {
+                Ok(vector) => {
+                    let metadata = knowledge_core::ports::VectorMetadata {
+                        model: ai.model_name().to_string(),
+                        entity_type: entity.entity_type.to_string(),
+                        title: title.clone(),
+                    };
+                    let _ = knowledge_core::ports::VectorStore::upsert(vs, &entity.id.to_string(), &vector, Some(metadata)).await;
+                }
+                Err(e) => {
+                    eprintln!("  Warning: embedding generation failed: {}", e);
+                }
+            }
+        }
+    }
+
     match action {
         ImportAction::Created => print!("Created: "),
         ImportAction::Merged => print!("Merged: "),
@@ -1048,8 +1147,11 @@ async fn import_with_adapter(
     Ok(action)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn cmd_search(
     store: Arc<SqliteStore>,
+    vector_store: Arc<SqliteVectorStore>,
+    ai_adapter: &dyn knowledge_core::ports::AiAdapter,
     query: &str,
     entity_type: Option<&str>,
     tag: Option<&str>,
@@ -1076,16 +1178,32 @@ async fn cmd_search(
     };
 
     let semantic_results = if semantic || hybrid {
-        // Semantic search requires an AI provider and populated vector store.
-        // The vector store is in-memory and not persisted across restarts,
-        // so semantic search only works when embeddings have been generated
-        // in the current session. For now, indicate that semantic search
-        // is not available when no provider is configured.
-        eprintln!(
-            "Warning: Semantic search requires an AI provider to be configured. \
-             Use keyword search (default) or import with an AI provider first."
-        );
-        Vec::<knowledge_core::ports::VectorResult>::new()
+        // Generate query embedding and search vector store
+        let query_vec = match ai_adapter.embed(query).await {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("Warning: Embedding generation failed: {}", e);
+                return Ok(());
+            }
+        };
+
+        if query_vec.is_empty() {
+            Vec::<knowledge_core::ports::VectorResult>::new()
+        } else {
+            let filter = entity_type.map(|t| knowledge_core::ports::VectorFilter {
+                entity_types: Some(vec![knowledge_core::features::entity::EntityType::new(t)]),
+                tags: None,
+                min_score: None,
+            });
+
+            match knowledge_core::ports::VectorStore::search(&*vector_store, &query_vec, 20, filter).await {
+                Ok(results) => results,
+                Err(e) => {
+                    eprintln!("Warning: Vector search failed: {}", e);
+                    Vec::new()
+                }
+            }
+        }
     } else {
         Vec::<knowledge_core::ports::VectorResult>::new()
     };

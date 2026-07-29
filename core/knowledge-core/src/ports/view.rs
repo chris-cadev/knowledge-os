@@ -35,32 +35,32 @@ pub enum ViewOutput {
     Timeline(TimelineData),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TreeData {
     pub roots: Vec<TreeNode>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TreeNode {
     pub entity: Entity,
     pub label: String,
     pub children: Vec<TreeNode>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GraphData {
     pub nodes: Vec<GraphNode>,
     pub edges: Vec<GraphEdge>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GraphNode {
     pub entity: Entity,
     pub label: String,
     pub node_type: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GraphEdge {
     pub source_id: String,
     pub target_id: String,
@@ -68,29 +68,29 @@ pub struct GraphEdge {
     pub label: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TableData {
     pub columns: Vec<TableColumn>,
     pub rows: Vec<TableRow>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TableColumn {
     pub name: String,
     pub sortable: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TableRow {
     pub cells: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TimelineData {
     pub entries: Vec<TimelineEntry>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TimelineEntry {
     pub entity: Entity,
     pub timestamp: String,

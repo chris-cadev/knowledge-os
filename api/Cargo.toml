@@ -11,7 +11,9 @@ knowledge-core = { path = "../core/knowledge-core" }
 knowledge-storage = { path = "../core/knowledge-storage" }
 knowledge-import = { path = "../core/knowledge-import" }
 knowledge-derivation = { path = "../core/knowledge-derivation" }
+async-trait = "0.1"
 axum = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
