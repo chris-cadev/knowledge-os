@@ -1,7 +1,6 @@
 use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::{Entity, EntityType};
 use knowledge_core::features::relationship::{Relationship, RelationshipType};
-use knowledge_core::ports::chat::*;
 use knowledge_core::ports::*;
 
 #[test]

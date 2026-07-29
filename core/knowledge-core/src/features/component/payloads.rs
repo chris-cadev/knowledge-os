@@ -86,8 +86,12 @@ mod tests {
 
     #[test]
     fn message_role_serializes_lowercase() {
-        let roles = vec![MessageRole::System, MessageRole::User, MessageRole::Assistant];
-        let expected = vec!["\"system\"", "\"user\"", "\"assistant\""];
+        let roles = [
+            MessageRole::System,
+            MessageRole::User,
+            MessageRole::Assistant,
+        ];
+        let expected = ["\"system\"", "\"user\"", "\"assistant\""];
         for (role, expected_json) in roles.iter().zip(expected.iter()) {
             let json = serde_json::to_string(role).unwrap();
             assert_eq!(json, *expected_json);

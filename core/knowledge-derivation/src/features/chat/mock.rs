@@ -1,15 +1,10 @@
 use async_trait::async_trait;
 use futures::stream::{self, Stream};
-use knowledge_core::ports::chat::*;
+use knowledge_core::ports::*;
 
+#[derive(Default)]
 pub struct MockChatAdapter {
     pub stream_delay_ms: u64,
-}
-
-impl Default for MockChatAdapter {
-    fn default() -> Self {
-        Self { stream_delay_ms: 0 }
-    }
 }
 
 #[async_trait]
@@ -41,10 +36,7 @@ impl ChatCompletion for MockChatAdapter {
                 match iter.next() {
                     Some((i, chunk)) => {
                         if delay_ms > 0 {
-                            tokio::time::sleep(std::time::Duration::from_millis(
-                                delay_ms,
-                            ))
-                            .await;
+                            tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
                         }
                         let citation = if i == 0 {
                             citations.first().map(|c| c.number)

@@ -32,6 +32,8 @@ Entity types define the categories of knowledge the system recognizes. Every ent
 | `Workspace`    | A bounded context for collaboration    | A team's knowledge space                    |
 | `Decision`     | An architectural or product decision   | "Use event sourcing for the pipeline"       |
 | `Note`         | A user-created annotation              | A thought, a reminder, a comment            |
+| `Conversation` | A series of messages between user and AI | "Q3 research review"                     |
+| `Message`      | A single turn in a conversation        | A user question or an AI response          |
 
 ### Entity Type Rules
 
@@ -73,6 +75,13 @@ Relationship types define the semantic nature of connections between entities. E
 | `inspired_by` | Any entity | Any entity | The source was inspired by the target            |
 | `contradicts` | Any entity | Any entity | The source contradicts the target                |
 | `supports`    | Any entity | Any entity | The source provides evidence for the target      |
+
+### Chat Relationships
+
+| Type            | Source       | Target  | Description                                  |
+| --------------- | ------------ | ------- | -------------------------------------------- |
+| `has_message`   | Conversation | Message | The conversation contains this message       |
+| `referenced_by` | Any entity   | Message | The entity is referenced by this message     |
 
 ### Dependency Relationships
 
@@ -135,6 +144,13 @@ Component types define the aspects of entities. Every component belongs to exact
 | `Summary`        | `{ text: string, generated_by: string }` | Condensed representation                  |
 | `Classification` | `{ taxonomy: string, labels: string[] }` | Categorical classification                |
 | `Confidence`     | `{ score: f64, source: string }`         | Confidence in the entity's correctness    |
+
+### Chat Components
+
+| Type             | Payload                                     | Description                        |
+| ---------------- | ------------------------------------------- | ---------------------------------- |
+| `MessageContent` | `{ role: "user"|"assistant"|"system", text: string }` | Text content of a chat message     |
+| `EntityRefs`     | `{ entity_ids: Uuid[] }`                    | Entities referenced in a message   |
 
 ### System Components
 

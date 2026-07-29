@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use knowledge_core::ports::chat::{ChatCompletion, ChatError};
+use knowledge_core::ports::{ChatCompletion, ChatError};
 
 pub fn create_chat_provider(config: &str) -> Result<Box<dyn ChatCompletion>, ChatError> {
     if config == "mock" || config.starts_with("mock://") {
@@ -29,8 +29,7 @@ pub fn create_chat_provider(config: &str) -> Result<Box<dyn ChatCompletion>, Cha
             .cloned()
             .or_else(|| std::env::var("OLLAMA_HOST").ok())
             .unwrap_or_else(|| "http://localhost:11434".to_string());
-        let adapter =
-            super::ollama::OllamaChatAdapter::new(model).with_endpoint(endpoint);
+        let adapter = super::ollama::OllamaChatAdapter::new(model).with_endpoint(endpoint);
         return Ok(Box::new(adapter));
     }
 
@@ -58,7 +57,7 @@ fn parse_query(s: &str) -> (String, HashMap<String, String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use knowledge_core::ports::chat::{
+    use knowledge_core::ports::{
         ChatConfig, ChatRequest, Message, MessageRole, ResponseMode, SourceToggles,
     };
 

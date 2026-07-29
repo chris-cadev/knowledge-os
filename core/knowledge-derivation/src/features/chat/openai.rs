@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
-use knowledge_core::ports::chat::*;
+use knowledge_core::ports::*;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +46,7 @@ struct OpenAiChatRequestBody {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAiChatChoice {
     index: u32,
     message: Option<OpenAiChatResponseMessage>,
@@ -54,6 +55,7 @@ struct OpenAiChatChoice {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAiChatResponseMessage {
     role: String,
     content: String,
@@ -65,6 +67,7 @@ struct OpenAiChatDelta {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAiChatUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
@@ -72,6 +75,7 @@ struct OpenAiChatUsage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAiChatResponse {
     id: String,
     choices: Vec<OpenAiChatChoice>,
@@ -198,53 +202,49 @@ impl ChatCompletion for OpenAiChatAdapter {
             return Err(map_openai_error(status, &text));
         }
 
-        let stream = response
-            .bytes_stream()
-            .flat_map(|chunk_result| {
-                let chunk = match chunk_result {
-                    Ok(c) => c,
-                    Err(_e) => return futures::stream::iter(vec![]),
-                };
-                let text = String::from_utf8_lossy(&chunk);
-                let mut deltas = Vec::new();
-                for line in text.lines() {
-                    if let Some(data) = line.strip_prefix("data: ") {
-                        if data == "[DONE]" {
-                            deltas.push(ChatDelta {
-                                delta: String::new(),
-                                citation: None,
-                                status: None,
-                                finished: true,
-                            });
-                            continue;
-                        }
-                        if let Ok(sse) =
-                            serde_json::from_str::<OpenAiChatResponse>(data)
-                        {
-                            if let Some(choice) = sse.choices.first() {
-                                if let Some(delta) = &choice.delta {
-                                    if let Some(content) = &delta.content {
-                                        if !content.is_empty() {
-                                            deltas.push(ChatDelta {
-                                                delta: content.clone(),
-                                                citation: None,
-                                                status: None,
-                                                finished: false,
-                                            });
-                                        }
+        let stream = response.bytes_stream().flat_map(|chunk_result| {
+            let chunk = match chunk_result {
+                Ok(c) => c,
+                Err(_) => return futures::stream::iter(vec![]),
+            };
+            let text = String::from_utf8_lossy(&chunk);
+            let mut deltas = Vec::new();
+            for line in text.lines() {
+                if let Some(data) = line.strip_prefix("data: ") {
+                    if data == "[DONE]" {
+                        deltas.push(ChatDelta {
+                            delta: String::new(),
+                            citation: None,
+                            status: None,
+                            finished: true,
+                        });
+                        continue;
+                    }
+                    if let Ok(sse) = serde_json::from_str::<OpenAiChatResponse>(data) {
+                        if let Some(choice) = sse.choices.first() {
+                            if let Some(delta) = &choice.delta {
+                                if let Some(content) = &delta.content {
+                                    if !content.is_empty() {
+                                        deltas.push(ChatDelta {
+                                            delta: content.clone(),
+                                            citation: None,
+                                            status: None,
+                                            finished: false,
+                                        });
                                     }
                                 }
-                                if choice.finish_reason.is_some() {
-                                    if let Some(last) = deltas.last_mut() {
-                                        last.finished = true;
-                                    }
+                            }
+                            if choice.finish_reason.is_some() {
+                                if let Some(last) = deltas.last_mut() {
+                                    last.finished = true;
                                 }
                             }
                         }
                     }
                 }
-                futures::stream::iter(deltas)
-            });
+            }
+            futures::stream::iter(deltas)
+        });
 
         Ok(Box::new(Box::pin(stream)))
     }
@@ -339,15 +339,13 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/v1/chat/completions"))
-            .respond_with(
-                ResponseTemplate::new(400).set_body_json(serde_json::json!({
-                    "error": {
-                        "message": "Invalid request",
-                        "type": "invalid_request_error",
-                        "code": null
-                    }
-                })),
-            )
+            .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "Invalid request",
+                    "type": "invalid_request_error",
+                    "code": null
+                }
+            })))
             .mount(&mock_server)
             .await;
 

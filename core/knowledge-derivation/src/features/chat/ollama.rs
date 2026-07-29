@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
-use knowledge_core::ports::chat::*;
+use knowledge_core::ports::*;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -107,7 +107,10 @@ impl ChatCompletion for OllamaChatAdapter {
             if let Ok(err) = serde_json::from_str::<OllamaErrorResponse>(&text) {
                 return Err(ChatError::Provider(err.error));
             }
-            return Err(ChatError::Provider(format!("Ollama error ({}): {}", status, text)));
+            return Err(ChatError::Provider(format!(
+                "Ollama error ({}): {}",
+                status, text
+            )));
         }
 
         let ollama_resp: OllamaChatResponse = serde_json::from_str(&text)
@@ -148,47 +151,46 @@ impl ChatCompletion for OllamaChatAdapter {
             if let Ok(err) = serde_json::from_str::<OllamaErrorResponse>(&text) {
                 return Err(ChatError::Provider(err.error));
             }
-            return Err(ChatError::Provider(format!("Ollama error ({}): {}", status, text)));
+            return Err(ChatError::Provider(format!(
+                "Ollama error ({}): {}",
+                status, text
+            )));
         }
 
-        let stream = response
-            .bytes_stream()
-            .flat_map(|chunk_result| {
-                let chunk = match chunk_result {
-                    Ok(c) => c,
-                    Err(_e) => return futures::stream::iter(vec![]),
-                };
-                let text = String::from_utf8_lossy(&chunk);
-                let mut deltas = Vec::new();
-                for line in text.lines() {
-                    if line.is_empty() {
-                        continue;
-                    }
-                    if let Ok(ollama_resp) =
-                        serde_json::from_str::<OllamaChatResponse>(line)
-                    {
-                        if let Some(msg) = ollama_resp.message {
-                            if !msg.content.is_empty() {
-                                deltas.push(ChatDelta {
-                                    delta: msg.content,
-                                    citation: None,
-                                    status: None,
-                                    finished: ollama_resp.done,
-                                });
-                            }
-                        }
-                        if ollama_resp.done {
+        let stream = response.bytes_stream().flat_map(|chunk_result| {
+            let chunk = match chunk_result {
+                Ok(c) => c,
+                Err(_) => return futures::stream::iter(vec![]),
+            };
+            let text = String::from_utf8_lossy(&chunk);
+            let mut deltas = Vec::new();
+            for line in text.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                if let Ok(ollama_resp) = serde_json::from_str::<OllamaChatResponse>(line) {
+                    if let Some(msg) = ollama_resp.message {
+                        if !msg.content.is_empty() {
                             deltas.push(ChatDelta {
-                                delta: String::new(),
+                                delta: msg.content,
                                 citation: None,
                                 status: None,
-                                finished: true,
+                                finished: ollama_resp.done,
                             });
                         }
                     }
+                    if ollama_resp.done {
+                        deltas.push(ChatDelta {
+                            delta: String::new(),
+                            citation: None,
+                            status: None,
+                            finished: true,
+                        });
+                    }
                 }
-                futures::stream::iter(deltas)
-            });
+            }
+            futures::stream::iter(deltas)
+        });
 
         Ok(Box::new(Box::pin(stream)))
     }
@@ -237,8 +239,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let adapter = OllamaChatAdapter::new("llama3.2".into())
-            .with_endpoint(mock_server.uri());
+        let adapter = OllamaChatAdapter::new("llama3.2".into()).with_endpoint(mock_server.uri());
 
         let request = make_request();
         let response = adapter.chat(request).await.unwrap();
@@ -257,8 +258,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let adapter = OllamaChatAdapter::new("llama3.2".into())
-            .with_endpoint(mock_server.uri());
+        let adapter = OllamaChatAdapter::new("llama3.2".into()).with_endpoint(mock_server.uri());
 
         let request = make_request();
         let response = adapter.chat(request).await.unwrap();
@@ -275,8 +275,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let adapter = OllamaChatAdapter::new("llama3.2".into())
-            .with_endpoint(mock_server.uri());
+        let adapter = OllamaChatAdapter::new("llama3.2".into()).with_endpoint(mock_server.uri());
 
         let request = make_request();
         let response = adapter.chat(request).await.unwrap();
@@ -310,8 +309,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let adapter = OllamaChatAdapter::new("llama3.2".into())
-            .with_endpoint(mock_server.uri());
+        let adapter = OllamaChatAdapter::new("llama3.2".into()).with_endpoint(mock_server.uri());
 
         let request = make_request();
         let stream = adapter.chat_stream(request).await.unwrap();

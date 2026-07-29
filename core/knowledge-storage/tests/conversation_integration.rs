@@ -20,11 +20,7 @@ async fn create_conversation(
     let conv = Entity::new(EntityType::new("Conversation"));
     EntityRepository::save(store, &conv).await.unwrap();
 
-    let title_comp = Component::new(
-        conv.id,
-        ComponentType::Title,
-        serde_json::json!(title),
-    );
+    let title_comp = Component::new(conv.id, ComponentType::Title, serde_json::json!(title));
     ComponentRepository::save(store, &title_comp).await.unwrap();
 
     for (role, text) in messages {
@@ -39,7 +35,9 @@ async fn create_conversation(
                 "text": text,
             }),
         );
-        ComponentRepository::save(store, &content_comp).await.unwrap();
+        ComponentRepository::save(store, &content_comp)
+            .await
+            .unwrap();
 
         let rel = Relationship::new(conv.id, msg.id, RelationshipType::HasMessage);
         RelationshipRepository::save(store, &rel).await.unwrap();
@@ -102,7 +100,11 @@ async fn get_conversation_loads_messages_ordered() {
     let conv_id = create_conversation(
         &store,
         "Test",
-        vec![("user", "first"), ("assistant", "second"), ("user", "third")],
+        vec![
+            ("user", "first"),
+            ("assistant", "second"),
+            ("user", "third"),
+        ],
     )
     .await;
 
