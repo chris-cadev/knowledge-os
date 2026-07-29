@@ -14,6 +14,12 @@ impl DocxImporter {
     }
 }
 
+impl Default for DocxImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl ImportAdapter for DocxImporter {
     fn can_import(&self, path: &Path) -> bool {
@@ -51,11 +57,7 @@ impl ImportAdapter for DocxImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,

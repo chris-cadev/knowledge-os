@@ -7,6 +7,12 @@ use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 pub struct IcsImporter;
 
+impl Default for IcsImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IcsImporter {
     pub fn new() -> Self {
         Self
@@ -43,18 +49,13 @@ impl IcsImporter {
             .map(|event_block| {
                 let summary = extract_ics_field(event_block, "SUMMARY")
                     .unwrap_or_else(|| "Untitled Event".to_string());
-                let description = extract_ics_field(event_block, "DESCRIPTION")
-                    .unwrap_or_default();
+                let description = extract_ics_field(event_block, "DESCRIPTION").unwrap_or_default();
                 let dtstart = extract_ics_field(event_block, "DTSTART");
                 let dtend = extract_ics_field(event_block, "DTEND");
 
                 let entity = Entity::new(EntityType::new("Event"));
                 let mut components = vec![
-                    Component::new(
-                        entity.id,
-                        ComponentType::Title,
-                        serde_json::json!(summary),
-                    ),
+                    Component::new(entity.id, ComponentType::Title, serde_json::json!(summary)),
                     Component::new(
                         entity.id,
                         ComponentType::Content,
@@ -76,19 +77,12 @@ impl IcsImporter {
                         "imported_at": chrono::Utc::now().to_rfc3339(),
                     });
                     if let Some(obj) = timeline.as_object_mut() {
-                        obj.insert(
-                            "created_at".to_string(),
-                            serde_json::json!(start),
-                        );
+                        obj.insert("created_at".to_string(), serde_json::json!(start));
                         if let Some(end) = &dtend {
                             obj.insert("ended_at".to_string(), serde_json::json!(end));
                         }
                     }
-                    components.push(Component::new(
-                        entity.id,
-                        ComponentType::Timeline,
-                        timeline,
-                    ));
+                    components.push(Component::new(entity.id, ComponentType::Timeline, timeline));
                 }
 
                 ImportResult {
@@ -106,15 +100,15 @@ impl IcsImporter {
 fn extract_ics_field(event_block: &str, field: &str) -> Option<String> {
     for line in event_block.lines() {
         let trimmed = line.trim();
-        if let Some(stripped) = trimmed.strip_prefix(field) {
-            if stripped.starts_with(':') {
-                let val = stripped[1..].trim().to_string();
-                if !val.is_empty() {
-                    return Some(val);
+        if let Some(after_field) = trimmed.strip_prefix(field) {
+            if let Some(val) = after_field.strip_prefix(':') {
+                let v = val.trim().to_string();
+                if !v.is_empty() {
+                    return Some(v);
                 }
-            } else if stripped.starts_with(';') {
-                if let Some(val_start) = stripped.find(':') {
-                    let val = stripped[val_start + 1..].trim().to_string();
+            } else if after_field.starts_with(';') {
+                if let Some(val_start) = after_field.find(':') {
+                    let val = after_field[val_start + 1..].trim().to_string();
                     if !val.is_empty() {
                         return Some(val);
                     }
@@ -126,6 +120,12 @@ fn extract_ics_field(event_block: &str, field: &str) -> Option<String> {
 }
 
 pub struct VcfImporter;
+
+impl Default for VcfImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl VcfImporter {
     pub fn new() -> Self {
@@ -170,11 +170,7 @@ impl VcfImporter {
 
                 let entity = Entity::new(EntityType::new("Person"));
                 let mut components = vec![
-                    Component::new(
-                        entity.id,
-                        ComponentType::Title,
-                        serde_json::json!(name),
-                    ),
+                    Component::new(entity.id, ComponentType::Title, serde_json::json!(name)),
                     Component::new(
                         entity.id,
                         ComponentType::Provenance,
@@ -219,15 +215,15 @@ impl VcfImporter {
 fn extract_vcf_field(card_block: &str, field: &str) -> Option<String> {
     for line in card_block.lines() {
         let trimmed = line.trim();
-        if let Some(stripped) = trimmed.strip_prefix(field) {
-            if stripped.starts_with(':') {
-                let val = stripped[1..].trim().to_string();
-                if !val.is_empty() {
-                    return Some(val);
+        if let Some(after_field) = trimmed.strip_prefix(field) {
+            if let Some(val) = after_field.strip_prefix(':') {
+                let v = val.trim().to_string();
+                if !v.is_empty() {
+                    return Some(v);
                 }
-            } else if stripped.starts_with(';') {
-                if let Some(val_start) = stripped.find(':') {
-                    let val = stripped[val_start + 1..].trim().to_string();
+            } else if after_field.starts_with(';') {
+                if let Some(val_start) = after_field.find(':') {
+                    let val = after_field[val_start + 1..].trim().to_string();
                     if !val.is_empty() {
                         return Some(val);
                     }
@@ -273,10 +269,7 @@ mod tests {
     #[test]
     fn test_extract_vcf_field() {
         let block = "FN:John Doe\nEMAIL:john@example.com\n";
-        assert_eq!(
-            extract_vcf_field(block, "FN"),
-            Some("John Doe".to_string())
-        );
+        assert_eq!(extract_vcf_field(block, "FN"), Some("John Doe".to_string()));
         assert_eq!(
             extract_vcf_field(block, "EMAIL"),
             Some("john@example.com".to_string())

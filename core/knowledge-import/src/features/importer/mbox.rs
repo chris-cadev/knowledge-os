@@ -7,6 +7,12 @@ use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 pub struct MboxImporter;
 
+impl Default for MboxImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MboxImporter {
     pub fn new() -> Self {
         Self
@@ -74,16 +80,8 @@ impl MboxImporter {
 
             let entity = Entity::new(EntityType::new("Email"));
             let mut components = vec![
-                Component::new(
-                    entity.id,
-                    ComponentType::Title,
-                    serde_json::json!(subject),
-                ),
-                Component::new(
-                    entity.id,
-                    ComponentType::Content,
-                    serde_json::json!(body),
-                ),
+                Component::new(entity.id, ComponentType::Title, serde_json::json!(subject)),
+                Component::new(entity.id, ComponentType::Content, serde_json::json!(body)),
                 Component::new(
                     entity.id,
                     ComponentType::Provenance,

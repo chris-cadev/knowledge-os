@@ -1,4 +1,4 @@
-use std::ffi::{CStr, c_char};
+use std::ffi::{c_char, CStr};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -25,19 +25,14 @@ impl DynamicPlugin {
     /// Loading shared libraries is inherently unsafe. The plugin must be
     /// compiled against a compatible version of Knowledge OS.
     pub unsafe fn load(lib_path: &Path) -> Result<Self, PluginError> {
-        let library = Arc::new(
-            libloading::Library::new(lib_path).map_err(|e| {
-                PluginError::LoadFailed(format!("failed to load plugin library: {}", e))
-            })?,
-        );
+        let library = Arc::new(libloading::Library::new(lib_path).map_err(|e| {
+            PluginError::LoadFailed(format!("failed to load plugin library: {}", e))
+        })?);
 
         // Load manifest
-        let manifest_fn: libloading::Symbol<unsafe extern "C" fn() -> *const c_char> = library
-            .get(b"kos_plugin_manifest")
-            .map_err(|_| {
-                PluginError::LoadFailed(
-                    "plugin missing kos_plugin_manifest symbol".to_string(),
-                )
+        let manifest_fn: libloading::Symbol<unsafe extern "C" fn() -> *const c_char> =
+            library.get(b"kos_plugin_manifest").map_err(|_| {
+                PluginError::LoadFailed("plugin missing kos_plugin_manifest symbol".to_string())
             })?;
 
         let manifest_ptr = manifest_fn();
@@ -51,9 +46,8 @@ impl DynamicPlugin {
             .to_str()
             .map_err(|e| PluginError::LoadFailed(format!("invalid manifest UTF-8: {}", e)))?;
 
-        let manifest_data: serde_json::Value = serde_json::from_str(manifest_str).map_err(|e| {
-            PluginError::LoadFailed(format!("invalid manifest JSON: {}", e))
-        })?;
+        let manifest_data: serde_json::Value = serde_json::from_str(manifest_str)
+            .map_err(|e| PluginError::LoadFailed(format!("invalid manifest JSON: {}", e)))?;
 
         let manifest = PluginManifest {
             name: manifest_data["name"]
@@ -68,10 +62,7 @@ impl DynamicPlugin {
                 .as_str()
                 .unwrap_or("")
                 .to_string(),
-            author: manifest_data["author"]
-                .as_str()
-                .unwrap_or("")
-                .to_string(),
+            author: manifest_data["author"].as_str().unwrap_or("").to_string(),
             license: manifest_data["license"].as_str().map(String::from),
             priority: manifest_data["priority"].as_u64().map(|u| u as u32),
         };
@@ -149,6 +140,4 @@ pub fn load_plugins_from(plugin_dir: &Path) -> Vec<DynamicPlugin> {
 }
 
 #[cfg(test)]
-mod tests {
-    
-}
+mod tests {}

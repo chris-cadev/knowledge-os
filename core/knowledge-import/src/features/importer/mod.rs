@@ -39,7 +39,9 @@ pub use markdown::MarkdownImporter;
 pub use mbox::MboxImporter;
 pub use note_apps::{EnexImporter, NotionJsonImporter, OpmlImporter};
 pub use obsidian::ObsidianVaultImporter;
-pub use opendocument::{OdgImporter, OdpImporter, OdsImporter, OdtImporter, OtpImporter, OtsImporter, OttImporter};
+pub use opendocument::{
+    OdgImporter, OdpImporter, OdsImporter, OdtImporter, OtpImporter, OtsImporter, OttImporter,
+};
 pub use pdf::PdfImporter;
 pub use plugins::{markdown_plugin, pdf_plugin, url_plugin, PluginAdapter};
 pub use pptx::PptxImporter;

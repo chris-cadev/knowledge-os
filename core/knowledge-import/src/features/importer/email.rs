@@ -7,6 +7,12 @@ use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 pub struct EmlImporter;
 
+impl Default for EmlImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EmlImporter {
     pub fn new() -> Self {
         Self
@@ -45,7 +51,7 @@ impl ImportAdapter for EmlImporter {
             .find(|h| h.get_key_ref().eq_ignore_ascii_case("From"))
             .map(|h| h.get_value());
 
-        let to = parsed
+        let _to = parsed
             .headers
             .iter()
             .find(|h| h.get_key_ref().eq_ignore_ascii_case("To"))
@@ -67,11 +73,7 @@ impl ImportAdapter for EmlImporter {
 
         let mut components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(subject)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(body),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(body)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -115,6 +117,12 @@ impl ImportAdapter for EmlImporter {
 }
 
 pub struct MsgImporter;
+
+impl Default for MsgImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl MsgImporter {
     pub fn new() -> Self {
@@ -163,11 +171,7 @@ impl ImportAdapter for MsgImporter {
         let entity = Entity::new(EntityType::new("Email"));
         let mut components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(subject)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(body),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(body)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,

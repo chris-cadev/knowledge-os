@@ -20,11 +20,7 @@ impl ClipboardImporter {
                 ComponentType::Title,
                 serde_json::json!("Clipboard Content"),
             ),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -52,11 +48,7 @@ impl ClipboardImporter {
                 ComponentType::Title,
                 serde_json::json!("Clipboard Content"),
             ),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -90,9 +82,7 @@ fn strip_html_tags(html: &str) -> String {
             _ => {}
         }
     }
-    text.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 impl Default for ClipboardImporter {

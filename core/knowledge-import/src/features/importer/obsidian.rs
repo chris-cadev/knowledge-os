@@ -6,6 +6,12 @@ use super::markdown::MarkdownImporter;
 
 pub struct ObsidianVaultImporter;
 
+impl Default for ObsidianVaultImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ObsidianVaultImporter {
     pub fn new() -> Self {
         Self
@@ -46,18 +52,17 @@ impl ObsidianVaultImporter {
         for entry in entries {
             let entry = entry?;
             let entry_path = entry.path();
-            if entry_path.is_file() {
-                if entry_path
+            if entry_path.is_file()
+                && entry_path
                     .extension()
                     .and_then(|e| e.to_str())
                     .map(|e| e.eq_ignore_ascii_case("md"))
                     .unwrap_or(false)
-                {
-                    match md_importer.import(&entry_path).await {
-                        Ok(result) => results.push(result),
-                        Err(e) => {
-                            eprintln!("Warning: Failed to import {}: {}", entry_path.display(), e);
-                        }
+            {
+                match md_importer.import(&entry_path).await {
+                    Ok(result) => results.push(result),
+                    Err(e) => {
+                        eprintln!("Warning: Failed to import {}: {}", entry_path.display(), e);
                     }
                 }
             }

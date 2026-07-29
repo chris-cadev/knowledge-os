@@ -1,14 +1,18 @@
 use async_trait::async_trait;
 use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::{Entity, EntityType};
-use knowledge_core::ports::{
-    ColumnInfo, ColumnMapping, ColumnValue, FieldMapping, ImportPreview,
-};
+use knowledge_core::ports::{ColumnInfo, ColumnMapping, ColumnValue, FieldMapping, ImportPreview};
 use std::path::Path;
 
 use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 pub struct CsvImporter;
+
+impl Default for CsvImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl CsvImporter {
     pub fn new() -> Self {
@@ -27,8 +31,7 @@ impl ImportAdapter for CsvImporter {
 
     async fn import(&self, _path: &Path) -> Result<ImportResult, ImportError> {
         Err(ImportError::Parse(
-            "CSV import requires column mapping. Use preview() then import_with_mapping()."
-                .into(),
+            "CSV import requires column mapping. Use preview() then import_with_mapping().".into(),
         ))
     }
 
@@ -38,7 +41,11 @@ impl ImportAdapter for CsvImporter {
 }
 
 impl CsvImporter {
-    pub async fn preview(&self, path: &Path, sample_size: usize) -> Result<ImportPreview, ImportError> {
+    pub async fn preview(
+        &self,
+        path: &Path,
+        sample_size: usize,
+    ) -> Result<ImportPreview, ImportError> {
         let mut reader = csv::ReaderBuilder::new()
             .from_path(path)
             .map_err(|e| ImportError::Parse(format!("CSV open error: {}", e)))?;
@@ -53,8 +60,7 @@ impl CsvImporter {
             if i >= sample_size {
                 break;
             }
-            let record =
-                record.map_err(|e| ImportError::Parse(format!("CSV row {}: {}", i, e)))?;
+            let record = record.map_err(|e| ImportError::Parse(format!("CSV row {}: {}", i, e)))?;
             rows.push(
                 record
                     .iter()
@@ -94,8 +100,7 @@ impl CsvImporter {
 
         let mut results = Vec::new();
         for (i, record) in reader.records().enumerate() {
-            let record =
-                record.map_err(|e| ImportError::Parse(format!("CSV row {}: {}", i, e)))?;
+            let record = record.map_err(|e| ImportError::Parse(format!("CSV row {}: {}", i, e)))?;
             let row: Vec<&str> = record.iter().collect();
 
             if mapping.skip_columns.iter().all(|c| !headers.contains(c)) {
@@ -119,11 +124,7 @@ impl CsvImporter {
 
             let entity = Entity::new(entity_type);
             let mut components = vec![
-                Component::new(
-                    entity.id,
-                    ComponentType::Title,
-                    serde_json::json!(title),
-                ),
+                Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
                 Component::new(
                     entity.id,
                     ComponentType::Provenance,
@@ -151,7 +152,10 @@ impl CsvImporter {
                 match field_map {
                     FieldMapping::Title => {
                         // Already handled above; update if not default
-                        if let Some(c) = components.iter_mut().find(|c| c.component_type == ComponentType::Title) {
+                        if let Some(c) = components
+                            .iter_mut()
+                            .find(|c| c.component_type == ComponentType::Title)
+                        {
                             c.data = serde_json::json!(val);
                         }
                     }
@@ -220,6 +224,12 @@ impl CsvImporter {
 
 pub struct JsonImporter;
 
+impl Default for JsonImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JsonImporter {
     pub fn new() -> Self {
         Self
@@ -278,6 +288,12 @@ impl ImportAdapter for JsonImporter {
 
 pub struct XmlImporter;
 
+impl Default for XmlImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl XmlImporter {
     pub fn new() -> Self {
         Self
@@ -332,11 +348,7 @@ impl ImportAdapter for XmlImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -362,6 +374,12 @@ impl ImportAdapter for XmlImporter {
 
 pub struct YamlImporter;
 
+impl Default for YamlImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl YamlImporter {
     pub fn new() -> Self {
         Self
@@ -371,10 +389,7 @@ impl YamlImporter {
 #[async_trait]
 impl ImportAdapter for YamlImporter {
     fn can_import(&self, path: &Path) -> bool {
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         ext.eq_ignore_ascii_case("yaml") || ext.eq_ignore_ascii_case("yml")
     }
 
@@ -460,7 +475,10 @@ mod tests {
             entity_type_override: None,
         };
 
-        let results = importer.import_with_mapping(file.path(), &mapping).await.unwrap();
+        let results = importer
+            .import_with_mapping(file.path(), &mapping)
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
         let title = results[0]
             .components
@@ -489,7 +507,10 @@ mod tests {
             entity_type_override: None,
         };
 
-        let results = importer.import_with_mapping(file.path(), &mapping).await.unwrap();
+        let results = importer
+            .import_with_mapping(file.path(), &mapping)
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
     }
 
@@ -514,7 +535,10 @@ mod tests {
             entity_type_override: None,
         };
 
-        let results = importer.import_with_mapping(file.path(), &mapping).await.unwrap();
+        let results = importer
+            .import_with_mapping(file.path(), &mapping)
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
         let tags = results[0]
             .components

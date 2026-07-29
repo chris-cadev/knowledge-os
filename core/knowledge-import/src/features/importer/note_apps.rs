@@ -6,9 +6,14 @@ use quick_xml::Reader as XmlReader;
 use std::path::Path;
 
 use super::adapter::{ImportAdapter, ImportError, ImportResult};
-use super::markdown::MarkdownImporter;
 
 pub struct EnexImporter;
+
+impl Default for EnexImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl EnexImporter {
     pub fn new() -> Self {
@@ -134,15 +139,19 @@ impl EnexImporter {
         }
 
         if results.is_empty() {
-            return Err(ImportError::Parse(
-                "No notes found in ENEX file".into(),
-            ));
+            return Err(ImportError::Parse("No notes found in ENEX file".into()));
         }
         Ok(results)
     }
 }
 
 pub struct OpmlImporter;
+
+impl Default for OpmlImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl OpmlImporter {
     pub fn new() -> Self {
@@ -176,7 +185,6 @@ impl OpmlImporter {
         let content = std::fs::read_to_string(path)?;
         let mut reader = XmlReader::from_str(&content);
         let mut results = Vec::new();
-        let mut in_outline = false;
         let mut current_text = String::new();
 
         let outline_tag = b"outline";
@@ -262,15 +270,19 @@ impl OpmlImporter {
         }
 
         if results.is_empty() {
-            return Err(ImportError::Parse(
-                "No outlines found in OPML file".into(),
-            ));
+            return Err(ImportError::Parse("No outlines found in OPML file".into()));
         }
         Ok(results)
     }
 }
 
 pub struct NotionJsonImporter;
+
+impl Default for NotionJsonImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl NotionJsonImporter {
     pub fn new() -> Self {
@@ -309,7 +321,7 @@ impl ImportAdapter for NotionJsonImporter {
             }
         };
 
-        for page in pages {
+        if let Some(page) = pages.into_iter().next() {
             let title = page
                 .get("properties")
                 .and_then(|p| p.get("title"))

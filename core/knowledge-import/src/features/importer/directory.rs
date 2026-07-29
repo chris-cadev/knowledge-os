@@ -78,7 +78,6 @@ pub fn detect_conflicts(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
     use tempfile::TempDir;
 
     #[test]

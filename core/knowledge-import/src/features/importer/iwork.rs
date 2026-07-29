@@ -54,13 +54,21 @@ fn extract_text_from_zip_index_xml(path: &Path) -> Result<String, ImportError> {
         let mut entry = archive.by_name("Index/Document.iwa").unwrap();
         entry.read_to_end(&mut buf)?;
     } else {
-        return Err(ImportError::Parse("missing index.xml or Document.iwa".into()));
+        return Err(ImportError::Parse(
+            "missing index.xml or Document.iwa".into(),
+        ));
     }
     drop(archive);
     extract_text_from_index_xml(&buf)
 }
 
 pub struct PagesImporter;
+
+impl Default for PagesImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl PagesImporter {
     pub fn new() -> Self {
@@ -87,11 +95,7 @@ impl ImportAdapter for PagesImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -115,6 +119,12 @@ impl ImportAdapter for PagesImporter {
 }
 
 pub struct NumbersImporter;
+
+impl Default for NumbersImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl NumbersImporter {
     pub fn new() -> Self {
@@ -141,11 +151,7 @@ impl ImportAdapter for NumbersImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -169,6 +175,12 @@ impl ImportAdapter for NumbersImporter {
 }
 
 pub struct KeynoteImporter;
+
+impl Default for KeynoteImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl KeynoteImporter {
     pub fn new() -> Self {
@@ -195,11 +207,7 @@ impl ImportAdapter for KeynoteImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,

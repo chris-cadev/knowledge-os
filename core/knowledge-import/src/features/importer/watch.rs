@@ -21,7 +21,7 @@ impl DirectoryWatcher {
             },
             Config::default().with_poll_interval(Duration::from_secs(2)),
         )
-        .map_err(|e| ImportError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| ImportError::Io(std::io::Error::other(e)))?;
 
         let mode = if recursive {
             RecursiveMode::Recursive
@@ -31,7 +31,7 @@ impl DirectoryWatcher {
 
         watcher
             .watch(path, mode)
-            .map_err(|e| ImportError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            .map_err(|e| ImportError::Io(std::io::Error::other(e)))?;
 
         Ok(Self {
             watcher,
@@ -43,10 +43,7 @@ impl DirectoryWatcher {
     pub fn next_event(&self) -> Result<Option<Event>, ImportError> {
         match self.rx.recv_timeout(Duration::from_millis(100)) {
             Ok(Ok(event)) => Ok(Some(event)),
-            Ok(Err(e)) => Err(ImportError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                e,
-            ))),
+            Ok(Err(e)) => Err(ImportError::Io(std::io::Error::other(e))),
             Err(mpsc::RecvTimeoutError::Timeout) => Ok(None),
             Err(mpsc::RecvTimeoutError::Disconnected) => Ok(None),
         }
@@ -61,10 +58,7 @@ impl DirectoryWatcher {
             }
             match self.rx.recv_timeout(Duration::from_millis(50)) {
                 Ok(Ok(event)) => {
-                    if matches!(
-                        event.kind,
-                        EventKind::Create(_) | EventKind::Modify(_)
-                    ) {
+                    if matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_)) {
                         events.push(event);
                     }
                 }

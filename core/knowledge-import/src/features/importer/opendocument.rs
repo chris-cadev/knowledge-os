@@ -16,11 +16,9 @@ fn strip_xml_tags(xml: &str) -> String {
     loop {
         match reader.read_event() {
             Ok(Event::Start(ref e)) => {
-                if e.name().as_ref() == b"text:p" || e.name().as_ref() == b"text:h" || e.name().as_ref() == b"text:span" {
-                    in_text = true;
-                } else {
-                    in_text = false;
-                }
+                in_text = e.name().as_ref() == b"text:p"
+                    || e.name().as_ref() == b"text:h"
+                    || e.name().as_ref() == b"text:span"
             }
             Ok(Event::Text(ref e)) if in_text => {
                 if let Ok(t) = e.unescape() {
@@ -42,8 +40,8 @@ fn strip_xml_tags(xml: &str) -> String {
 
 fn extract_odf_text(path: &Path, expected_content_path: &str) -> Result<String, ImportError> {
     let file = std::fs::File::open(path)?;
-    let mut archive =
-        ZipArchive::new(file).map_err(|e| ImportError::Parse(format!("not a valid ZIP/ODF: {}", e)))?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| ImportError::Parse(format!("not a valid ZIP/ODF: {}", e)))?;
     let mut content_file = archive
         .by_name(expected_content_path)
         .map_err(|_| ImportError::Parse(format!("missing {}", expected_content_path)))?;
@@ -55,8 +53,8 @@ fn extract_odf_text(path: &Path, expected_content_path: &str) -> Result<String, 
 
 fn extract_ods_text(path: &Path) -> Result<String, ImportError> {
     let file = std::fs::File::open(path)?;
-    let mut archive =
-        ZipArchive::new(file).map_err(|e| ImportError::Parse(format!("not a valid ZIP/ODS: {}", e)))?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| ImportError::Parse(format!("not a valid ZIP/ODS: {}", e)))?;
     let mut content_file = archive
         .by_name("content.xml")
         .map_err(|_| ImportError::Parse("missing content.xml".into()))?;
@@ -98,6 +96,12 @@ fn extract_ods_text(path: &Path) -> Result<String, ImportError> {
 
 pub struct OdtImporter;
 
+impl Default for OdtImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OdtImporter {
     pub fn new() -> Self {
         Self
@@ -131,11 +135,7 @@ impl ImportAdapter for OdtImporter {
             .to_lowercase();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -159,6 +159,12 @@ impl ImportAdapter for OdtImporter {
 }
 
 pub struct OdsImporter;
+
+impl Default for OdsImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl OdsImporter {
     pub fn new() -> Self {
@@ -193,11 +199,7 @@ impl ImportAdapter for OdsImporter {
             .to_lowercase();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -221,6 +223,12 @@ impl ImportAdapter for OdsImporter {
 }
 
 pub struct OdpImporter;
+
+impl Default for OdpImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl OdpImporter {
     pub fn new() -> Self {
@@ -255,11 +263,7 @@ impl ImportAdapter for OdpImporter {
             .to_lowercase();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -283,6 +287,12 @@ impl ImportAdapter for OdpImporter {
 }
 
 pub struct OdgImporter;
+
+impl Default for OdgImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl OdgImporter {
     pub fn new() -> Self {
@@ -309,11 +319,7 @@ impl ImportAdapter for OdgImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -337,6 +343,12 @@ impl ImportAdapter for OdgImporter {
 }
 
 pub struct OttImporter;
+
+impl Default for OttImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl OttImporter {
     pub fn new() -> Self {
@@ -363,11 +375,7 @@ impl ImportAdapter for OttImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -391,6 +399,12 @@ impl ImportAdapter for OttImporter {
 }
 
 pub struct OtsImporter;
+
+impl Default for OtsImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl OtsImporter {
     pub fn new() -> Self {
@@ -417,11 +431,7 @@ impl ImportAdapter for OtsImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -445,6 +455,12 @@ impl ImportAdapter for OtsImporter {
 }
 
 pub struct OtpImporter;
+
+impl Default for OtpImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl OtpImporter {
     pub fn new() -> Self {
@@ -471,11 +487,7 @@ impl ImportAdapter for OtpImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,

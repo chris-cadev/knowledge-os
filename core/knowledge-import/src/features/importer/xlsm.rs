@@ -8,6 +8,12 @@ use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 pub struct XlsmImporter;
 
+impl Default for XlsmImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl XlsmImporter {
     pub fn new() -> Self {
         Self
@@ -24,8 +30,8 @@ impl ImportAdapter for XlsmImporter {
     }
 
     async fn import(&self, path: &Path) -> Result<ImportResult, ImportError> {
-        let mut workbook = open_workbook_auto(path)
-            .map_err(|e| ImportError::Parse(e.to_string()))?;
+        let mut workbook =
+            open_workbook_auto(path).map_err(|e| ImportError::Parse(e.to_string()))?;
 
         let sheet_name = workbook
             .sheet_names()
@@ -64,11 +70,7 @@ impl ImportAdapter for XlsmImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,

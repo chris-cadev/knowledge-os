@@ -69,18 +69,12 @@ mod tests {
     #[test]
     fn test_magic_bytes_unknown() {
         let file = create_file_with_bytes(b"not a known format");
-        assert_eq!(
-            detect_format(file.path()).unwrap(),
-            DetectedFormat::Unknown
-        );
+        assert_eq!(detect_format(file.path()).unwrap(), DetectedFormat::Unknown);
     }
 
     #[test]
     fn test_magic_bytes_empty_file() {
         let file = create_file_with_bytes(b"");
-        assert_eq!(
-            detect_format(file.path()).unwrap(),
-            DetectedFormat::Unknown
-        );
+        assert_eq!(detect_format(file.path()).unwrap(), DetectedFormat::Unknown);
     }
 }

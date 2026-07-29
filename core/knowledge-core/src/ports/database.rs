@@ -75,5 +75,6 @@ impl std::error::Error for DatabaseError {}
 pub trait DatabaseSource: Send + Sync {
     async fn test_connection(&self) -> Result<ConnectionInfo, DatabaseError>;
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DatabaseError>;
-    async fn preview_table(&self, table: &str, limit: usize) -> Result<TablePreview, DatabaseError>;
+    async fn preview_table(&self, table: &str, limit: usize)
+        -> Result<TablePreview, DatabaseError>;
 }

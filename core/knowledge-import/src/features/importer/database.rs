@@ -1,9 +1,9 @@
 use async_trait::async_trait;
-use sqlx::Row;
 use knowledge_core::ports::database::{
     ColumnSchema, ConnectionInfo, DatabaseError, DatabaseSource, DbColumnValue, TableInfo,
     TablePreview,
 };
+use sqlx::Row;
 use std::path::{Path, PathBuf};
 
 pub struct SqliteDatabaseSource {
@@ -51,22 +51,20 @@ impl DatabaseSource for SqliteDatabaseSource {
             .await
             .map_err(|e| DatabaseError::Connection(e.to_string()))?;
 
-        let table_rows: Vec<(String,)> = sqlx::query_as(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
-        )
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| DatabaseError::Query(e.to_string()))?;
+        let table_rows: Vec<(String,)> =
+            sqlx::query_as("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+                .fetch_all(&pool)
+                .await
+                .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         let mut tables = Vec::new();
         for (name,) in table_rows {
-            let col_rows: Vec<(String, String, bool)> = sqlx::query_as(
-                "SELECT name, type, \"notnull\" FROM pragma_table_info(?)",
-            )
-            .bind(&name)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| DatabaseError::Query(e.to_string()))?;
+            let col_rows: Vec<(String, String, bool)> =
+                sqlx::query_as("SELECT name, type, \"notnull\" FROM pragma_table_info(?)")
+                    .bind(&name)
+                    .fetch_all(&pool)
+                    .await
+                    .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
             let columns: Vec<ColumnSchema> = col_rows
                 .into_iter()
@@ -93,24 +91,26 @@ impl DatabaseSource for SqliteDatabaseSource {
         Ok(tables)
     }
 
-    async fn preview_table(&self, table: &str, limit: usize) -> Result<TablePreview, DatabaseError> {
+    async fn preview_table(
+        &self,
+        table: &str,
+        limit: usize,
+    ) -> Result<TablePreview, DatabaseError> {
         let pool = sqlx::SqlitePool::connect(&sqlite_connect_string(&self.path))
             .await
             .map_err(|e| DatabaseError::Connection(e.to_string()))?;
 
-        let (total,): (i64,) =
-            sqlx::query_as(&format!("SELECT COUNT(*) FROM \"{}\"", table))
-                .fetch_one(&pool)
+        let (total,): (i64,) = sqlx::query_as(&format!("SELECT COUNT(*) FROM \"{}\"", table))
+            .fetch_one(&pool)
+            .await
+            .map_err(|e| DatabaseError::Query(e.to_string()))?;
+
+        let col_rows: Vec<(String, String, bool)> =
+            sqlx::query_as("SELECT name, type, \"notnull\" FROM pragma_table_info(?)")
+                .bind(table)
+                .fetch_all(&pool)
                 .await
                 .map_err(|e| DatabaseError::Query(e.to_string()))?;
-
-        let col_rows: Vec<(String, String, bool)> = sqlx::query_as(
-            "SELECT name, type, \"notnull\" FROM pragma_table_info(?)",
-        )
-        .bind(table)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         let columns: Vec<ColumnSchema> = col_rows
             .into_iter()
@@ -186,7 +186,11 @@ impl DatabaseSource for PostgresDatabaseSource {
         ))
     }
 
-    async fn preview_table(&self, _table: &str, _limit: usize) -> Result<TablePreview, DatabaseError> {
+    async fn preview_table(
+        &self,
+        _table: &str,
+        _limit: usize,
+    ) -> Result<TablePreview, DatabaseError> {
         Err(DatabaseError::NotFound(
             "PostgreSQL preview_table not yet implemented".into(),
         ))
@@ -230,7 +234,11 @@ impl DatabaseSource for MySqlDatabaseSource {
         ))
     }
 
-    async fn preview_table(&self, _table: &str, _limit: usize) -> Result<TablePreview, DatabaseError> {
+    async fn preview_table(
+        &self,
+        _table: &str,
+        _limit: usize,
+    ) -> Result<TablePreview, DatabaseError> {
         Err(DatabaseError::NotFound(
             "MySQL preview_table not yet implemented".into(),
         ))
@@ -284,9 +292,7 @@ mod tests {
     async fn test_sqlite_list_tables_empty() {
         let path = db_path("list_empty");
         // Create empty database file
-        let pool = sqlx::SqlitePool::connect(&sqlite_uri(&path))
-            .await
-            .unwrap();
+        let pool = sqlx::SqlitePool::connect(&sqlite_uri(&path)).await.unwrap();
         pool.close().await;
         let source = SqliteDatabaseSource::new(path.clone());
         let tables = source.list_tables().await.unwrap();
@@ -319,8 +325,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_connection_failure() {
-        let source =
-            PostgresDatabaseSource::new("postgres://invalid:5432/nonexistent".to_string());
+        let source = PostgresDatabaseSource::new("postgres://invalid:5432/nonexistent".to_string());
         let result = source.test_connection().await;
         assert!(result.is_err());
     }

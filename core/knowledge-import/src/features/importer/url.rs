@@ -131,8 +131,6 @@ impl UrlImporter {
             "url-json"
         } else if content_type.contains("xml") {
             "url-xml"
-        } else if content_type.contains("html") {
-            "url"
         } else {
             "url"
         };

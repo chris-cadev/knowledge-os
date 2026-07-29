@@ -14,21 +14,24 @@ impl XlsxImporter {
     }
 }
 
+impl Default for XlsxImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl ImportAdapter for XlsxImporter {
     fn can_import(&self, path: &Path) -> bool {
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         ext.eq_ignore_ascii_case("xlsx")
             || ext.eq_ignore_ascii_case("xls")
             || ext.eq_ignore_ascii_case("xlsm")
     }
 
     async fn import(&self, path: &Path) -> Result<ImportResult, ImportError> {
-        let mut workbook = open_workbook_auto(path)
-            .map_err(|e| ImportError::Parse(e.to_string()))?;
+        let mut workbook =
+            open_workbook_auto(path).map_err(|e| ImportError::Parse(e.to_string()))?;
 
         let sheet_name = workbook
             .sheet_names()
@@ -77,11 +80,7 @@ impl ImportAdapter for XlsxImporter {
         };
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,

@@ -8,6 +8,12 @@ use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 pub struct DocImporter;
 
+impl Default for DocImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DocImporter {
     pub fn new() -> Self {
         Self
@@ -36,6 +42,12 @@ impl ImportAdapter for DocImporter {
 
 pub struct XlsImporter;
 
+impl Default for XlsImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl XlsImporter {
     pub fn new() -> Self {
         Self
@@ -52,8 +64,8 @@ impl ImportAdapter for XlsImporter {
     }
 
     async fn import(&self, path: &Path) -> Result<ImportResult, ImportError> {
-        let mut workbook = open_workbook_auto(path)
-            .map_err(|e| ImportError::Parse(e.to_string()))?;
+        let mut workbook =
+            open_workbook_auto(path).map_err(|e| ImportError::Parse(e.to_string()))?;
 
         let sheet_name = workbook
             .sheet_names()
@@ -92,11 +104,7 @@ impl ImportAdapter for XlsImporter {
             .to_string();
         let components = vec![
             Component::new(entity.id, ComponentType::Title, serde_json::json!(title)),
-            Component::new(
-                entity.id,
-                ComponentType::Content,
-                serde_json::json!(text),
-            ),
+            Component::new(entity.id, ComponentType::Content, serde_json::json!(text)),
             Component::new(
                 entity.id,
                 ComponentType::Provenance,
@@ -121,6 +129,12 @@ impl ImportAdapter for XlsImporter {
 }
 
 pub struct PptImporter;
+
+impl Default for PptImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl PptImporter {
     pub fn new() -> Self {
@@ -149,6 +163,12 @@ impl ImportAdapter for PptImporter {
 }
 
 pub struct PpsImporter;
+
+impl Default for PpsImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl PpsImporter {
     pub fn new() -> Self {

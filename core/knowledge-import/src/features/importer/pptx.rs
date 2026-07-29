@@ -11,6 +11,12 @@ use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 pub struct PptxImporter;
 
+impl Default for PptxImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PptxImporter {
     pub fn new() -> Self {
         Self
@@ -52,10 +58,7 @@ impl PptxImporter {
 #[async_trait]
 impl ImportAdapter for PptxImporter {
     fn can_import(&self, path: &Path) -> bool {
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         ext.eq_ignore_ascii_case("pptx") || ext.eq_ignore_ascii_case("pps")
     }
 
@@ -67,7 +70,9 @@ impl ImportAdapter for PptxImporter {
         let mut slide_texts: Vec<(usize, String)> = Vec::new();
 
         for i in 0..archive.len() {
-            let mut entry = archive.by_index(i).map_err(|e| ImportError::Parse(e.to_string()))?;
+            let mut entry = archive
+                .by_index(i)
+                .map_err(|e| ImportError::Parse(e.to_string()))?;
             let name = entry.name().to_string();
 
             if name.starts_with("ppt/slides/slide") && name.ends_with(".xml") {

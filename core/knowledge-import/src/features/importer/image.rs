@@ -7,6 +7,12 @@ use super::adapter::{ImportAdapter, ImportError, ImportResult};
 
 pub struct ImageImporter;
 
+impl Default for ImageImporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ImageImporter {
     pub fn new() -> Self {
         Self
@@ -150,9 +156,6 @@ mod tests {
             .iter()
             .find(|c| c.component_type == ComponentType::BinaryContent)
             .unwrap();
-        assert_eq!(
-            binary.data.get("mime_type").unwrap(),
-            "image/png"
-        );
+        assert_eq!(binary.data.get("mime_type").unwrap(), "image/png");
     }
 }
