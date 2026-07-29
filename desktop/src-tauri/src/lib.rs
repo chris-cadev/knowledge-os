@@ -7,6 +7,7 @@ use knowledge_core::ports::{
     ChatCompletion, ComponentRepository, EntityRepository, RelationshipRepository, SearchIndex,
     TraversalPort, VectorStore,
 };
+use knowledge_core::services::entity_retrieval::EntityRetrievalService;
 use knowledge_derivation::features::chat::pipeline::ChatPipeline;
 use knowledge_derivation::features::search::vector_store::InMemoryVectorStore;
 use knowledge_storage::adapters::sqlite::SqliteStore;
@@ -68,23 +69,32 @@ pub fn run() {
             let search_index: Arc<dyn SearchIndex> = wrapper.clone();
             let vector_store: Arc<dyn VectorStore> =
                 Arc::new(InMemoryVectorStore::new(128));
-            let _traversal_port: Arc<dyn TraversalPort> = wrapper.clone();
+            let traversal_port: Arc<dyn TraversalPort> = wrapper.clone();
 
             let chat_provider = create_chat_provider()?;
             let chat_provider_kind = "mock".to_string();
 
             let chat_pipeline = Arc::new(ChatPipeline::new(
                 chat_provider,
+                entity_repo.clone(),
+                component_repo.clone(),
+                relationship_repo.clone(),
+                search_index.clone(),
+                vector_store,
+            ));
+
+            let entity_retrieval = Arc::new(EntityRetrievalService::new(
                 entity_repo,
                 component_repo,
                 relationship_repo,
                 search_index,
-                vector_store,
+                traversal_port,
             ));
 
             app.manage(AppState {
                 store,
                 chat_pipeline,
+                entity_retrieval,
                 chat_provider_kind,
             });
             Ok(())
