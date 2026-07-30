@@ -55,7 +55,12 @@ pub async fn import_files(
                 correlation_id,
                 path_str
             );
-            let dir_importer = DirectoryImporter::new(true);
+            let global_kosignore = state.data_dir.join(".kosignore");
+            let gi = knowledge_import::features::importer::ignore_config::resolve_ignore(
+                path,
+                Some(global_kosignore.as_path()),
+            );
+            let dir_importer = DirectoryImporter::new(true).with_ignore(gi);
             let files = match dir_importer.list_files(path) {
                 Ok(f) => {
                     log::info!(
@@ -879,7 +884,12 @@ pub async fn import_file_recursive(
     let store = &*state.store;
     let registry = built_in_plugins();
     let dir_path = std::path::Path::new(&path);
-    let dir_importer = DirectoryImporter::new(true);
+    let global_kosignore = state.data_dir.join(".kosignore");
+    let gi = knowledge_import::features::importer::ignore_config::resolve_ignore(
+        dir_path,
+        Some(global_kosignore.as_path()),
+    );
+    let dir_importer = DirectoryImporter::new(true).with_ignore(gi);
 
     let files = dir_importer.list_files(dir_path).map_err(|e| {
         log::error!(
@@ -1093,6 +1103,7 @@ pub async fn undo_import(
 /// Preview a directory before importing (shows file count and format breakdown).
 #[tauri::command]
 pub async fn import_directory_preview(
+    state: State<'_, AppState>,
     path: String,
     recursive: Option<bool>,
 ) -> Result<DirectoryPreviewResponse, String> {
@@ -1106,7 +1117,12 @@ pub async fn import_directory_preview(
     );
 
     let dir_path = std::path::Path::new(&path);
-    let dir_importer = DirectoryImporter::new(is_recursive);
+    let global_kosignore = state.data_dir.join(".kosignore");
+    let gi = knowledge_import::features::importer::ignore_config::resolve_ignore(
+        dir_path,
+        Some(global_kosignore.as_path()),
+    );
+    let dir_importer = DirectoryImporter::new(is_recursive).with_ignore(gi);
 
     let files = dir_importer.list_files(dir_path).map_err(|e| {
         log::error!(

@@ -12,6 +12,7 @@ mod store;
 pub mod chat;
 pub mod entity;
 pub mod file;
+pub mod ignore_config;
 pub mod import;
 pub mod provider;
 pub mod search;

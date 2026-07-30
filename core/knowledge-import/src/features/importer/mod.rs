@@ -5,6 +5,7 @@ pub mod database;
 pub mod directory;
 pub mod docx;
 pub mod email;
+pub mod ignore_config;
 pub mod image;
 pub mod iwork;
 pub mod legacy_office;
