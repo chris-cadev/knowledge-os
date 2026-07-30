@@ -61,6 +61,46 @@ export interface ImportError {
   message: string;
 }
 
+export interface ImportProgressItem {
+  path: string;
+  status: string;
+  action?: string;
+  error?: string;
+  entity_id?: string;
+}
+
+export interface ImportProgressResult {
+  items: ImportProgressItem[];
+  created: number;
+  merged: number;
+  errors: ImportError[];
+}
+
+export interface DirectoryPreview {
+  file_count: number;
+  total_size_bytes: number;
+  formats: Record<string, number>;
+  files: string[];
+}
+
+export interface ColumnSchemaInfo {
+  name: string;
+  data_type: string;
+  nullable: boolean;
+}
+
+export interface StructuredPreview {
+  columns: ColumnSchemaInfo[];
+  sample_rows: any[][];
+  total_rows: number;
+  format: string;
+}
+
+export interface UndoResult {
+  removed_entities: string[];
+  import_id: string;
+}
+
 export interface SearchResult {
   entity_id: string;
   title: string;

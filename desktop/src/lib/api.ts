@@ -6,6 +6,10 @@ import type {
   EntitySummary,
   EntityDetail,
   ImportResult,
+  ImportProgressResult,
+  DirectoryPreview,
+  StructuredPreview,
+  UndoResult,
   SearchResult,
   GraphOutput,
   TreeOutput,
@@ -19,8 +23,69 @@ export async function listEntities(
   return invoke("list_entities", { entityType: entityType ?? null });
 }
 
-export async function importFiles(paths: string[]): Promise<ImportResult> {
+export async function importFiles(paths: string[]): Promise<ImportProgressResult> {
   return invoke("import_files", { paths });
+}
+
+export async function importUrl(url: string): Promise<ImportProgressResult> {
+  return invoke("import_url", { url });
+}
+
+export async function importClipboard(
+  text: string,
+  sourceFormat?: string
+): Promise<ImportProgressResult> {
+  return invoke("import_clipboard", { text, sourceFormat: sourceFormat ?? null });
+}
+
+export async function importDatabase(
+  connectionString: string,
+  tables?: string[]
+): Promise<ImportProgressResult> {
+  return invoke("import_database", {
+    connectionString,
+    tables: tables ?? [],
+  });
+}
+
+export async function importFileRecursive(path: string): Promise<ImportProgressResult> {
+  return invoke("import_file_recursive", { path });
+}
+
+export async function importImage(path: string): Promise<ImportProgressResult> {
+  return invoke("import_image", { path });
+}
+
+export async function undoImport(
+  importId?: string
+): Promise<UndoResult> {
+  return invoke("undo_import", { importId: importId ?? null });
+}
+
+export async function importDirectoryPreview(
+  path: string,
+  recursive?: boolean
+): Promise<DirectoryPreview> {
+  return invoke("import_directory_preview", { path, recursive: recursive ?? null });
+}
+
+export async function importStructuredPreview(
+  path: string,
+  format: string
+): Promise<StructuredPreview> {
+  return invoke("import_structured_preview", { path, format });
+}
+
+export async function importStructured(
+  path: string,
+  format: string,
+  columnMapping?: string
+): Promise<ImportProgressResult> {
+  return invoke("import_structured", {
+    path,
+    format,
+    columnMapping: columnMapping ?? null,
+  });
 }
 
 export async function searchEntities(

@@ -74,10 +74,57 @@ pub struct ImportErrorResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[allow(dead_code)]
 pub struct ImportResultResponse {
     pub created: usize,
     pub merged: usize,
     pub errors: Vec<ImportErrorResponse>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ImportProgressItem {
+    pub path: String,
+    pub status: String,
+    pub action: Option<String>,
+    pub error: Option<String>,
+    pub entity_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ImportProgressResponse {
+    pub items: Vec<ImportProgressItem>,
+    pub created: usize,
+    pub merged: usize,
+    pub errors: Vec<ImportErrorResponse>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DirectoryPreviewResponse {
+    pub file_count: usize,
+    pub total_size_bytes: u64,
+    pub formats: std::collections::HashMap<String, usize>,
+    pub files: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ColumnSchemaResponse {
+    pub name: String,
+    pub data_type: String,
+    pub nullable: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StructuredPreviewResponse {
+    pub columns: Vec<ColumnSchemaResponse>,
+    pub sample_rows: Vec<Vec<serde_json::Value>>,
+    pub total_rows: u64,
+    pub format: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UndoImportResponse {
+    pub removed_entities: Vec<String>,
+    pub import_id: String,
 }
 
 // ---------------------------------------------------------------------------
