@@ -14,6 +14,7 @@
   import Timeline from "./views/Timeline.svelte";
   import Import from "./views/Import.svelte";
   import Search from "./views/Search.svelte";
+  import Chat from "./views/Chat.svelte";
 
   initTheme();
   initRouter();
@@ -31,6 +32,7 @@
     timeline: Timeline,
     import: Import,
     search: Search,
+    chat: Chat,
   };
 
   let CurrentView = $derived(views[state.currentView] ?? Dashboard);

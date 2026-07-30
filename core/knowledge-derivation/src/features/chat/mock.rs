@@ -28,6 +28,7 @@ impl ChatCompletion for MockChatAdapter {
         let citations = extract_mock_citations(&request, &message);
         let chunks: Vec<String> = chunk_message(&message, 8);
         let total = chunks.len();
+
         let delay_ms = self.stream_delay_ms;
 
         let stream = stream::unfold(
@@ -86,7 +87,7 @@ fn extract_mock_citations(request: &ChatRequest, message: &str) -> Vec<CitationS
             title: e.title.clone(),
             snippet: e.content.chars().take(200).collect(),
         })
-        .filter(|_| message.contains(&format!("[{}]", 1)))
+        .filter(|_| message.contains("[1]"))
         .collect()
 }
 
@@ -123,9 +124,9 @@ mod tests {
         let adapter = MockChatAdapter::default();
         let request = make_request(vec![EntityContext {
             entity_id: uuid::Uuid::new_v4(),
-            entity_type: "Article".into(),
+            entity_type: "Paper".into(),
             title: "Test Entity".into(),
-            content: "Some content".into(),
+            content: "Some content here.".into(),
             tags: vec![],
             relationships: vec![],
         }]);
@@ -138,6 +139,7 @@ mod tests {
         let adapter = MockChatAdapter::default();
         let request = make_request(vec![]);
         let response = adapter.chat(request).await.unwrap();
+        assert!(response.message.contains("don't have any entities"));
         assert!(response.citations.is_empty());
     }
 
@@ -146,9 +148,9 @@ mod tests {
         let adapter = MockChatAdapter::default();
         let request = make_request(vec![EntityContext {
             entity_id: uuid::Uuid::new_v4(),
-            entity_type: "Article".into(),
+            entity_type: "Paper".into(),
             title: "Test Entity".into(),
-            content: "Some content".into(),
+            content: "Some content here.".into(),
             tags: vec![],
             relationships: vec![],
         }]);
@@ -161,9 +163,9 @@ mod tests {
         let adapter = MockChatAdapter::default();
         let request = make_request(vec![EntityContext {
             entity_id: uuid::Uuid::new_v4(),
-            entity_type: "Article".into(),
+            entity_type: "Paper".into(),
             title: "Test Entity".into(),
-            content: "Some content".into(),
+            content: "Some content here.".into(),
             tags: vec![],
             relationships: vec![],
         }]);
@@ -178,9 +180,9 @@ mod tests {
         let adapter = MockChatAdapter::default();
         let request = make_request(vec![EntityContext {
             entity_id: uuid::Uuid::new_v4(),
-            entity_type: "Article".into(),
+            entity_type: "Paper".into(),
             title: "Test Entity".into(),
-            content: "Some content".into(),
+            content: "Some content here.".into(),
             tags: vec![],
             relationships: vec![],
         }]);
@@ -195,13 +197,18 @@ mod tests {
         }
     }
 
-    #[test]
-    fn mock_chat_response_serializable() {
-        let response = ChatResponse {
-            message: "test response".into(),
-            citations: vec![],
-            referenced_entities: vec![],
-        };
+    #[tokio::test]
+    async fn mock_chat_response_serializable() {
+        let adapter = MockChatAdapter::default();
+        let request = make_request(vec![EntityContext {
+            entity_id: uuid::Uuid::new_v4(),
+            entity_type: "Paper".into(),
+            title: "Test Entity".into(),
+            content: "Some content here.".into(),
+            tags: vec![],
+            relationships: vec![],
+        }]);
+        let response = adapter.chat(request).await.unwrap();
         let json = serde_json::to_string(&response).unwrap();
         let deserialized: ChatResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(response.message, deserialized.message);
