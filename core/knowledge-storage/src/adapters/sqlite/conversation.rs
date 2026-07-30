@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use knowledge_core::ports::{
-    ConversationDetail, ConversationRepository, ConversationSummary, MessageDetail, MessageRole,
-    StorageError,
+    CitationSource, ConversationDetail, ConversationRepository, ConversationSummary, MessageDetail,
+    MessageRole, StorageError,
 };
 use rusqlite::OptionalExtension;
 use uuid::Uuid;
@@ -238,12 +238,56 @@ impl ConversationRepository for SqliteStore {
 
             let entity_ids = extract_entity_ids(entity_refs_data);
 
+            let mut citations = Vec::new();
+            for (i, ref_id) in entity_ids.iter().enumerate() {
+                let etype: Option<String> = conn
+                    .query_row(
+                        "SELECT entity_type FROM entities WHERE id = ?1 AND is_active = 1",
+                        rusqlite::params![ref_id.to_string()],
+                        |row| row.get(0),
+                    )
+                    .optional()
+                    .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                if let Some(ref etype_json) = etype {
+                    let entity_type_str: String =
+                        serde_json::from_str(etype_json).unwrap_or_default();
+                    let title_data: Option<String> = conn
+                        .query_row(
+                            "SELECT data FROM components WHERE entity_id = ?1 AND component_type = ?2 LIMIT 1",
+                            rusqlite::params![ref_id.to_string(), component_type_json("Title")],
+                            |row| row.get(0),
+                        )
+                        .optional()
+                        .map_err(|e| StorageError::Internal(e.to_string()))?;
+                    let title = title_from_data(title_data);
+                    let snippet_data: Option<String> = conn
+                        .query_row(
+                            "SELECT data FROM components WHERE entity_id = ?1 AND component_type = ?2 LIMIT 1",
+                            rusqlite::params![ref_id.to_string(), component_type_json("Content")],
+                            |row| row.get(0),
+                        )
+                        .optional()
+                        .map_err(|e| StorageError::Internal(e.to_string()))?;
+                    let snippet = snippet_data
+                        .and_then(|s| serde_json::from_str::<String>(&s).ok())
+                        .unwrap_or_default();
+                    citations.push(CitationSource {
+                        number: i + 1,
+                        entity_id: *ref_id,
+                        entity_type: entity_type_str,
+                        title,
+                        snippet: snippet.chars().take(200).collect(),
+                    });
+                }
+            }
+
             messages.push(MessageDetail {
                 id: msg_id,
                 role,
                 text,
                 entity_refs: entity_ids,
-                citations: vec![],
+                citations,
                 created_at: msg_entity.created_at,
             });
         }

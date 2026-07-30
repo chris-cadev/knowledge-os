@@ -2,19 +2,12 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::features::component::Component;
+use crate::ports::MessageRole;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MessageContentData {
     pub role: MessageRole,
     pub text: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum MessageRole {
-    System,
-    User,
-    Assistant,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

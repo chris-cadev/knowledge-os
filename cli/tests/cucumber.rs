@@ -1,4 +1,9 @@
 use cucumber::{gherkin::Step, given, then, when, World};
+use knowledge_core::features::component::{Component, ComponentType};
+use knowledge_core::features::entity::{Entity, EntityType};
+use knowledge_core::features::relationship::{Relationship, RelationshipType};
+use knowledge_core::ports::{ComponentRepository, EntityRepository, RelationshipRepository};
+use knowledge_storage::adapters::sqlite::SqliteStore;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -122,6 +127,165 @@ async fn empty_database(world: &mut CliWorld) {
 }
 
 // =============================================================================
+// Knowledge Base Steps
+// =============================================================================
+
+#[given("an empty knowledge base")]
+async fn empty_knowledge_base(world: &mut CliWorld) {
+    world.temp_dir = Some(TempDir::new().unwrap());
+    world.last_output = None;
+    world.last_entity_id = None;
+    world.last_collection_id = None;
+    world.last_merge_id = None;
+    world.files.clear();
+    world.entity_ids.clear();
+}
+
+// =============================================================================
+// Conversation Steps
+// =============================================================================
+
+#[given(expr = "a conversation {string} with {int} message(s)")]
+async fn create_conversation_with_messages(world: &mut CliWorld, title: String, count: usize) {
+    let db_path = world.temp_path().join("test.db");
+    let store = SqliteStore::new(db_path.to_str().unwrap()).unwrap();
+
+    let conv = Entity::new(EntityType::new("Conversation"));
+    EntityRepository::save(&store, &conv).await.unwrap();
+
+    let title_comp = Component::new(conv.id, ComponentType::Title, serde_json::json!(title));
+    ComponentRepository::save(&store, &title_comp)
+        .await
+        .unwrap();
+
+    for i in 0..count {
+        let role = if i % 2 == 0 { "user" } else { "assistant" };
+        let msg = Entity::new(EntityType::new("Message"));
+        EntityRepository::save(&store, &msg).await.unwrap();
+
+        let content_comp = Component::new(
+            msg.id,
+            ComponentType::MessageContent,
+            serde_json::json!({
+                "role": role,
+                "text": format!("Message {} content.", i + 1),
+            }),
+        );
+        ComponentRepository::save(&store, &content_comp)
+            .await
+            .unwrap();
+
+        let rel = Relationship::new(conv.id, msg.id, RelationshipType::HasMessage);
+        RelationshipRepository::save(&store, &rel).await.unwrap();
+    }
+
+    world.last_entity_id = Some(conv.id.to_string());
+}
+
+#[when("I extract the conversation ID from the last output")]
+async fn extract_conversation_id(world: &mut CliWorld) {
+    let stdout = world.stdout();
+    for line in stdout.lines() {
+        if let Some(uuid) = extract_uuid(line) {
+            world.last_entity_id = Some(uuid);
+            return;
+        }
+    }
+    // If no UUID found in output (e.g. created via store directly), keep existing last_entity_id
+}
+
+#[then(expr = "the output is empty")]
+async fn assert_output_empty(world: &mut CliWorld) {
+    let stdout = world.stdout();
+    let stderr = world.stderr();
+    assert!(
+        stdout.is_empty(),
+        "Expected empty stdout, got:\nstdout: {}\nstderr: {}",
+        stdout,
+        stderr
+    );
+}
+
+#[then(expr = "the output contains {string} before {string}")]
+async fn assert_output_contains_before(world: &mut CliWorld, first: String, second: String) {
+    let stdout = world.stdout();
+    let first_pos = stdout.find(&first).unwrap_or(usize::MAX);
+    let second_pos = stdout.find(&second).unwrap_or(usize::MAX);
+    assert!(
+        first_pos < second_pos,
+        "Expected '{}' to appear before '{}' in output, but got:\n{}",
+        first,
+        second,
+        stdout
+    );
+}
+
+#[then(expr = "the conversation title is {string}")]
+async fn assert_conversation_title(world: &mut CliWorld, title: String) {
+    let stdout = world.stdout();
+    assert!(
+        stdout.contains(&title),
+        "Expected conversation title '{}' in output, got:\n{}",
+        title,
+        stdout
+    );
+}
+
+#[then(expr = "the conversation is not in {string}")]
+async fn assert_conversation_not_in(world: &mut CliWorld, command: String) {
+    let id = world.last_entity_id.clone().unwrap_or_default();
+    let mut args: Vec<&str> = command.split_whitespace().collect();
+    if args.first() == Some(&"kos") {
+        args.remove(0);
+    }
+    let output = world.run_kos_direct(&args);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    assert!(
+        !stdout.contains(&id),
+        "Expected conversation {} to not appear in '{}' output, but got:\n{}",
+        id,
+        command,
+        stdout
+    );
+}
+
+#[then(expr = "all {int} messages are archived")]
+async fn assert_all_messages_archived(world: &mut CliWorld, count: usize) {
+    let conv_id = world.last_entity_id.clone().unwrap();
+    let db_path = world.temp_path().join("test.db");
+    let conn = rusqlite::Connection::open(db_path).unwrap();
+    let has_msg_type = serde_json::to_string("HasMessage").unwrap();
+    let mut stmt = conn
+        .prepare(
+            "SELECT e.is_active FROM entities e
+             JOIN relationships r ON r.target_id = e.id
+             WHERE r.source_id = ?1 AND r.relationship_type = ?2 AND r.is_active = 1",
+        )
+        .unwrap();
+    let rows: Vec<i32> = stmt
+        .query_map(rusqlite::params![conv_id, has_msg_type], |row| {
+            row.get::<_, i32>(0)
+        })
+        .unwrap()
+        .map(|r| r.unwrap())
+        .collect();
+    assert_eq!(
+        rows.len(),
+        count,
+        "Expected {} messages, found {}",
+        count,
+        rows.len()
+    );
+    for (i, active) in rows.iter().enumerate() {
+        assert_eq!(
+            *active, 0,
+            "Expected message {} to be archived (is_active = 0), but got {}",
+            i, active
+        );
+    }
+}
+
+// =============================================================================
 // File Setup
 // =============================================================================
 
@@ -206,6 +370,7 @@ async fn run_kos_command(world: &mut CliWorld, cmd: String) {
     let mut expanded = cmd.replace("<directory>", &world.temp_path().to_string_lossy());
     if let Some(ref id) = entity_id {
         expanded = expanded.replace("<entity-id>", id);
+        expanded = expanded.replace("<id>", id);
     }
     if let Some(ref id) = collection_id {
         expanded = expanded.replace("<collection-id>", id);
@@ -213,11 +378,30 @@ async fn run_kos_command(world: &mut CliWorld, cmd: String) {
     if let Some(ref id) = merge_id {
         expanded = expanded.replace("<merge-id>", id);
     }
-    let mut args: Vec<&str> = expanded.split_whitespace().collect();
-    if args.first() == Some(&"kos") {
-        args.remove(0);
+    let mut args: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    for ch in expanded.chars() {
+        match ch {
+            '"' => in_quotes = !in_quotes,
+            ' ' if !in_quotes => {
+                if !current.is_empty() {
+                    args.push(current.clone());
+                    current.clear();
+                }
+            }
+            _ => current.push(ch),
+        }
     }
-    world.run_kos(&args);
+    if !current.is_empty() {
+        args.push(current);
+    }
+    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    if args_ref.first() == Some(&"kos") {
+        world.run_kos(&args_ref[1..]);
+    } else {
+        world.run_kos(&args_ref);
+    }
 }
 
 #[when("I extract the entity ID from the last import")]
@@ -637,6 +821,7 @@ async fn run_kos_with_plugin_dir(world: &mut CliWorld, _plugin_dir_name: String,
     let mut expanded = cmd.replace("<directory>", &world.temp_path().to_string_lossy());
     if let Some(ref id) = entity_id {
         expanded = expanded.replace("<entity-id>", id);
+        expanded = expanded.replace("<id>", id);
     }
     if let Some(ref id) = collection_id {
         expanded = expanded.replace("<collection-id>", id);
@@ -644,11 +829,30 @@ async fn run_kos_with_plugin_dir(world: &mut CliWorld, _plugin_dir_name: String,
     if let Some(ref id) = merge_id {
         expanded = expanded.replace("<merge-id>", id);
     }
-    let mut args: Vec<&str> = expanded.split_whitespace().collect();
-    if args.first() == Some(&"kos") {
-        args.remove(0);
+    let mut args: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    for ch in expanded.chars() {
+        match ch {
+            '"' => in_quotes = !in_quotes,
+            ' ' if !in_quotes => {
+                if !current.is_empty() {
+                    args.push(current.clone());
+                    current.clear();
+                }
+            }
+            _ => current.push(ch),
+        }
     }
-    world.run_kos_with_env(&args, &[("KOS_PLUGIN_DIR", &plugin_dir_str)]);
+    if !current.is_empty() {
+        args.push(current);
+    }
+    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    if args_ref.first() == Some(&"kos") {
+        world.run_kos_with_env(&args_ref[1..], &[("KOS_PLUGIN_DIR", &plugin_dir_str)]);
+    } else {
+        world.run_kos_with_env(&args_ref, &[("KOS_PLUGIN_DIR", &plugin_dir_str)]);
+    }
 }
 
 // =============================================================================

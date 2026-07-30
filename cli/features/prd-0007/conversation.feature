@@ -17,9 +17,9 @@ Feature: Conversation CLI
     Then the output contains "Q3 review"
 
   Scenario: Rename conversation
-    Given a conversation "Old name" with 1 message
+    Given a conversation "Old" with 1 message
     When I extract the conversation ID from the last output
-    And I run "conversation rename <id> New name"
+    And I run "conversation rename <id> Renamed"
     Then the output contains "renamed"
 
   Scenario: Delete conversation archives it
