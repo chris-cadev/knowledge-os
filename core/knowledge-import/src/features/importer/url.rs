@@ -119,7 +119,7 @@ impl UrlImporter {
 
         // Extract title from HTML or use URL
         let title = if content_type.contains("html") {
-            extract_html_title(content).unwrap_or_else(|| url.to_string())
+            super::html::extract_html_title(content).unwrap_or_else(|| url.to_string())
         } else {
             url.to_string()
         };
@@ -135,9 +135,9 @@ impl UrlImporter {
             "url"
         };
 
-        // Convert HTML to text (simple extraction)
+        // Convert HTML to text
         let text_content = if content_type.contains("html") {
-            html_to_text(content)
+            super::html::html_to_text(content)
         } else {
             content.to_string()
         };
@@ -200,55 +200,6 @@ impl ImportAdapter for UrlImporter {
     }
 }
 
-fn extract_html_title(html: &str) -> Option<String> {
-    // Simple regex to find <title> tag
-    let re = regex::Regex::new(r"(?i)<title[^>]*>([^<]+)</title>").ok()?;
-    let caps = re.captures(html)?;
-    Some(caps[1].trim().to_string())
-}
-
-fn html_to_text(html: &str) -> String {
-    // Very simple HTML to text conversion
-    // In production, use a proper HTML parser like html5ever or scraper
-    let mut text = String::new();
-    let mut in_tag = false;
-
-    for c in html.chars() {
-        match c {
-            '<' => in_tag = true,
-            '>' if in_tag => {
-                in_tag = false;
-                text.push(' ');
-            }
-            '&' if !in_tag => {
-                // Handle common HTML entities
-                text.push(' ');
-            }
-            _ if !in_tag => {
-                text.push(c);
-            }
-            _ => {}
-        }
-    }
-
-    // Collapse whitespace
-    let mut result = String::new();
-    let mut prev_was_space = false;
-    for c in text.chars() {
-        if c.is_whitespace() {
-            if !prev_was_space {
-                result.push(' ');
-                prev_was_space = true;
-            }
-        } else {
-            result.push(c);
-            prev_was_space = false;
-        }
-    }
-
-    result.trim().to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,13 +223,16 @@ mod tests {
 <body></body>
 </html>"#;
 
-        assert_eq!(extract_html_title(html), Some("My Page Title".to_string()));
+        assert_eq!(
+            super::super::html::extract_html_title(html),
+            Some("My Page Title".to_string())
+        );
     }
 
     #[test]
     fn test_html_to_text() {
         let html = "<h1>Hello</h1><p>This is a <strong>test</strong>.</p>";
-        let text = html_to_text(html);
+        let text = super::super::html::html_to_text(html);
         assert!(text.contains("Hello"));
         assert!(text.contains("test"));
     }
