@@ -12,10 +12,9 @@ use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::{Entity, EntityType};
 use knowledge_core::features::relationship::{Relationship, RelationshipType};
 use knowledge_core::ports::{
-    Collection, CollectionRepository, ComponentRepository, EntityRepository,
-    EventLog, RelationshipRepository, SearchIndex, SearchQuery, TraversalConfig,
-    TraversalDirection, TraversalPort, TraversalQuery, TransactionalWrite, ViewFilter, ViewOutput,
-    ViewRegistry,
+    Collection, CollectionRepository, ComponentRepository, EntityRepository, EventLog,
+    RelationshipRepository, SearchIndex, SearchQuery, TransactionalWrite, TraversalConfig,
+    TraversalDirection, TraversalPort, TraversalQuery, ViewFilter, ViewOutput, ViewRegistry,
 };
 use knowledge_derivation::features::view::{
     graph::GraphViewAdapter, table::TableViewAdapter, timeline::TimelineViewAdapter,
@@ -157,7 +156,10 @@ async fn main() {
         .route("/v1/entities/:id/components", get(get_components))
         // Relationships
         .route("/v1/relationships", post(create_relationship))
-        .route("/v1/entities/:id/relationships", get(get_entity_relationships))
+        .route(
+            "/v1/entities/:id/relationships",
+            get(get_entity_relationships),
+        )
         // Search
         .route("/v1/search", get(search_entities))
         // Traversal
@@ -168,10 +170,16 @@ async fn main() {
         .route("/v1/views/table", get(table_view))
         .route("/v1/views/timeline", get(timeline_view))
         // Collections
-        .route("/v1/collections", get(list_collections).post(create_collection))
+        .route(
+            "/v1/collections",
+            get(list_collections).post(create_collection),
+        )
         .route("/v1/collections/:id", delete(delete_collection))
         .route("/v1/collections/:id/members", get(get_collection_members))
-        .route("/v1/collections/:id/members/:entity_id", post(add_collection_member))
+        .route(
+            "/v1/collections/:id/members/:entity_id",
+            post(add_collection_member),
+        )
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
@@ -291,35 +299,33 @@ async fn get_entity(
             error: e.to_string(),
         })?;
 
-    let outgoing =
-        RelationshipRepository::by_source(state.store.as_ref(), entity.id)
-            .await
-            .map_err(|e| ApiError {
-                error: e.to_string(),
-            })?
-            .into_iter()
-            .map(|r| RelationshipData {
-                id: r.id.to_string(),
-                relationship_type: format!("{:?}", r.relationship_type),
-                source_id: r.source_id.to_string(),
-                target_id: r.target_id.to_string(),
-            })
-            .collect();
+    let outgoing = RelationshipRepository::by_source(state.store.as_ref(), entity.id)
+        .await
+        .map_err(|e| ApiError {
+            error: e.to_string(),
+        })?
+        .into_iter()
+        .map(|r| RelationshipData {
+            id: r.id.to_string(),
+            relationship_type: format!("{:?}", r.relationship_type),
+            source_id: r.source_id.to_string(),
+            target_id: r.target_id.to_string(),
+        })
+        .collect();
 
-    let incoming =
-        RelationshipRepository::by_target(state.store.as_ref(), entity.id)
-            .await
-            .map_err(|e| ApiError {
-                error: e.to_string(),
-            })?
-            .into_iter()
-            .map(|r| RelationshipData {
-                id: r.id.to_string(),
-                relationship_type: format!("{:?}", r.relationship_type),
-                source_id: r.source_id.to_string(),
-                target_id: r.target_id.to_string(),
-            })
-            .collect();
+    let incoming = RelationshipRepository::by_target(state.store.as_ref(), entity.id)
+        .await
+        .map_err(|e| ApiError {
+            error: e.to_string(),
+        })?
+        .into_iter()
+        .map(|r| RelationshipData {
+            id: r.id.to_string(),
+            relationship_type: format!("{:?}", r.relationship_type),
+            source_id: r.source_id.to_string(),
+            target_id: r.target_id.to_string(),
+        })
+        .collect();
 
     let events = EventLog::list_by_entity(state.store.as_ref(), entity.id)
         .await
@@ -505,7 +511,6 @@ async fn get_entity_relationships(
 
 // ---- Search ----
 
-
 async fn search_entities(
     State(state): State<ApiState>,
     Query(params): Query<SearchParams>,
@@ -527,7 +532,8 @@ async fn search_entities(
             .await
             .map_err(|e| ApiError {
                 error: e.to_string(),
-            })? {
+            })?
+        {
             let components = ComponentRepository::get(state.store.as_ref(), entity.id)
                 .await
                 .map_err(|e| ApiError {
@@ -595,7 +601,6 @@ async fn traverse_graph(
 
 // ---- Views ----
 
-
 use async_trait::async_trait;
 
 struct StoreWrapper(Arc<SqliteStore>);
@@ -614,29 +619,48 @@ impl EntityRepository for StoreWrapper {
     async fn list(&self) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
         EntityRepository::list(self.0.as_ref()).await
     }
-    async fn find_by_type(&self, entity_type: &str) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
+    async fn find_by_type(
+        &self,
+        entity_type: &str,
+    ) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
         EntityRepository::find_by_type(self.0.as_ref(), entity_type).await
     }
-    async fn find_by_title(&self, title: &str) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
+    async fn find_by_title(
+        &self,
+        title: &str,
+    ) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
         EntityRepository::find_by_title(self.0.as_ref(), title).await
     }
     async fn increment_version(&self, id: Uuid) -> Result<(), knowledge_core::ports::StorageError> {
         EntityRepository::increment_version(self.0.as_ref(), id).await
     }
-    async fn find_by_component_type(&self, component_type: &str) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
+    async fn find_by_component_type(
+        &self,
+        component_type: &str,
+    ) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
         EntityRepository::find_by_component_type(self.0.as_ref(), component_type).await
     }
-    async fn find_by_tag(&self, tag: &str) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
+    async fn find_by_tag(
+        &self,
+        tag: &str,
+    ) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
         EntityRepository::find_by_tag(self.0.as_ref(), tag).await
     }
-    async fn get_version_history(&self, entity_id: Uuid) -> Result<Vec<knowledge_core::ports::EntityVersion>, knowledge_core::ports::StorageError> {
+    async fn get_version_history(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<knowledge_core::ports::EntityVersion>, knowledge_core::ports::StorageError>
+    {
         EntityRepository::get_version_history(self.0.as_ref(), entity_id).await
     }
 }
 
 #[async_trait]
 impl ComponentRepository for StoreWrapper {
-    async fn get(&self, entity_id: Uuid) -> Result<Vec<Component>, knowledge_core::ports::StorageError> {
+    async fn get(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<Component>, knowledge_core::ports::StorageError> {
         ComponentRepository::get(self.0.as_ref(), entity_id).await
     }
     async fn save(&self, component: &Component) -> Result<(), knowledge_core::ports::StorageError> {
@@ -645,64 +669,123 @@ impl ComponentRepository for StoreWrapper {
     async fn delete(&self, id: Uuid) -> Result<(), knowledge_core::ports::StorageError> {
         ComponentRepository::delete(self.0.as_ref(), id).await
     }
-    async fn find_by_type(&self, entity_id: Uuid, component_type: &str) -> Result<Vec<Component>, knowledge_core::ports::StorageError> {
+    async fn find_by_type(
+        &self,
+        entity_id: Uuid,
+        component_type: &str,
+    ) -> Result<Vec<Component>, knowledge_core::ports::StorageError> {
         ComponentRepository::find_by_type(self.0.as_ref(), entity_id, component_type).await
     }
-    async fn update_data(&self, id: Uuid, data: serde_json::Value) -> Result<(), knowledge_core::ports::StorageError> {
+    async fn update_data(
+        &self,
+        id: Uuid,
+        data: serde_json::Value,
+    ) -> Result<(), knowledge_core::ports::StorageError> {
         ComponentRepository::update_data(self.0.as_ref(), id, data).await
     }
-    async fn find_by_component_data(&self, component_type: &str, json_path: &str, value: &str) -> Result<Vec<Component>, knowledge_core::ports::StorageError> {
-        ComponentRepository::find_by_component_data(self.0.as_ref(), component_type, json_path, value).await
+    async fn find_by_component_data(
+        &self,
+        component_type: &str,
+        json_path: &str,
+        value: &str,
+    ) -> Result<Vec<Component>, knowledge_core::ports::StorageError> {
+        ComponentRepository::find_by_component_data(
+            self.0.as_ref(),
+            component_type,
+            json_path,
+            value,
+        )
+        .await
     }
-    async fn delete_by_entity(&self, entity_id: Uuid) -> Result<(), knowledge_core::ports::StorageError> {
+    async fn delete_by_entity(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<(), knowledge_core::ports::StorageError> {
         ComponentRepository::delete_by_entity(self.0.as_ref(), entity_id).await
     }
 }
 
 #[async_trait]
 impl RelationshipRepository for StoreWrapper {
-    async fn get(&self, id: Uuid) -> Result<Option<Relationship>, knowledge_core::ports::StorageError> {
+    async fn get(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<Relationship>, knowledge_core::ports::StorageError> {
         RelationshipRepository::get(self.0.as_ref(), id).await
     }
-    async fn save(&self, relationship: &Relationship) -> Result<(), knowledge_core::ports::StorageError> {
+    async fn save(
+        &self,
+        relationship: &Relationship,
+    ) -> Result<(), knowledge_core::ports::StorageError> {
         RelationshipRepository::save(self.0.as_ref(), relationship).await
     }
-    async fn update(&self, relationship: &Relationship) -> Result<(), knowledge_core::ports::StorageError> {
+    async fn update(
+        &self,
+        relationship: &Relationship,
+    ) -> Result<(), knowledge_core::ports::StorageError> {
         RelationshipRepository::update(self.0.as_ref(), relationship).await
     }
     async fn delete(&self, id: Uuid) -> Result<(), knowledge_core::ports::StorageError> {
         RelationshipRepository::delete(self.0.as_ref(), id).await
     }
-    async fn by_source(&self, source_id: Uuid) -> Result<Vec<Relationship>, knowledge_core::ports::StorageError> {
+    async fn by_source(
+        &self,
+        source_id: Uuid,
+    ) -> Result<Vec<Relationship>, knowledge_core::ports::StorageError> {
         RelationshipRepository::by_source(self.0.as_ref(), source_id).await
     }
-    async fn by_target(&self, target_id: Uuid) -> Result<Vec<Relationship>, knowledge_core::ports::StorageError> {
+    async fn by_target(
+        &self,
+        target_id: Uuid,
+    ) -> Result<Vec<Relationship>, knowledge_core::ports::StorageError> {
         RelationshipRepository::by_target(self.0.as_ref(), target_id).await
     }
-    async fn find_by_source_and_target(&self, source_id: Uuid, target_id: Uuid) -> Result<Option<Relationship>, knowledge_core::ports::StorageError> {
-        RelationshipRepository::find_by_source_and_target(self.0.as_ref(), source_id, target_id).await
+    async fn find_by_source_and_target(
+        &self,
+        source_id: Uuid,
+        target_id: Uuid,
+    ) -> Result<Option<Relationship>, knowledge_core::ports::StorageError> {
+        RelationshipRepository::find_by_source_and_target(self.0.as_ref(), source_id, target_id)
+            .await
     }
-    async fn find_by_type(&self, relationship_type: &str) -> Result<Vec<Relationship>, knowledge_core::ports::StorageError> {
+    async fn find_by_type(
+        &self,
+        relationship_type: &str,
+    ) -> Result<Vec<Relationship>, knowledge_core::ports::StorageError> {
         RelationshipRepository::find_by_type(self.0.as_ref(), relationship_type).await
     }
 }
 
 #[async_trait]
 impl TraversalPort for StoreWrapper {
-    async fn traverse(&self, query: &TraversalQuery, config: &TraversalConfig) -> Result<Vec<knowledge_core::ports::TraversalResult>, knowledge_core::ports::TraversalError> {
+    async fn traverse(
+        &self,
+        query: &TraversalQuery,
+        config: &TraversalConfig,
+    ) -> Result<Vec<knowledge_core::ports::TraversalResult>, knowledge_core::ports::TraversalError>
+    {
         TraversalPort::traverse(self.0.as_ref(), query, config).await
     }
 }
 
 #[async_trait]
 impl CollectionRepository for StoreWrapper {
-    async fn create(&self, collection: Collection) -> Result<Collection, knowledge_core::ports::StorageError> {
+    async fn create(
+        &self,
+        collection: Collection,
+    ) -> Result<Collection, knowledge_core::ports::StorageError> {
         CollectionRepository::create(self.0.as_ref(), collection).await
     }
-    async fn get(&self, id: Uuid) -> Result<Option<Collection>, knowledge_core::ports::StorageError> {
+    async fn get(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<Collection>, knowledge_core::ports::StorageError> {
         CollectionRepository::get(self.0.as_ref(), id).await
     }
-    async fn update(&self, collection: Collection) -> Result<Collection, knowledge_core::ports::StorageError> {
+    async fn update(
+        &self,
+        collection: Collection,
+    ) -> Result<Collection, knowledge_core::ports::StorageError> {
         CollectionRepository::update(self.0.as_ref(), collection).await
     }
     async fn delete(&self, id: Uuid) -> Result<(), knowledge_core::ports::StorageError> {
@@ -711,19 +794,37 @@ impl CollectionRepository for StoreWrapper {
     async fn list(&self) -> Result<Vec<Collection>, knowledge_core::ports::StorageError> {
         CollectionRepository::list(self.0.as_ref()).await
     }
-    async fn add_member(&self, collection_id: Uuid, entity_id: Uuid) -> Result<(), knowledge_core::ports::StorageError> {
+    async fn add_member(
+        &self,
+        collection_id: Uuid,
+        entity_id: Uuid,
+    ) -> Result<(), knowledge_core::ports::StorageError> {
         CollectionRepository::add_member(self.0.as_ref(), collection_id, entity_id).await
     }
-    async fn remove_member(&self, collection_id: Uuid, entity_id: Uuid) -> Result<(), knowledge_core::ports::StorageError> {
+    async fn remove_member(
+        &self,
+        collection_id: Uuid,
+        entity_id: Uuid,
+    ) -> Result<(), knowledge_core::ports::StorageError> {
         CollectionRepository::remove_member(self.0.as_ref(), collection_id, entity_id).await
     }
-    async fn get_members(&self, collection_id: Uuid) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
+    async fn get_members(
+        &self,
+        collection_id: Uuid,
+    ) -> Result<Vec<Entity>, knowledge_core::ports::StorageError> {
         CollectionRepository::get_members(self.0.as_ref(), collection_id).await
     }
-    async fn get_entity_collections(&self, entity_id: Uuid) -> Result<Vec<Collection>, knowledge_core::ports::StorageError> {
+    async fn get_entity_collections(
+        &self,
+        entity_id: Uuid,
+    ) -> Result<Vec<Collection>, knowledge_core::ports::StorageError> {
         CollectionRepository::get_entity_collections(self.0.as_ref(), entity_id).await
     }
-    async fn is_member(&self, collection_id: Uuid, entity_id: Uuid) -> Result<bool, knowledge_core::ports::StorageError> {
+    async fn is_member(
+        &self,
+        collection_id: Uuid,
+        entity_id: Uuid,
+    ) -> Result<bool, knowledge_core::ports::StorageError> {
         CollectionRepository::is_member(self.0.as_ref(), collection_id, entity_id).await
     }
 }
@@ -752,17 +853,20 @@ fn build_view_registry(state: &ApiState) -> ViewRegistry {
     registry
 }
 
-async fn tree_view(
-    State(state): State<ApiState>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+async fn tree_view(State(state): State<ApiState>) -> Result<Json<serde_json::Value>, ApiError> {
     let registry = build_view_registry(&state);
     let filter = ViewFilter::default();
-    let output = registry.render("tree", &filter).await.map_err(|e| ApiError {
-        error: e.to_string(),
-    })?;
+    let output = registry
+        .render("tree", &filter)
+        .await
+        .map_err(|e| ApiError {
+            error: e.to_string(),
+        })?;
     match output {
         ViewOutput::Tree(data) => Ok(Json(serde_json::json!(data))),
-        _ => Err(ApiError { error: "unexpected view output".into() }),
+        _ => Err(ApiError {
+            error: "unexpected view output".into(),
+        }),
     }
 }
 
@@ -776,40 +880,51 @@ async fn graph_view(
         max_depth: params.get("depth").and_then(|d| d.parse().ok()),
         ..Default::default()
     };
-    let output = registry.render("graph", &filter).await.map_err(|e| ApiError {
-        error: e.to_string(),
-    })?;
+    let output = registry
+        .render("graph", &filter)
+        .await
+        .map_err(|e| ApiError {
+            error: e.to_string(),
+        })?;
     match output {
         ViewOutput::Graph(data) => Ok(Json(serde_json::json!(data))),
-        _ => Err(ApiError { error: "unexpected view output".into() }),
+        _ => Err(ApiError {
+            error: "unexpected view output".into(),
+        }),
     }
 }
 
-async fn table_view(
-    State(state): State<ApiState>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+async fn table_view(State(state): State<ApiState>) -> Result<Json<serde_json::Value>, ApiError> {
     let registry = build_view_registry(&state);
     let filter = ViewFilter::default();
-    let output = registry.render("table", &filter).await.map_err(|e| ApiError {
-        error: e.to_string(),
-    })?;
+    let output = registry
+        .render("table", &filter)
+        .await
+        .map_err(|e| ApiError {
+            error: e.to_string(),
+        })?;
     match output {
         ViewOutput::Table(data) => Ok(Json(serde_json::json!(data))),
-        _ => Err(ApiError { error: "unexpected view output".into() }),
+        _ => Err(ApiError {
+            error: "unexpected view output".into(),
+        }),
     }
 }
 
-async fn timeline_view(
-    State(state): State<ApiState>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+async fn timeline_view(State(state): State<ApiState>) -> Result<Json<serde_json::Value>, ApiError> {
     let registry = build_view_registry(&state);
     let filter = ViewFilter::default();
-    let output = registry.render("timeline", &filter).await.map_err(|e| ApiError {
-        error: e.to_string(),
-    })?;
+    let output = registry
+        .render("timeline", &filter)
+        .await
+        .map_err(|e| ApiError {
+            error: e.to_string(),
+        })?;
     match output {
         ViewOutput::Timeline(data) => Ok(Json(serde_json::json!(data))),
-        _ => Err(ApiError { error: "unexpected view output".into() }),
+        _ => Err(ApiError {
+            error: "unexpected view output".into(),
+        }),
     }
 }
 

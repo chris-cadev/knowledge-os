@@ -27,9 +27,7 @@ fn title_from_data(data: Option<String>) -> String {
         .unwrap_or_else(|| "Untitled".to_string())
 }
 
-fn extract_role_and_text(
-    data: Option<String>,
-) -> (MessageRole, String) {
+fn extract_role_and_text(data: Option<String>) -> (MessageRole, String) {
     data.and_then(|d| {
         let v: serde_json::Value = serde_json::from_str(&d).ok()?;
         Some((
@@ -41,7 +39,10 @@ fn extract_role_and_text(
                     _ => MessageRole::System,
                 })
                 .unwrap_or(MessageRole::User),
-            v.get("text").and_then(|t| t.as_str()).unwrap_or("").to_string(),
+            v.get("text")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string(),
         ))
     })
     .unwrap_or((MessageRole::User, String::new()))
@@ -50,13 +51,12 @@ fn extract_role_and_text(
 fn extract_entity_ids(data: Option<String>) -> Vec<Uuid> {
     data.and_then(|d| {
         let v: serde_json::Value = serde_json::from_str(&d).ok()?;
-        v.get("entity_ids")
-            .and_then(|ids| {
-                ids.as_array()?
-                    .iter()
-                    .map(|id| Uuid::parse_str(id.as_str()?).ok())
-                    .collect::<Option<Vec<_>>>()
-            })
+        v.get("entity_ids").and_then(|ids| {
+            ids.as_array()?
+                .iter()
+                .map(|id| Uuid::parse_str(id.as_str()?).ok())
+                .collect::<Option<Vec<_>>>()
+        })
     })
     .unwrap_or_default()
 }
@@ -120,9 +120,7 @@ impl ConversationRepository for SqliteStore {
                                 .take(100)
                                 .collect::<String>()
                                 .replace('\n', " ");
-                            let dt = last_msg_at
-                                .as_ref()
-                                .map(|s| parse_rfc3339(s));
+                            let dt = last_msg_at.as_ref().map(|s| parse_rfc3339(s));
                             (Some(preview), dt)
                         } else {
                             (None, None)

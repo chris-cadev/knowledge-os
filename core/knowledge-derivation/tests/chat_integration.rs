@@ -1,4 +1,4 @@
-use knowledge_core::ports::chat::*;
+use knowledge_core::ports::*;
 use knowledge_derivation::features::chat::factory::create_chat_provider;
 
 #[test]
