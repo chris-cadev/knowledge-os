@@ -61,10 +61,8 @@ impl ImportAdapter for ImageImporter {
 
     async fn import(&self, path: &Path) -> Result<ImportResult, ImportError> {
         let bytes = std::fs::read(path)?;
-
         let mime_type = mime_for_extension(path)
             .ok_or_else(|| ImportError::UnsupportedFormat("unknown image mime type".to_string()))?;
-
         let title = path
             .file_stem()
             .and_then(|s| s.to_str())
@@ -84,8 +82,6 @@ impl ImportAdapter for ImageImporter {
                     "size": size,
                 }),
             ),
-        ];
-
         if let Some(ref ocr) = self.ocr_provider {
             match ocr.process_image(entity.id, bytes, mime_type).await {
                 Ok(text) => {
@@ -168,7 +164,7 @@ mod tests {
             0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR chunk length + type
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // width=1, height=1
             0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // bit depth, color type
-            0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41, // CRC + IDAT chunk
+            0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x48, 0x44, // CRC + IDAT chunk
             0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x01, 0x36,
             0x28, 0x19, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, // IEND chunk
             0xae, 0x42, 0x60, 0x82,

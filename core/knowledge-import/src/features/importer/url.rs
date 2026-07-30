@@ -124,6 +124,17 @@ impl UrlImporter {
             url.to_string()
         };
 
+        // Determine format based on content type
+        let format = if content_type.contains("csv") {
+            "url-csv"
+        } else if content_type.contains("json") {
+            "url-json"
+        } else if content_type.contains("xml") {
+            "url-xml"
+        } else {
+            "url"
+        };
+
         // Convert HTML to text (simple extraction)
         let text_content = if content_type.contains("html") {
             html_to_text(content)
@@ -144,7 +155,7 @@ impl UrlImporter {
                 serde_json::json!({
                     "source": url,
                     "imported_at": chrono::Utc::now().to_rfc3339(),
-                    "format": "url",
+                    "format": format,
                     "content_type": content_type,
                 }),
             ),

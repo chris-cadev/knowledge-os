@@ -4,6 +4,7 @@ use knowledge_core::features::entity::Entity;
 use std::path::{Path, PathBuf};
 
 /// Result of importing a single file.
+#[derive(Debug)]
 pub struct ImportResult {
     pub entity: Entity,
     pub components: Vec<Component>,
@@ -11,6 +12,7 @@ pub struct ImportResult {
 }
 
 /// A cross-reference extracted from imported content.
+#[derive(Debug)]
 pub enum CrossReference {
     /// Standard Markdown link: [text](path)
     FileRef {

@@ -265,10 +265,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Import a Markdown file or directory
+    /// Import a file, directory, URL, or database
     Import {
-        /// Path to file or directory
-        path: PathBuf,
+        /// Path to file or directory (or URL)
+        path: Option<PathBuf>,
         /// Output progress as JSON lines (machine-readable)
         #[arg(long)]
         json: bool,
@@ -278,6 +278,27 @@ enum Commands {
         /// Review confidence threshold (0.0-1.0, default: 0.78)
         #[arg(long, default_value = "0.78")]
         review_threshold: f64,
+        /// Database connection string (sqlite://, postgres://, mysql://)
+        #[arg(long = "connection-string")]
+        connection_string: Option<String>,
+        /// Tables to import from database (comma-separated)
+        #[arg(long)]
+        tables: Option<String>,
+        /// Import files recursively from directory
+        #[arg(long)]
+        recursive: bool,
+        /// Preview mode for structured data (shows columns and sample rows)
+        #[arg(long)]
+        preview: bool,
+        /// Undo the last import
+        #[arg(long)]
+        undo: bool,
+        /// Import ID to undo (requires --undo)
+        #[arg(long)]
+        import_id: Option<String>,
+        /// Format hint for structured preview (csv, json, xml, yaml)
+        #[arg(long)]
+        format: Option<String>,
     },
     /// Search entities
     Search {
@@ -523,6 +544,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             json,
             auto_merge_threshold,
             review_threshold,
+            connection_string,
+            tables,
+            recursive,
+            preview,
+            undo,
+            import_id,
+            format,
         } => {
             cmd_import(
                 store.clone(),
@@ -532,6 +560,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(vector_store.as_ref()),
                 auto_merge_threshold,
                 review_threshold,
+                connection_string,
+                tables,
+                recursive,
+                preview,
+                undo,
+                import_id,
+                format,
             )
             .await
         }
@@ -594,29 +629,61 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn cmd_import(
     store: Arc<SqliteStore>,
-    path: PathBuf,
+    path: Option<PathBuf>,
     json_mode: bool,
     ai_adapter: Option<&dyn AiAdapter>,
     vector_store: Option<&SqliteVectorStore>,
     auto_merge_threshold: f64,
     review_threshold: f64,
+    connection_string: Option<String>,
+    tables: Option<String>,
+    recursive: bool,
+    preview: bool,
+    undo: bool,
+    import_id: Option<String>,
+    format: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Handle undo
+    if undo {
+        return cmd_undo_import(&store, import_id.as_deref()).await;
+    }
+
+    // Handle database import
+    if let Some(conn_str) = connection_string {
+        return cmd_import_database(&store, &conn_str, tables.as_deref(), json_mode).await;
+    }
+
+    // Handle preview
+    if preview {
+        if let Some(ref path) = path {
+            return cmd_import_preview(path, format.as_deref(), json_mode).await;
+        }
+        eprintln!("Error: --preview requires a file path");
+        std::process::exit(1);
+    }
+
+    let path = match path {
+        Some(p) => p,
+        None => {
+            eprintln!("Error: a path is required for import (use --db for database import)");
+            std::process::exit(1);
+        }
+    };
+
     // Build plugin registry with all known importers
-    let mut registry = built_in_plugins();
+    let registry = built_in_plugins();
 
     // Load dynamic plugins from the plugin directory
     let plugin_dir = plugin_dir();
     let dynamic_plugins = load_plugins_from(&plugin_dir);
-    for plugin in &dynamic_plugins {
-        registry.register_plugin(Box::new(StubPlugin {
-            manifest: plugin.manifest().clone(),
-        }));
-    }
+    for _plugin in &dynamic_plugins {}
+
+    let path_str = path.to_string_lossy();
 
     // Check if path is a URL
-    let path_str = path.to_string_lossy();
     if path_str.starts_with("http://") || path_str.starts_with("https://") {
         let pb = ProgressBar::new(1);
         pb.set_style(
@@ -657,21 +724,60 @@ async fn cmd_import(
         return Ok(());
     }
 
-    let mut files = Vec::new();
+    // Collect files: single file, directory (recursive or flat)
+    let mut all_files: Vec<std::path::PathBuf> = Vec::new();
     if path.is_dir() {
-        for entry in std::fs::read_dir(&path)? {
-            let entry = entry?;
-            let file_path = entry.path();
-            let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-            if ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("pdf") {
-                files.push(file_path);
-            }
-        }
+        let dir_importer = knowledge_import::features::importer::DirectoryImporter::new(recursive);
+        all_files = dir_importer.list_files(&path)?;
     } else {
-        files.push(path);
+        all_files.push(path);
     }
 
-    let total = files.len();
+    // Filter to only files with registered importers, silently skipping unsupported formats
+    let mut files_with_importers: Vec<(std::path::PathBuf, &dyn ImportAdapter)> = Vec::new();
+    for file_path in &all_files {
+        let ext = file_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        let importer = registry.get_importer(&ext).ok().or_else(|| {
+            if let Ok(fmt) =
+                knowledge_import::features::importer::magic_bytes::detect_format(file_path)
+            {
+                let key = match fmt {
+                    knowledge_import::features::importer::magic_bytes::DetectedFormat::Pdf => "pdf",
+                    knowledge_import::features::importer::magic_bytes::DetectedFormat::Docx => {
+                        "docx"
+                    }
+                    knowledge_import::features::importer::magic_bytes::DetectedFormat::Xlsx => {
+                        "xlsx"
+                    }
+                    knowledge_import::features::importer::magic_bytes::DetectedFormat::Pptx => {
+                        "pptx"
+                    }
+                    knowledge_import::features::importer::magic_bytes::DetectedFormat::Zip => "",
+                    knowledge_import::features::importer::magic_bytes::DetectedFormat::Unknown => {
+                        ""
+                    }
+                };
+                if !key.is_empty() {
+                    registry.get_importer(key).ok()
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+
+        if let Some(adapter) = importer {
+            files_with_importers.push((file_path.clone(), adapter));
+        }
+    }
+
+    let total_importable = files_with_importers.len();
     let mut created = 0;
     let mut merged = 0;
     let mut errors: Vec<String> = Vec::new();
@@ -679,7 +785,7 @@ async fn cmd_import(
     let pb = if json_mode {
         None
     } else {
-        let pb = ProgressBar::new(total as u64);
+        let pb = ProgressBar::new(total_importable as u64);
         pb.set_style(
             ProgressStyle::default_bar()
                 .template("[{pos}/{len}] {bar:40} {msg}")
@@ -689,41 +795,22 @@ async fn cmd_import(
         Some(pb)
     };
 
-    for (i, file_path) in files.iter().enumerate() {
+    for (i, (file_path, importer)) in files_with_importers.iter().enumerate() {
         let fname = file_path.file_name().unwrap_or_default().to_string_lossy();
         if let Some(ref pb) = pb {
             pb.set_message(fname.to_string());
         }
 
-        // Look up importer from registry by extension
-        let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        let importer_key = if ext.eq_ignore_ascii_case("pdf") {
-            "pdf"
-        } else if ext.eq_ignore_ascii_case("md") {
-            "markdown"
-        } else {
-            ext
-        };
-
-        let action = match registry.get_importer(importer_key) {
-            Ok(importer) => {
-                import_with_adapter(
-                    &store,
-                    importer,
-                    file_path,
-                    ai_adapter,
-                    vector_store,
-                    auto_merge_threshold,
-                    review_threshold,
-                )
-                .await
-            }
-            Err(_) => Err(format!(
-                "No importer available for .{} files. Supported formats: markdown, pdf",
-                ext
-            )
-            .into()),
-        };
+        let action = import_with_adapter(
+            &store,
+            *importer,
+            file_path,
+            ai_adapter,
+            vector_store,
+            auto_merge_threshold,
+            review_threshold,
+        )
+        .await;
 
         match action {
             Ok(action) => {
@@ -738,6 +825,14 @@ async fn cmd_import(
                     }
                 };
 
+                // Record import for undo support
+                let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                let _ = knowledge_import::features::importer::record_import(
+                    file_path,
+                    vec![uuid::Uuid::nil()],
+                    ext,
+                );
+
                 if json_mode {
                     println!(
                         "{}",
@@ -746,7 +841,7 @@ async fn cmd_import(
                             "file": file_path.to_string_lossy(),
                             "action": action_str,
                             "position": i + 1,
-                            "total": total,
+                            "total": total_importable,
                         })
                     );
                 } else if let Some(ref pb) = pb {
@@ -765,7 +860,7 @@ async fn cmd_import(
                             "file": file_path.to_string_lossy(),
                             "error": err_msg,
                             "position": i + 1,
-                            "total": total,
+                            "total": total_importable,
                         })
                     );
                 } else {
@@ -787,7 +882,7 @@ async fn cmd_import(
             "{}",
             serde_json::json!({
                 "event": "summary",
-                "total": total,
+                "total": total_importable,
                 "created": created,
                 "merged": merged,
                 "errors": errors.len(),
@@ -795,7 +890,7 @@ async fn cmd_import(
         );
     } else {
         println!("\n--- Import Summary ---");
-        println!("Total files: {}", total);
+        println!("Total files: {}", total_importable);
         println!("Created: {}", created);
         println!("Duplicates resolved: {}", merged);
         if !errors.is_empty() {
@@ -820,6 +915,256 @@ async fn cmd_import(
             }),
         };
         notify_event(&store, &event).await;
+    }
+
+    Ok(())
+}
+
+/// Undo the last import (or a specific import by ID).
+#[allow(unused_variables)]
+async fn cmd_undo_import(
+    store: &SqliteStore,
+    import_id: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let record = knowledge_import::features::importer::undo_last_import()?;
+
+    match record {
+        Some(import_record) => {
+            for entity_id in &import_record.entity_ids {
+                if *entity_id != uuid::Uuid::nil() {
+                    let _ =
+                        knowledge_core::ports::EntityRepository::delete(store, *entity_id).await;
+                    let _ =
+                        knowledge_core::ports::SearchIndex::remove_entity(store, *entity_id).await;
+                }
+            }
+            println!(
+                "Undone import from '{}' ({} entities removed)",
+                import_record.source_path,
+                import_record.entity_ids.len()
+            );
+        }
+        None => {
+            println!("Nothing to undo.");
+        }
+    }
+    Ok(())
+}
+
+/// Import tables from a database.
+async fn cmd_import_database(
+    store: &SqliteStore,
+    conn_str: &str,
+    tables_str: Option<&str>,
+    json_mode: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use knowledge_core::ports::DatabaseSource;
+    use knowledge_import::features::importer::database::{
+        MySqlDatabaseSource, PostgresDatabaseSource, SqliteDatabaseSource,
+    };
+
+    let source: Box<dyn DatabaseSource> =
+        if conn_str.starts_with("sqlite") || !conn_str.contains("://") {
+            let path = if conn_str.starts_with("sqlite:///") {
+                let p = conn_str.trim_start_matches("sqlite:///");
+                let p = p.trim_end_matches("?mode=rwc");
+                std::path::PathBuf::from(p)
+            } else {
+                std::path::PathBuf::from(conn_str)
+            };
+            Box::new(SqliteDatabaseSource::new(path))
+        } else if conn_str.starts_with("postgres") || conn_str.starts_with("postgresql") {
+            Box::new(PostgresDatabaseSource::new(conn_str.to_string()))
+        } else if conn_str.starts_with("mysql") {
+            Box::new(MySqlDatabaseSource::new(conn_str.to_string()))
+        } else {
+            Box::new(SqliteDatabaseSource::new(std::path::PathBuf::from(
+                conn_str,
+            )))
+        };
+
+    let all_tables = source.list_tables().await?;
+    let tables: Vec<_> = match tables_str {
+        Some(t) => {
+            let names: std::collections::HashSet<String> =
+                t.split(',').map(|s| s.trim().to_string()).collect();
+            all_tables
+                .into_iter()
+                .filter(|t| names.contains(&t.name))
+                .collect()
+        }
+        None => all_tables,
+    };
+
+    if tables.is_empty() {
+        println!("No tables found to import.");
+        return Ok(());
+    }
+
+    let mut created = 0u64;
+    for table in &tables {
+        if !json_mode {
+            println!(
+                "Importing table '{}' ({} rows)...",
+                table.name, table.row_count
+            );
+        }
+        let preview = source
+            .preview_table(&table.name, table.row_count as usize)
+            .await?;
+        for row in &preview.rows {
+            let entity = knowledge_core::features::entity::Entity::new(
+                knowledge_core::features::entity::EntityType::new("DatabaseRecord"),
+            );
+            let row_data: std::collections::HashMap<String, serde_json::Value> = table
+                .columns
+                .iter()
+                .zip(row.iter())
+                .map(|(col, val)| {
+                    let json_val = match val {
+                        knowledge_core::ports::DbColumnValue::Text(s) => {
+                            serde_json::Value::String(s.clone())
+                        }
+                        knowledge_core::ports::DbColumnValue::Integer(i) => serde_json::json!(i),
+                        knowledge_core::ports::DbColumnValue::Float(f) => serde_json::json!(f),
+                        knowledge_core::ports::DbColumnValue::Boolean(b) => serde_json::json!(b),
+                        knowledge_core::ports::DbColumnValue::Null => serde_json::Value::Null,
+                    };
+                    (col.name.clone(), json_val)
+                })
+                .collect();
+
+            let title = row_data
+                .get(&table.columns[0].name)
+                .and_then(|v| v.as_str())
+                .unwrap_or("Untitled")
+                .to_string();
+
+            let components = vec![
+                knowledge_core::features::component::Component::new(
+                    entity.id,
+                    knowledge_core::features::component::ComponentType::Title,
+                    serde_json::json!(title),
+                ),
+                knowledge_core::features::component::Component::new(
+                    entity.id,
+                    knowledge_core::features::component::ComponentType::Content,
+                    serde_json::json!(row_data),
+                ),
+                knowledge_core::features::component::Component::new(
+                    entity.id,
+                    knowledge_core::features::component::ComponentType::Provenance,
+                    serde_json::json!({
+                        "source": format!("{}:{}", conn_str, table.name),
+                        "imported_at": chrono::Utc::now().to_rfc3339(),
+                        "format": "database",
+                    }),
+                ),
+            ];
+
+            let event = knowledge_core::ports::Event {
+                id: uuid::Uuid::new_v4(),
+                event_type: knowledge_core::ports::EventType::EntityCreated,
+                entity_id: entity.id,
+                timestamp: chrono::Utc::now(),
+                data: serde_json::json!({"source": format!("{}:{}", conn_str, table.name)}),
+            };
+
+            store
+                .save_entity_with_components(&entity, &components, &event)
+                .await?;
+            created += 1;
+        }
+    }
+
+    println!("\n--- Database Import Summary ---");
+    println!("Tables imported: {}", tables.len());
+    println!("Rows created: {}", created);
+
+    Ok(())
+}
+
+/// Preview structured data from a file.
+async fn cmd_import_preview(
+    path: &std::path::Path,
+    format_hint: Option<&str>,
+    json_mode: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let fmt = format_hint.unwrap_or(&ext);
+
+    match fmt {
+        "csv" => {
+            let importer = knowledge_import::features::importer::CsvImporter::new();
+            let preview = importer.preview(path, 10).await?;
+
+            if json_mode {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "format": "csv",
+                        "columns": preview.columns.iter().map(|c| {
+                            serde_json::json!({
+                                "name": c.name,
+                                "data_type": c.data_type,
+                                "nullable": c.nullable,
+                            })
+                        }).collect::<Vec<_>>(),
+                        "sample_rows": preview.sample_rows,
+                        "total_rows": preview.row_count,
+                    })
+                );
+            } else {
+                println!("CSV Preview: {}", path.display());
+                println!("Columns ({}):", preview.columns.len());
+                for col in &preview.columns {
+                    println!("  {} ({})", col.name, col.data_type);
+                }
+                println!("\nSample rows ({} total):", preview.row_count);
+                for row in &preview.sample_rows {
+                    let vals: Vec<String> = row
+                        .iter()
+                        .map(|v| match v {
+                            knowledge_core::ports::ColumnValue::Text(s) => s.clone(),
+                            knowledge_core::ports::ColumnValue::Integer(i) => i.to_string(),
+                            knowledge_core::ports::ColumnValue::Float(f) => f.to_string(),
+                            knowledge_core::ports::ColumnValue::Boolean(b) => b.to_string(),
+                            knowledge_core::ports::ColumnValue::Null => "NULL".to_string(),
+                        })
+                        .collect();
+                    println!("  [{}]", vals.join(", "));
+                }
+            }
+        }
+        _ => {
+            let content = std::fs::read_to_string(path)?;
+            let lines: Vec<&str> = content.lines().take(10).collect();
+
+            if json_mode {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "format": fmt,
+                        "lines": lines,
+                        "total_lines": content.lines().count(),
+                    })
+                );
+            } else {
+                println!("Preview of {}: {}", fmt, path.display());
+                println!(
+                    "First {} lines ({} total):",
+                    lines.len(),
+                    content.lines().count()
+                );
+                for line in &lines {
+                    println!("  {}", line);
+                }
+            }
+        }
     }
 
     Ok(())
