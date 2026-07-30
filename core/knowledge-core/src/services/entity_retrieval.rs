@@ -281,7 +281,7 @@ fn extract_title_from_components(components: &[crate::features::component::Compo
                 crate::features::component::ComponentType::Title
             )
         })
-        .and_then(|c| c.data.get("name").and_then(|v| v.as_str()))
+        .and_then(|c| c.data.as_str())
         .unwrap_or("Untitled")
         .to_string()
 }

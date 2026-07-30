@@ -355,7 +355,7 @@ impl ChatPipeline {
                 let title = components
                     .iter()
                     .find(|c| c.component_type == ComponentType::Title)
-                    .and_then(|c| c.data.get("name").and_then(|v| v.as_str()))
+                    .and_then(|c| c.data.as_str())
                     .unwrap_or("Untitled")
                     .to_string();
                 let content = components
@@ -387,7 +387,7 @@ impl ChatPipeline {
                             let target_title = target_comps
                                 .iter()
                                 .find(|c| c.component_type == ComponentType::Title)
-                                .and_then(|c| c.data.get("name").and_then(|v| v.as_str()))
+                                .and_then(|c| c.data.as_str())
                                 .unwrap_or("Untitled")
                                 .to_string();
                             relationships.push(RelationshipSummary {
