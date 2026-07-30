@@ -10,7 +10,9 @@ use knowledge_import::features::importer::{
 };
 use knowledge_plugin::registry::built_in_plugins;
 use std::collections::HashMap;
+use std::time::Instant;
 use tauri::State;
+use uuid::Uuid;
 
 use super::response::*;
 use super::store::AppState;
@@ -21,6 +23,16 @@ pub async fn import_files(
     state: State<'_, AppState>,
     paths: Vec<String>,
 ) -> Result<ImportProgressResponse, String> {
+    let correlation_id = Uuid::new_v4();
+    let start_time = Instant::now();
+
+    log::info!(
+        "import.started: correlation_id={}, file_count={}, paths={:?}",
+        correlation_id,
+        paths.len(),
+        paths
+    );
+
     let store = &*state.store;
     let registry = built_in_plugins();
     let mut items = Vec::new();
@@ -30,12 +42,36 @@ pub async fn import_files(
 
     for path_str in &paths {
         let path = std::path::Path::new(path_str);
+        log::debug!(
+            "import.processing_path: correlation_id={}, path={}, is_dir={}",
+            correlation_id,
+            path_str,
+            path.is_dir()
+        );
 
         if path.is_dir() {
+            log::info!(
+                "import.directory.detected: correlation_id={}, path={}",
+                correlation_id,
+                path_str
+            );
             let dir_importer = DirectoryImporter::new(true);
             let files = match dir_importer.list_files(path) {
-                Ok(f) => f,
+                Ok(f) => {
+                    log::info!(
+                        "import.directory.listed: correlation_id={}, file_count={}",
+                        correlation_id,
+                        f.len()
+                    );
+                    f
+                }
                 Err(e) => {
+                    log::error!(
+                        "import.directory.list_failed: correlation_id={}, path={}, error={}",
+                        correlation_id,
+                        path_str,
+                        e
+                    );
                     errors.push(ImportErrorResponse {
                         path: path_str.clone(),
                         message: e.to_string(),
@@ -52,6 +88,7 @@ pub async fn import_files(
                     &mut created,
                     &mut merged,
                     &mut errors,
+                    correlation_id,
                 )
                 .await;
             }
@@ -64,10 +101,21 @@ pub async fn import_files(
                 &mut created,
                 &mut merged,
                 &mut errors,
+                correlation_id,
             )
             .await;
         }
     }
+
+    let duration = start_time.elapsed();
+    log::info!(
+        "import.completed: correlation_id={}, created={}, merged={}, errors={}, duration_ms={}",
+        correlation_id,
+        created,
+        merged,
+        errors.len(),
+        duration.as_millis()
+    );
 
     Ok(ImportProgressResponse {
         items,
@@ -86,13 +134,22 @@ async fn import_single_file(
     created: &mut usize,
     _merged: &mut usize,
     errors: &mut Vec<ImportErrorResponse>,
+    correlation_id: Uuid,
 ) {
+    let file_start_time = Instant::now();
     let path_str = file_path.to_string_lossy().to_string();
     let ext = file_path
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
+
+    log::info!(
+        "import.file.started: correlation_id={}, path={}, extension={}",
+        correlation_id,
+        path_str,
+        if ext.is_empty() { "none" } else { &ext }
+    );
 
     items.push(ImportProgressItem {
         path: path_str.clone(),
@@ -103,11 +160,21 @@ async fn import_single_file(
     });
 
     let importer = if path_str.starts_with("http://") || path_str.starts_with("https://") {
+        log::debug!(
+            "import.file.url_detected: correlation_id={}, path={}",
+            correlation_id,
+            path_str
+        );
         registry.get_importer("url").ok()
     } else {
         // Try by extension first
         let mut imp = registry.get_importer(&ext).ok();
         if imp.is_none() {
+            log::debug!(
+                "import.file.extension_importer_not_found: correlation_id={}, extension={}, trying_magic_bytes",
+                correlation_id,
+                ext
+            );
             // Try magic bytes detection
             if let Ok(fmt) =
                 knowledge_import::features::importer::magic_bytes::detect_format(file_path)
@@ -129,12 +196,33 @@ async fn import_single_file(
                     }
                 };
                 if !fmt_key.is_empty() {
+                    log::info!(
+                        "import.file.magic_bytes_detected: correlation_id={}, format={}, path={}",
+                        correlation_id,
+                        fmt_key,
+                        path_str
+                    );
                     imp = registry.get_importer(fmt_key).ok();
                 }
             }
         }
         imp
     };
+
+    if importer.is_some() {
+        log::info!(
+            "import.file.importer_selected: correlation_id={}, path={}",
+            correlation_id,
+            path_str
+        );
+    } else {
+        log::warn!(
+            "import.file.no_importer_found: correlation_id={}, extension={}, path={}",
+            correlation_id,
+            ext,
+            path_str
+        );
+    }
 
     let import_result = match importer {
         Some(adapter) => adapter.import(file_path).await,
@@ -147,8 +235,22 @@ async fn import_single_file(
     };
 
     let import_result = match import_result {
-        Ok(r) => r,
+        Ok(r) => {
+            log::info!(
+                "import.file.parsed: correlation_id={}, path={}, entity_id={}",
+                correlation_id,
+                path_str,
+                r.entity.id
+            );
+            r
+        }
         Err(e) => {
+            log::error!(
+                "import.file.parse_failed: correlation_id={}, path={}, error={}, stage=parsing",
+                correlation_id,
+                path_str,
+                e
+            );
             errors.push(ImportErrorResponse {
                 path: path_str.clone(),
                 message: e.to_string(),
@@ -171,6 +273,14 @@ async fn import_single_file(
         data: serde_json::json!({"source": source_str}),
     };
 
+    log::debug!(
+        "import.file.saving_entity: correlation_id={}, entity_id={}, components={}, cross_refs={}",
+        correlation_id,
+        import_result.entity.id,
+        import_result.components.len(),
+        import_result.cross_references.len()
+    );
+
     if let Err(e) = TransactionalWrite::save_entity_with_components(
         store,
         &import_result.entity,
@@ -179,6 +289,13 @@ async fn import_single_file(
     )
     .await
     {
+        log::error!(
+            "import.file.save_failed: correlation_id={}, path={}, entity_id={}, error={}, stage=saving",
+            correlation_id,
+            path_str,
+            import_result.entity.id,
+            e
+        );
         errors.push(ImportErrorResponse {
             path: path_str.clone(),
             message: format!("failed to save entity: {}", e),
@@ -190,8 +307,21 @@ async fn import_single_file(
         return;
     }
 
+    log::debug!(
+        "import.file.entity_saved: correlation_id={}, entity_id={}, path={}",
+        correlation_id,
+        import_result.entity.id,
+        path_str
+    );
+
     let _ =
         SearchIndex::index_entity(store, &import_result.entity, &import_result.components).await;
+
+    log::debug!(
+        "import.file.entity_indexed: correlation_id={}, entity_id={}",
+        correlation_id,
+        import_result.entity.id
+    );
 
     for cross_ref in &import_result.cross_references {
         let target_id: Option<uuid::Uuid> = match cross_ref {
@@ -247,7 +377,33 @@ async fn import_single_file(
                     knowledge_core::features::relationship::RelationshipType::References,
                 );
                 let _ = RelationshipRepository::save(store, &rel).await;
+                log::debug!(
+                    "import.file.cross_reference.created: correlation_id={}, source={}, target={}",
+                    correlation_id,
+                    import_result.entity.id,
+                    target_id
+                );
+            } else {
+                log::trace!(
+                    "import.file.cross_reference.exists: correlation_id={}, source={}, target={}",
+                    correlation_id,
+                    import_result.entity.id,
+                    target_id
+                );
             }
+        } else {
+            log::trace!(
+                "import.file.cross_reference.target_not_found: correlation_id={}, source={}, ref_type={}",
+                correlation_id,
+                import_result.entity.id,
+                match cross_ref {
+                    knowledge_import::features::importer::CrossReference::FileRef { .. } => "FileRef",
+                    knowledge_import::features::importer::CrossReference::WikilinkRef { .. } => "WikilinkRef",
+                    knowledge_import::features::importer::CrossReference::MentionRef { .. } => "MentionRef",
+                    knowledge_import::features::importer::CrossReference::SectionRef { .. } => "SectionRef",
+                    knowledge_import::features::importer::CrossReference::UrlRef { .. } => "UrlRef",
+                }
+            );
         }
     }
 
@@ -264,6 +420,15 @@ async fn import_single_file(
         vec![import_result.entity.id],
         &ext,
     );
+
+    let file_duration = file_start_time.elapsed();
+    log::info!(
+        "import.file.completed: correlation_id={}, path={}, entity_id={}, duration_ms={}",
+        correlation_id,
+        path_str,
+        import_result.entity.id,
+        file_duration.as_millis()
+    );
 }
 
 /// Import content from a URL.
@@ -272,13 +437,34 @@ pub async fn import_url(
     state: State<'_, AppState>,
     url: String,
 ) -> Result<ImportProgressResponse, String> {
+    let correlation_id = Uuid::new_v4();
+    let start_time = Instant::now();
+
+    log::info!(
+        "import.url.started: correlation_id={}, url={}",
+        correlation_id,
+        url
+    );
+
     let store = &*state.store;
     let url_importer = UrlImporter::new();
 
-    let import_result = url_importer
-        .import_url(&url)
-        .await
-        .map_err(|e| format!("URL import failed: {}", e))?;
+    let import_result = url_importer.import_url(&url).await.map_err(|e| {
+        log::error!(
+            "import.url.fetch_failed: correlation_id={}, url={}, error={}",
+            correlation_id,
+            url,
+            e
+        );
+        format!("URL import failed: {}", e)
+    })?;
+
+    log::info!(
+        "import.url.fetched: correlation_id={}, url={}, entity_id={}",
+        correlation_id,
+        url,
+        import_result.entity.id
+    );
 
     let event = Event {
         id: uuid::Uuid::new_v4(),
@@ -295,10 +481,28 @@ pub async fn import_url(
         &event,
     )
     .await
-    .map_err(|e| format!("failed to save entity: {}", e))?;
+    .map_err(|e| {
+        log::error!(
+            "import.url.save_failed: correlation_id={}, url={}, entity_id={}, error={}",
+            correlation_id,
+            url,
+            import_result.entity.id,
+            e
+        );
+        format!("failed to save entity: {}", e)
+    })?;
 
     let _ =
         SearchIndex::index_entity(store, &import_result.entity, &import_result.components).await;
+
+    let duration = start_time.elapsed();
+    log::info!(
+        "import.url.completed: correlation_id={}, url={}, entity_id={}, duration_ms={}",
+        correlation_id,
+        url,
+        import_result.entity.id,
+        duration.as_millis()
+    );
 
     Ok(ImportProgressResponse {
         items: vec![ImportProgressItem {
@@ -321,20 +525,49 @@ pub async fn import_clipboard(
     text: String,
     source_format: Option<String>,
 ) -> Result<ImportProgressResponse, String> {
+    let correlation_id = Uuid::new_v4();
+    let start_time = Instant::now();
+    let is_html = source_format.as_deref() == Some("html");
+
+    log::info!(
+        "import.clipboard.started: correlation_id={}, format={}, length={}",
+        correlation_id,
+        if is_html { "html" } else { "text" },
+        text.len()
+    );
+
     let store = &*state.store;
     let clipboard_importer = ClipboardImporter::new();
-
-    let is_html = source_format.as_deref() == Some("html");
 
     let import_result = if is_html {
         clipboard_importer
             .import_html(&text, "clipboard")
-            .map_err(|e| format!("clipboard import failed: {}", e))?
+            .map_err(|e| {
+                log::error!(
+                    "import.clipboard.parse_failed: correlation_id={}, format=html, error={}",
+                    correlation_id,
+                    e
+                );
+                format!("clipboard import failed: {}", e)
+            })?
     } else {
         clipboard_importer
             .import_text(&text, "clipboard")
-            .map_err(|e| format!("clipboard import failed: {}", e))?
+            .map_err(|e| {
+                log::error!(
+                    "import.clipboard.parse_failed: correlation_id={}, format=text, error={}",
+                    correlation_id,
+                    e
+                );
+                format!("clipboard import failed: {}", e)
+            })?
     };
+
+    log::info!(
+        "import.clipboard.parsed: correlation_id={}, entity_id={}",
+        correlation_id,
+        import_result.entity.id
+    );
 
     let event = Event {
         id: uuid::Uuid::new_v4(),
@@ -351,10 +584,26 @@ pub async fn import_clipboard(
         &event,
     )
     .await
-    .map_err(|e| format!("failed to save entity: {}", e))?;
+    .map_err(|e| {
+        log::error!(
+            "import.clipboard.save_failed: correlation_id={}, entity_id={}, error={}",
+            correlation_id,
+            import_result.entity.id,
+            e
+        );
+        format!("failed to save entity: {}", e)
+    })?;
 
     let _ =
         SearchIndex::index_entity(store, &import_result.entity, &import_result.components).await;
+
+    let duration = start_time.elapsed();
+    log::info!(
+        "import.clipboard.completed: correlation_id={}, entity_id={}, duration_ms={}",
+        correlation_id,
+        import_result.entity.id,
+        duration.as_millis()
+    );
 
     Ok(ImportProgressResponse {
         items: vec![ImportProgressItem {
@@ -377,6 +626,16 @@ pub async fn import_database(
     connection_string: String,
     tables: Vec<String>,
 ) -> Result<ImportProgressResponse, String> {
+    let correlation_id = Uuid::new_v4();
+    let start_time = Instant::now();
+
+    log::info!(
+        "import.database.started: correlation_id={}, connection={}, table_filter={:?}",
+        correlation_id,
+        connection_string,
+        tables
+    );
+
     let store = &*state.store;
     let source: Box<dyn DatabaseSource> = if connection_string.starts_with("sqlite")
         || connection_string.starts_with("file:")
@@ -389,31 +648,70 @@ pub async fn import_database(
         } else {
             std::path::PathBuf::from(&connection_string)
         };
+        log::debug!(
+            "import.database.type_detected: correlation_id={}, type=sqlite, path={:?}",
+            correlation_id,
+            path
+        );
         Box::new(SqliteDatabaseSource::new(path))
     } else if connection_string.starts_with("postgres")
         || connection_string.starts_with("postgresql")
     {
+        log::debug!(
+            "import.database.type_detected: correlation_id={}, type=postgres",
+            correlation_id
+        );
         Box::new(PostgresDatabaseSource::new(connection_string.clone()))
     } else if connection_string.starts_with("mysql") {
+        log::debug!(
+            "import.database.type_detected: correlation_id={}, type=mysql",
+            correlation_id
+        );
         Box::new(MySqlDatabaseSource::new(connection_string.clone()))
     } else {
+        log::debug!(
+            "import.database.type_defaulted: correlation_id={}, type=sqlite",
+            correlation_id
+        );
         Box::new(SqliteDatabaseSource::new(std::path::PathBuf::from(
             &connection_string,
         )))
     };
 
-    let available_tables = source
-        .list_tables()
-        .await
-        .map_err(|e| format!("failed to list tables: {}", e))?;
+    let available_tables = source.list_tables().await.map_err(|e| {
+        log::error!(
+            "import.database.list_tables_failed: correlation_id={}, error={}",
+            correlation_id,
+            e
+        );
+        format!("failed to list tables: {}", e)
+    })?;
+
+    log::info!(
+        "import.database.tables_listed: correlation_id={}, available_count={}",
+        correlation_id,
+        available_tables.len()
+    );
 
     let tables_to_import: Vec<_> = if tables.is_empty() {
+        log::info!(
+            "import.database.importing_all_tables: correlation_id={}, count={}",
+            correlation_id,
+            available_tables.len()
+        );
         available_tables
     } else {
-        available_tables
+        let filtered: Vec<_> = available_tables
             .into_iter()
             .filter(|t| tables.contains(&t.name))
-            .collect()
+            .collect();
+        log::info!(
+            "import.database.tables_filtered: correlation_id={}, requested={:?}, matched={}",
+            correlation_id,
+            tables,
+            filtered.len()
+        );
+        filtered
     };
 
     let mut created = 0usize;
@@ -421,10 +719,29 @@ pub async fn import_database(
     let mut errors = Vec::new();
 
     for table in &tables_to_import {
-        let preview = source
-            .preview_table(&table.name, 100)
-            .await
-            .map_err(|e| format!("failed to preview table '{}': {}", table.name, e))?;
+        log::debug!(
+            "import.database.table.processing: correlation_id={}, table={}, columns={}",
+            correlation_id,
+            table.name,
+            table.columns.len()
+        );
+
+        let preview = source.preview_table(&table.name, 100).await.map_err(|e| {
+            log::error!(
+                "import.database.table.preview_failed: correlation_id={}, table={}, error={}",
+                correlation_id,
+                table.name,
+                e
+            );
+            format!("failed to preview table '{}': {}", table.name, e)
+        })?;
+
+        log::info!(
+            "import.database.table.previewed: correlation_id={}, table={}, rows={}",
+            correlation_id,
+            table.name,
+            preview.rows.len()
+        );
 
         for row in &preview.rows {
             let entity = knowledge_core::features::entity::Entity::new(
@@ -495,12 +812,26 @@ pub async fn import_database(
                 .save_entity_with_components(&entity, &components, &event)
                 .await
             {
+                log::error!(
+                    "import.database.row.save_failed: correlation_id={}, table={}, entity_id={}, error={}",
+                    correlation_id,
+                    table.name,
+                    entity.id,
+                    e
+                );
                 errors.push(ImportErrorResponse {
                     path: format!("{}:{}", connection_string, table.name),
                     message: e.to_string(),
                 });
                 continue;
             }
+
+            log::trace!(
+                "import.database.row.saved: correlation_id={}, table={}, entity_id={}",
+                correlation_id,
+                table.name,
+                entity.id
+            );
 
             created += 1;
             items.push(ImportProgressItem {
@@ -512,6 +843,15 @@ pub async fn import_database(
             });
         }
     }
+
+    let duration = start_time.elapsed();
+    log::info!(
+        "import.database.completed: correlation_id={}, tables={}, created={}, duration_ms={}",
+        correlation_id,
+        tables_to_import.len(),
+        created,
+        duration.as_millis()
+    );
 
     Ok(ImportProgressResponse {
         items,
@@ -527,14 +867,36 @@ pub async fn import_file_recursive(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<ImportProgressResponse, String> {
+    let correlation_id = Uuid::new_v4();
+    let start_time = Instant::now();
+
+    log::info!(
+        "import.recursive.started: correlation_id={}, path={}",
+        correlation_id,
+        path
+    );
+
     let store = &*state.store;
     let registry = built_in_plugins();
     let dir_path = std::path::Path::new(&path);
     let dir_importer = DirectoryImporter::new(true);
 
-    let files = dir_importer
-        .list_files(dir_path)
-        .map_err(|e| format!("failed to list directory: {}", e))?;
+    let files = dir_importer.list_files(dir_path).map_err(|e| {
+        log::error!(
+            "import.recursive.list_failed: correlation_id={}, path={}, error={}",
+            correlation_id,
+            path,
+            e
+        );
+        format!("failed to list directory: {}", e)
+    })?;
+
+    log::info!(
+        "import.recursive.files_listed: correlation_id={}, path={}, file_count={}",
+        correlation_id,
+        path,
+        files.len()
+    );
 
     let mut items = Vec::new();
     let mut created = 0usize;
@@ -550,9 +912,20 @@ pub async fn import_file_recursive(
             &mut created,
             &mut merged,
             &mut errors,
+            correlation_id,
         )
         .await;
     }
+
+    let duration = start_time.elapsed();
+    log::info!(
+        "import.recursive.completed: correlation_id={}, path={}, created={}, errors={}, duration_ms={}",
+        correlation_id,
+        path,
+        created,
+        errors.len(),
+        duration.as_millis()
+    );
 
     Ok(ImportProgressResponse {
         items,
@@ -568,14 +941,35 @@ pub async fn import_image(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<ImportProgressResponse, String> {
+    let correlation_id = Uuid::new_v4();
+    let start_time = Instant::now();
+
+    log::info!(
+        "import.image.started: correlation_id={}, path={}",
+        correlation_id,
+        path
+    );
+
     let store = &*state.store;
     let image_importer = knowledge_import::features::importer::ImageImporter::new();
     let file_path = std::path::Path::new(&path);
 
-    let import_result = image_importer
-        .import(file_path)
-        .await
-        .map_err(|e| format!("image import failed: {}", e))?;
+    let import_result = image_importer.import(file_path).await.map_err(|e| {
+        log::error!(
+            "import.image.ocr_failed: correlation_id={}, path={}, error={}",
+            correlation_id,
+            path,
+            e
+        );
+        format!("image import failed: {}", e)
+    })?;
+
+    log::info!(
+        "import.image.ocr_completed: correlation_id={}, path={}, entity_id={}",
+        correlation_id,
+        path,
+        import_result.entity.id
+    );
 
     let event = Event {
         id: uuid::Uuid::new_v4(),
@@ -592,7 +986,25 @@ pub async fn import_image(
         &event,
     )
     .await
-    .map_err(|e| format!("failed to save entity: {}", e))?;
+    .map_err(|e| {
+        log::error!(
+            "import.image.save_failed: correlation_id={}, path={}, entity_id={}, error={}",
+            correlation_id,
+            path,
+            import_result.entity.id,
+            e
+        );
+        format!("failed to save entity: {}", e)
+    })?;
+
+    let duration = start_time.elapsed();
+    log::info!(
+        "import.image.completed: correlation_id={}, path={}, entity_id={}, duration_ms={}",
+        correlation_id,
+        path,
+        import_result.entity.id,
+        duration.as_millis()
+    );
 
     Ok(ImportProgressResponse {
         items: vec![ImportProgressItem {
@@ -614,34 +1026,67 @@ pub async fn undo_import(
     state: State<'_, AppState>,
     import_id: Option<String>,
 ) -> Result<UndoImportResponse, String> {
+    let correlation_id = Uuid::new_v4();
+
+    log::info!(
+        "import.undo.started: correlation_id={}, import_id={:?}",
+        correlation_id,
+        import_id
+    );
+
     let store = &*state.store;
 
     let record = if let Some(_id) = import_id {
         // Find specific import by ID (stub for now — uses last import)
-        knowledge_import::features::importer::undo_last_import()
-            .map_err(|e| format!("undo failed: {}", e))?
+        knowledge_import::features::importer::undo_last_import().map_err(|e| {
+            log::error!(
+                "import.undo.failed: correlation_id={}, error={}",
+                correlation_id,
+                e
+            );
+            format!("undo failed: {}", e)
+        })?
     } else {
-        knowledge_import::features::importer::undo_last_import()
-            .map_err(|e| format!("undo failed: {}", e))?
+        knowledge_import::features::importer::undo_last_import().map_err(|e| {
+            log::error!(
+                "import.undo.failed: correlation_id={}, error={}",
+                correlation_id,
+                e
+            );
+            format!("undo failed: {}", e)
+        })?
     };
 
     match record {
         Some(import_record) => {
             let mut removed = Vec::new();
+            log::info!(
+                "import.undo.processing: correlation_id={}, entity_count={}",
+                correlation_id,
+                import_record.entity_ids.len()
+            );
             for entity_id in &import_record.entity_ids {
                 let _ = knowledge_core::ports::EntityRepository::delete(store, *entity_id).await;
                 let _ = SearchIndex::remove_entity(store, *entity_id).await;
                 removed.push(entity_id.to_string());
             }
+            log::info!(
+                "import.undo.completed: correlation_id={}, removed_count={}",
+                correlation_id,
+                removed.len()
+            );
             Ok(UndoImportResponse {
                 removed_entities: removed,
                 import_id: import_record.id.to_string(),
             })
         }
-        None => Ok(UndoImportResponse {
-            removed_entities: vec![],
-            import_id: String::new(),
-        }),
+        None => {
+            log::info!("import.undo.no_record: correlation_id={}", correlation_id);
+            Ok(UndoImportResponse {
+                removed_entities: vec![],
+                import_id: String::new(),
+            })
+        }
     }
 }
 
@@ -651,13 +1096,26 @@ pub async fn import_directory_preview(
     path: String,
     recursive: Option<bool>,
 ) -> Result<DirectoryPreviewResponse, String> {
-    let dir_path = std::path::Path::new(&path);
+    let start_time = Instant::now();
     let is_recursive = recursive.unwrap_or(true);
+
+    log::info!(
+        "import.preview.directory.started: path={}, recursive={}",
+        path,
+        is_recursive
+    );
+
+    let dir_path = std::path::Path::new(&path);
     let dir_importer = DirectoryImporter::new(is_recursive);
 
-    let files = dir_importer
-        .list_files(dir_path)
-        .map_err(|e| format!("failed to list directory: {}", e))?;
+    let files = dir_importer.list_files(dir_path).map_err(|e| {
+        log::error!(
+            "import.preview.directory.list_failed: path={}, error={}",
+            path,
+            e
+        );
+        format!("failed to list directory: {}", e)
+    })?;
 
     let mut formats: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     let mut total_size: u64 = 0;
@@ -685,6 +1143,16 @@ pub async fn import_directory_preview(
         .map(|f| f.to_string_lossy().to_string())
         .collect();
 
+    let duration = start_time.elapsed();
+    log::info!(
+        "import.preview.directory.completed: path={}, file_count={}, total_size={}, formats={}, duration_ms={}",
+        path,
+        files.len(),
+        total_size,
+        formats.len(),
+        duration.as_millis()
+    );
+
     Ok(DirectoryPreviewResponse {
         file_count: files.len(),
         total_size_bytes: total_size,
@@ -699,15 +1167,27 @@ pub async fn import_structured_preview(
     path: String,
     format: String,
 ) -> Result<StructuredPreviewResponse, String> {
+    let start_time = Instant::now();
+
+    log::info!(
+        "import.preview.structured.started: path={}, format={}",
+        path,
+        format
+    );
+
     let file_path = std::path::Path::new(&path);
 
-    match format.to_lowercase().as_str() {
+    let result = match format.to_lowercase().as_str() {
         "csv" => {
             let importer = knowledge_import::features::importer::CsvImporter::new();
-            let preview = importer
-                .preview(file_path, 10)
-                .await
-                .map_err(|e| format!("CSV preview failed: {}", e))?;
+            let preview = importer.preview(file_path, 10).await.map_err(|e| {
+                log::error!(
+                    "import.preview.structured.csv_failed: path={}, error={}",
+                    path,
+                    e
+                );
+                format!("CSV preview failed: {}", e)
+            })?;
 
             let columns: Vec<ColumnSchemaResponse> = preview
                 .columns
@@ -752,8 +1232,14 @@ pub async fn import_structured_preview(
         }
         "json" | "xml" | "yaml" | "yml" => {
             // Simple preview for other structured formats
-            let content = std::fs::read_to_string(file_path)
-                .map_err(|e| format!("failed to read file: {}", e))?;
+            let content = std::fs::read_to_string(file_path).map_err(|e| {
+                log::error!(
+                    "import.preview.structured.read_failed: path={}, error={}",
+                    path,
+                    e
+                );
+                format!("failed to read file: {}", e)
+            })?;
             let lines: Vec<&str> = content.lines().take(10).collect();
             let sample_rows: Vec<Vec<serde_json::Value>> = lines
                 .iter()
@@ -771,8 +1257,25 @@ pub async fn import_structured_preview(
                 format: format.to_lowercase(),
             })
         }
-        _ => Err(format!("unsupported structured format: {}", format)),
-    }
+        _ => {
+            log::error!(
+                "import.preview.structured.unsupported_format: path={}, format={}",
+                path,
+                format
+            );
+            Err(format!("unsupported structured format: {}", format))
+        }
+    };
+
+    let duration = start_time.elapsed();
+    log::info!(
+        "import.preview.structured.completed: path={}, format={}, duration_ms={}",
+        path,
+        format,
+        duration.as_millis()
+    );
+
+    result
 }
 
 /// Import structured data with column mapping.
@@ -783,24 +1286,46 @@ pub async fn import_structured(
     format: String,
     column_mapping: Option<String>,
 ) -> Result<ImportProgressResponse, String> {
+    let correlation_id = Uuid::new_v4();
+    let start_time = Instant::now();
+
+    log::info!(
+        "import.structured.started: correlation_id={}, path={}, format={}, has_mapping={}",
+        correlation_id,
+        path,
+        format,
+        column_mapping.is_some()
+    );
+
     let store = &*state.store;
     let file_path = std::path::Path::new(&path);
 
-    match format.to_lowercase().as_str() {
+    let result = match format.to_lowercase().as_str() {
         "csv" => {
             let importer = knowledge_import::features::importer::CsvImporter::new();
 
             let mapping = match column_mapping {
                 Some(json_str) => {
                     serde_json::from_str::<knowledge_core::ports::ColumnMapping>(&json_str)
-                        .map_err(|e| format!("invalid column mapping JSON: {}", e))?
+                        .map_err(|e| {
+                            log::error!(
+                                "import.structured.mapping_invalid: correlation_id={}, error={}",
+                                correlation_id,
+                                e
+                            );
+                            format!("invalid column mapping JSON: {}", e)
+                        })?
                 }
                 None => {
                     // Auto-detect: first column as title, rest as content
-                    let preview = importer
-                        .preview(file_path, 1)
-                        .await
-                        .map_err(|e| format!("preview failed: {}", e))?;
+                    let preview = importer.preview(file_path, 1).await.map_err(|e| {
+                        log::error!(
+                            "import.structured.preview_failed: correlation_id={}, error={}",
+                            correlation_id,
+                            e
+                        );
+                        format!("preview failed: {}", e)
+                    })?;
                     let mut field_mappings = std::collections::HashMap::new();
                     if let Some(first_col) = preview.columns.first() {
                         field_mappings.insert(
@@ -825,7 +1350,20 @@ pub async fn import_structured(
             let results = importer
                 .import_with_mapping(file_path, &mapping)
                 .await
-                .map_err(|e| format!("CSV import failed: {}", e))?;
+                .map_err(|e| {
+                    log::error!(
+                        "import.structured.import_failed: correlation_id={}, error={}",
+                        correlation_id,
+                        e
+                    );
+                    format!("CSV import failed: {}", e)
+                })?;
+
+            log::info!(
+                "import.structured.parsed: correlation_id={}, row_count={}",
+                correlation_id,
+                results.len()
+            );
 
             let mut items = Vec::new();
             let mut created = 0usize;
@@ -848,12 +1386,24 @@ pub async fn import_structured(
                     )
                     .await
                 {
+                    log::error!(
+                        "import.structured.row.save_failed: correlation_id={}, entity_id={}, error={}",
+                        correlation_id,
+                        import_result.entity.id,
+                        e
+                    );
                     errors.push(ImportErrorResponse {
                         path: path.clone(),
                         message: e.to_string(),
                     });
                     continue;
                 }
+
+                log::trace!(
+                    "import.structured.row.saved: correlation_id={}, entity_id={}",
+                    correlation_id,
+                    import_result.entity.id
+                );
 
                 created += 1;
                 items.push(ImportProgressItem {
@@ -872,9 +1422,39 @@ pub async fn import_structured(
                 errors,
             })
         }
-        _ => Err(format!(
-            "import_structured only supports CSV currently, got: {}",
-            format
-        )),
+        _ => {
+            log::error!(
+                "import.structured.unsupported_format: correlation_id={}, format={}",
+                correlation_id,
+                format
+            );
+            Err(format!(
+                "import_structured only supports CSV currently, got: {}",
+                format
+            ))
+        }
+    };
+
+    let duration = start_time.elapsed();
+    match &result {
+        Ok(response) => {
+            log::info!(
+                "import.structured.completed: correlation_id={}, created={}, errors={}, duration_ms={}",
+                correlation_id,
+                response.created,
+                response.errors.len(),
+                duration.as_millis()
+            );
+        }
+        Err(e) => {
+            log::error!(
+                "import.structured.failed: correlation_id={}, error={}, duration_ms={}",
+                correlation_id,
+                e,
+                duration.as_millis()
+            );
+        }
     }
+
+    result
 }
