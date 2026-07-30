@@ -9,6 +9,9 @@
     setOcrProvider,
     getOcrProviderStatus,
     resetOcrProvider,
+    getIgnorePatterns,
+    setIgnorePatterns,
+    resetIgnorePatterns,
   } from "../lib/api.js";
   import type { ProviderStatus, TestResult, OcrProviderStatus } from "../lib/types.js";
 
@@ -35,6 +38,11 @@
   let ocrSaving = $state(false);
   let ocrSaved = $state(false);
   let showOcrAdvanced = $state(false);
+
+  // ── Ignore patterns state ────────────────────────────────────
+  let ignorePatterns = $state("");
+  let ignoreSaving = $state(false);
+  let ignoreSaved = $state(false);
 
   // ── UI state ─────────────────────────────────────────────────
   let showChatApiKey = $state(false);
@@ -107,6 +115,11 @@
       ocrBaseUrl = os.base_url;
     } catch {
       // OCR config may not exist yet
+    }
+    try {
+      ignorePatterns = await getIgnorePatterns();
+    } catch {
+      // ignore config may not exist yet
     }
   }
 
@@ -242,6 +255,33 @@
       statusLevel = "info";
     } catch (e) {
       statusMessage = `OCR reset failed: ${e}`;
+      statusLevel = "error";
+    }
+  }
+
+  async function handleSaveIgnore() {
+    ignoreSaving = true;
+    ignoreSaved = false;
+    try {
+      await setIgnorePatterns(ignorePatterns);
+      ignoreSaved = true;
+      statusMessage = "Import exclusion patterns saved";
+      statusLevel = "success";
+    } catch (e) {
+      statusMessage = `Failed to save exclusion patterns: ${e}`;
+      statusLevel = "error";
+    } finally {
+      ignoreSaving = false;
+    }
+  }
+
+  async function handleResetIgnore() {
+    try {
+      ignorePatterns = await resetIgnorePatterns();
+      statusMessage = "Reset to default exclusion patterns";
+      statusLevel = "info";
+    } catch (e) {
+      statusMessage = `Reset failed: ${e}`;
       statusLevel = "error";
     }
   }
@@ -582,6 +622,35 @@
     {/if}
   </section>
 
+  <!-- ── Import Exclusions ──────────────────────────────────── -->
+  <section class="section" aria-label="Import exclusion patterns">
+    <div class="section-header">
+      <h3>Import Exclusions</h3>
+    </div>
+    <p class="section-desc">
+      Patterns use gitignore syntax — one per line, lines starting with <code>#</code> are comments.
+      If no patterns are configured and the import directory contains a <code>.gitignore</code>, it is used as fallback.
+    </p>
+    <textarea
+      class="ignore-textarea"
+      bind:value={ignorePatterns}
+      rows="12"
+      spellcheck="false"
+      aria-label="Exclusion patterns"
+    ></textarea>
+    <div class="actions">
+      <button class="btn btn-primary" onclick={handleSaveIgnore} disabled={ignoreSaving}>
+        {ignoreSaving ? "Saving..." : "Save"}
+      </button>
+      <button class="btn btn-danger-outline" onclick={handleResetIgnore}>
+        Reset to Defaults
+      </button>
+      {#if ignoreSaved}
+        <span class="save-indicator" role="status">Saved</span>
+      {/if}
+    </div>
+  </section>
+
   <!-- ── Help Section (Nielsen #10, F6.10) ──────────────────── -->
   <section class="section help-section" aria-label="Help and documentation">
     <h3>Need Help?</h3>
@@ -643,6 +712,50 @@
     font-size: var(--font-size-lg);
     color: var(--text-primary);
     margin: 0;
+  }
+
+  .section-desc {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin: 0 0 var(--spacing-md) 0;
+    line-height: 1.5;
+  }
+
+  .section-desc code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9em;
+    background: var(--bg-tertiary);
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+  }
+
+  .ignore-textarea {
+    width: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    resize: vertical;
+    tab-size: 2;
+  }
+
+  .ignore-textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+
+  .save-indicator {
+    font-size: var(--font-size-sm);
+    color: var(--accent);
+    font-weight: 600;
+    padding: 1px 8px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    border-radius: var(--radius-sm);
   }
 
   .saved-badge {

@@ -296,3 +296,17 @@ export async function getOcrProviderStatus(): Promise<OcrProviderStatus> {
 export async function resetOcrProvider(): Promise<OcrProviderStatus> {
   return invoke("reset_ocr_provider");
 }
+
+// === Ignore Configuration API ===
+
+export async function getIgnorePatterns(): Promise<string> {
+  return invoke("get_ignore_patterns");
+}
+
+export async function setIgnorePatterns(patterns: string): Promise<void> {
+  return invoke("set_ignore_patterns", { patterns });
+}
+
+export async function resetIgnorePatterns(): Promise<string> {
+  return invoke("reset_ignore_patterns");
+}
