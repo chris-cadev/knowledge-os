@@ -130,20 +130,22 @@ The bridge listens for `log-entry` events from the backend and formats them with
 
 ## Architecture
 
-```
-┌─────────────────┐
-│  Rust Backend   │
-│  (import.rs)    │
-│                 │
-│  log::info!(...)│
-│  log::debug!(...)
-└────────┬────────┘
-         │
-         ├─> fern (console + file)
-         │
-         └─> LogBridge (Tauri event)
-                    │
-                    └─> Frontend (browser console)
+```mermaid
+graph TD
+    A[Rust Backend<br/>import.rs] -->|log::info!, log::debug!, etc| B[fern Logger]
+    B -->|Console Output| C[Terminal<br/>Colored Output]
+    B -->|File Output| D[app.log<br/>Persistent Storage]
+    B -->|Log Events| E[LogBridge<br/>Tauri Event Emitter]
+    E -->|log-entry Event| F[Frontend<br/>logger.ts]
+    F -->|Formatted Logs| G[Browser Console<br/>Colored Output]
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#e8f5e9
+    style D fill:#f3e5f5
+    style E fill:#fff9c4
+    style F fill:#e1f5ff
+    style G fill:#e8f5e9
 ```
 
 ## Future Enhancements
