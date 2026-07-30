@@ -33,6 +33,8 @@ ignore = "0.4"
 sha2 = "0.10"
 once_cell = "1"
 uuid = { version = "1", features = ["v4"] }
+scraper = "0.27"
+html2text = "0.17"
 
 [dev-dependencies]
 knowledge-plugin = { path = "../knowledge-plugin" }

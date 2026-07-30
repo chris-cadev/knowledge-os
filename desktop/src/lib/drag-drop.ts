@@ -1,6 +1,6 @@
 // === Knowledge OS — Drag-drop file handling utility ===
 
-const SUPPORTED_EXTENSIONS = new Set([".md", ".pdf"]);
+const SUPPORTED_EXTENSIONS = new Set([".md", ".pdf", ".html", ".htm"]);
 
 export interface FileDropEvent {
   paths: string[];
@@ -14,7 +14,7 @@ export type DropHandler = (event: FileDropEvent) => void;
  *
  * Chrome/Firefox encode dropped files as `file://` URIs in the data
  * transfer. This utility extracts the path component and filters for
- * supported extensions (.md, .pdf).
+ * supported extensions (.md, .pdf, .html, .htm).
  */
 export function extractFilePaths(dataTransfer: DataTransfer): string[] {
   const paths: string[] = [];
@@ -48,7 +48,7 @@ export function extractFilePaths(dataTransfer: DataTransfer): string[] {
 }
 
 /**
- * Check whether a file path has a supported extension (.md, .pdf).
+ * Check whether a file path has a supported extension (.md, .pdf, .html, .htm).
  */
 export function isSupportedFile(path: string): boolean {
   const lower = path.toLowerCase();

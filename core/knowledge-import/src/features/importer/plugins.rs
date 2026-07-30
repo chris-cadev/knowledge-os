@@ -81,6 +81,11 @@ pub fn url_plugin() -> PluginAdapter<crate::features::importer::url::UrlImporter
     PluginAdapter::new(crate::features::importer::url::UrlImporter::new())
 }
 
+/// Create an HTML importer plugin.
+pub fn html_plugin() -> PluginAdapter<crate::features::importer::html::HtmlImporter> {
+    PluginAdapter::new(crate::features::importer::html::HtmlImporter::new())
+}
+
 /// Create an image importer plugin without OCR.
 pub fn image_plugin() -> PluginAdapter<crate::features::importer::image::ImageImporter> {
     PluginAdapter::new(crate::features::importer::image::ImageImporter::new())

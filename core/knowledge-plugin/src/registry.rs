@@ -287,6 +287,16 @@ pub fn built_in_plugins() -> CapabilityRegistry {
             Box::new(importer::UrlImporter::new()) as Box<dyn ImportAdapter>,
             make_manifest("url-importer", "Import content from web URLs"),
         ),
+        (
+            "html",
+            Box::new(importer::HtmlImporter::new()) as Box<dyn ImportAdapter>,
+            make_manifest("html-importer", "Import HTML files"),
+        ),
+        (
+            "htm",
+            Box::new(importer::HtmlImporter::new()) as Box<dyn ImportAdapter>,
+            make_manifest("html-importer", "Import HTML files"),
+        ),
         // Office document formats
         (
             "docx",

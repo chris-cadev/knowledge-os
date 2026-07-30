@@ -118,7 +118,7 @@
         multiple: true,
         filters: [
           { name: "All Supported", extensions: [
-            "md", "pdf", "docx", "pptx", "xlsx", "xlsm",
+            "md", "pdf", "html", "htm", "docx", "pptx", "xlsx", "xlsm",
             "csv", "json", "xml", "yaml", "yml",
             "png", "jpg", "jpeg", "gif", "bmp", "webp", "tiff", "tif",
             "eml", "msg", "ics", "vcf", "enex", "opml", "mbox",

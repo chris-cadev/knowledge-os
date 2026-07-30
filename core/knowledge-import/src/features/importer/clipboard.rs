@@ -41,7 +41,7 @@ impl ClipboardImporter {
 
     pub fn import_html(&self, html: &str, source: &str) -> Result<ImportResult, ImportError> {
         let entity = Entity::new(EntityType::new("Note"));
-        let text = strip_html_tags(html);
+        let text = super::html::html_to_text(html);
         let components = vec![
             Component::new(
                 entity.id,
@@ -66,23 +66,6 @@ impl ClipboardImporter {
             cross_references: vec![],
         })
     }
-}
-
-fn strip_html_tags(html: &str) -> String {
-    let mut text = String::new();
-    let mut in_tag = false;
-    for c in html.chars() {
-        match c {
-            '<' => in_tag = true,
-            '>' if in_tag => {
-                in_tag = false;
-                text.push(' ');
-            }
-            _ if !in_tag => text.push(c),
-            _ => {}
-        }
-    }
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 impl Default for ClipboardImporter {

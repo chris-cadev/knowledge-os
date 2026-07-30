@@ -5,6 +5,7 @@ pub mod database;
 pub mod directory;
 pub mod docx;
 pub mod email;
+pub mod html;
 pub mod ignore_config;
 pub mod image;
 pub mod iwork;
@@ -32,6 +33,7 @@ pub use database::{MySqlDatabaseSource, PostgresDatabaseSource, SqliteDatabaseSo
 pub use directory::DirectoryImporter;
 pub use docx::DocxImporter;
 pub use email::{EmlImporter, MsgImporter};
+pub use html::HtmlImporter;
 pub use image::ImageImporter;
 pub use iwork::{KeynoteImporter, NumbersImporter, PagesImporter};
 pub use legacy_office::{DocImporter, PpsImporter, PptImporter, XlsImporter};
@@ -44,7 +46,9 @@ pub use opendocument::{
     OdgImporter, OdpImporter, OdsImporter, OdtImporter, OtpImporter, OtsImporter, OttImporter,
 };
 pub use pdf::PdfImporter;
-pub use plugins::{image_plugin, markdown_plugin, pdf_plugin, url_plugin, PluginAdapter};
+pub use plugins::{
+    html_plugin, image_plugin, markdown_plugin, pdf_plugin, url_plugin, PluginAdapter,
+};
 pub use pptx::PptxImporter;
 pub use structured::{CsvImporter, JsonImporter, XmlImporter, YamlImporter};
 pub use undo::{get_import_history, get_previous_hashes, record_import, undo_last_import};
