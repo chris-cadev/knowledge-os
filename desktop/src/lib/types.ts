@@ -262,6 +262,13 @@ export interface TestResult {
   error: string | null;
 }
 
+export interface OcrProviderStatus {
+  backend: string;
+  model: string;
+  base_url: string;
+  reachable: boolean;
+}
+
 export type View =
   | "dashboard"
   | "browse"

@@ -143,17 +143,146 @@ pub async fn set_provider(
     })
 }
 
+pub async fn load_and_apply_provider(
+    state: &AppState,
+    config: &ProviderConfig,
+) -> Result<String, String> {
+    save_provider_config(&state.data_dir, config).await?;
+    let (provider, kind) = create_chat_provider_from_config(config)?;
+    let mut pipeline = state.chat_pipeline.lock().await;
+    pipeline.set_chat_provider(provider);
+    *state.chat_provider_kind.lock().await = kind.clone();
+    Ok(kind)
+}
+
 #[tauri::command]
 pub async fn get_providers_status(
     state: tauri::State<'_, AppState>,
 ) -> Result<ProviderStatus, String> {
-    let kind = state.chat_provider_kind.lock().await.clone();
+    let config = load_provider_config(&state.data_dir).await;
+    Ok(ProviderStatus {
+        provider: config.provider_kind,
+        model: config.model,
+        base_url: config.base_url.unwrap_or_default(),
+        reachable: true,
+        latency_ms: 0,
+    })
+}
+
+#[tauri::command]
+pub async fn reset_provider(state: tauri::State<'_, AppState>) -> Result<ProviderStatus, String> {
+    let config = ProviderConfig::default();
+    let kind = load_and_apply_provider(&state, &config).await?;
     Ok(ProviderStatus {
         provider: kind,
         model: String::new(),
         base_url: String::new(),
         reachable: true,
         latency_ms: 0,
+    })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OcrProviderConfig {
+    pub backend: String,
+    pub model: String,
+    pub base_url: Option<String>,
+    pub api_key: Option<String>,
+}
+
+impl Default for OcrProviderConfig {
+    fn default() -> Self {
+        Self {
+            backend: "mock".into(),
+            model: String::new(),
+            base_url: None,
+            api_key: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OcrProviderStatus {
+    pub backend: String,
+    pub model: String,
+    pub base_url: String,
+    pub reachable: bool,
+}
+
+pub fn ocr_config_path(data_dir: &std::path::Path) -> PathBuf {
+    data_dir.join("ocr_config.json")
+}
+
+pub async fn load_ocr_config(data_dir: &std::path::Path) -> OcrProviderConfig {
+    let path = ocr_config_path(data_dir);
+    match tokio::fs::read_to_string(&path).await {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Err(_) => OcrProviderConfig::default(),
+    }
+}
+
+pub async fn save_ocr_config(
+    data_dir: &std::path::Path,
+    config: &OcrProviderConfig,
+) -> Result<(), String> {
+    let path = ocr_config_path(data_dir);
+    let parent = path.parent().unwrap();
+    std::fs::create_dir_all(parent).map_err(|e| format!("failed to create config dir: {}", e))?;
+    let content =
+        serde_json::to_string_pretty(config).map_err(|e| format!("failed to serialize: {}", e))?;
+    tokio::fs::write(&path, content)
+        .await
+        .map_err(|e| format!("failed to write config: {}", e))
+}
+
+#[tauri::command]
+pub async fn set_ocr_provider(
+    state: tauri::State<'_, AppState>,
+    backend: String,
+    model: String,
+    base_url: Option<String>,
+    api_key: Option<String>,
+) -> Result<OcrProviderStatus, String> {
+    let config = OcrProviderConfig {
+        backend: backend.clone(),
+        model: model.clone(),
+        base_url: base_url.clone(),
+        api_key: api_key.clone(),
+    };
+    save_ocr_config(&state.data_dir, &config).await?;
+    let base_url_str = config.base_url.unwrap_or_default();
+    Ok(OcrProviderStatus {
+        backend,
+        model,
+        base_url: base_url_str,
+        reachable: true,
+    })
+}
+
+#[tauri::command]
+pub async fn get_ocr_provider_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<OcrProviderStatus, String> {
+    let config = load_ocr_config(&state.data_dir).await;
+    Ok(OcrProviderStatus {
+        backend: config.backend,
+        model: config.model,
+        base_url: config.base_url.unwrap_or_default(),
+        reachable: true,
+    })
+}
+
+#[tauri::command]
+pub async fn reset_ocr_provider(
+    state: tauri::State<'_, AppState>,
+) -> Result<OcrProviderStatus, String> {
+    let config = OcrProviderConfig::default();
+    save_ocr_config(&state.data_dir, &config).await?;
+    Ok(OcrProviderStatus {
+        backend: config.backend,
+        model: String::new(),
+        base_url: String::new(),
+        reachable: true,
     })
 }
 

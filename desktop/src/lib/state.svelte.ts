@@ -19,6 +19,10 @@ function navigate(view: View, entityId?: string) {
   }
 }
 
+let providerName = $state<string>("Mock");
+let providerModel = $state<string>("");
+let providerReachable = $state<boolean>(true);
+
 export function getState() {
   return {
     get currentView() {
@@ -80,6 +84,24 @@ export function getState() {
     },
     set entityCount(c: number) {
       entityCount = c;
+    },
+    get providerName() {
+      return providerName;
+    },
+    set providerName(n: string) {
+      providerName = n;
+    },
+    get providerModel() {
+      return providerModel;
+    },
+    set providerModel(m: string) {
+      providerModel = m;
+    },
+    get providerReachable() {
+      return providerReachable;
+    },
+    set providerReachable(r: boolean) {
+      providerReachable = r;
     },
     navigate,
   };

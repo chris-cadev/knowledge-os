@@ -20,6 +20,7 @@ import type {
   TimelineOutput,
   ProviderStatus,
   TestResult,
+  OcrProviderStatus,
 } from "./types.js";
 
 export async function listEntities(
@@ -261,4 +262,30 @@ export async function chatTestProvider(
     baseUrl: baseUrl ?? null,
     apiKey: apiKey ?? null,
   });
+}
+
+export async function resetProvider(): Promise<ProviderStatus> {
+  return invoke("reset_provider");
+}
+
+export async function setOcrProvider(
+  backend: string,
+  model: string,
+  baseUrl?: string | null,
+  apiKey?: string | null
+): Promise<OcrProviderStatus> {
+  return invoke("set_ocr_provider", {
+    backend,
+    model,
+    baseUrl: baseUrl ?? null,
+    apiKey: apiKey ?? null,
+  });
+}
+
+export async function getOcrProviderStatus(): Promise<OcrProviderStatus> {
+  return invoke("get_ocr_provider_status");
+}
+
+export async function resetOcrProvider(): Promise<OcrProviderStatus> {
+  return invoke("reset_ocr_provider");
 }
