@@ -177,6 +177,30 @@ export interface ConversationSummary {
   updated_at: string;
 }
 
+export interface ChatState {
+  conversations: ConversationSummary[];
+  currentConversationId: string | null;
+  messages: MessageDisplay[];
+  inputText: string;
+  mode: "fast" | "thinking";
+  knowledgeGraph: boolean;
+  webSearch: boolean;
+  streaming: boolean;
+  processingStatus: ProcessingStatus | null;
+}
+
+export interface MessageDisplay {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  citations?: Citation[];
+  referencedEntities?: string[];
+  feedback?: FeedbackRating;
+  timestamp: string;
+}
+
+export type FeedbackRating = "thumbs_up" | "thumbs_down";
+
 export type View =
   | "dashboard"
   | "browse"
@@ -186,4 +210,5 @@ export type View =
   | "table"
   | "timeline"
   | "import"
-  | "search";
+  | "search"
+  | "chat";

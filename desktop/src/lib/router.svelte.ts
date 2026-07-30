@@ -25,6 +25,7 @@ export function initRouter() {
         "/timeline": "timeline",
         "/import": "import",
         "/search": "search",
+        "/chat": "chat",
       };
       state.currentView = viewMap[hash] ?? "dashboard";
     }
@@ -48,6 +49,7 @@ export function navigateTo(view: View, entityId?: string) {
       timeline: "/timeline",
       import: "/import",
       search: "/search",
+      chat: "/chat",
     };
     window.location.hash = hashMap[view] ?? "/";
   }

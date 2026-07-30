@@ -18,6 +18,7 @@
     { view: "tree", label: "Tree", icon: "account_tree" },
     { view: "table", label: "Table", icon: "table_chart" },
     { view: "timeline", label: "Timeline", icon: "timeline" },
+    { view: "chat", label: "Chat", icon: "chat" },
     { view: "import", label: "Import", icon: "file_upload" },
     { view: "search", label: "Search", icon: "search" },
   ];
