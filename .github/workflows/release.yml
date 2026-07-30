@@ -10,11 +10,11 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         # ponytail: third-party action; if compromised or deprecated, replace with raw actions/cache keyed on Cargo.lock hash
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '26'
           cache: npm
@@ -28,7 +28,7 @@ jobs:
         working-directory: desktop
       - run: cp target/release/kos kos-linux-x86_64
       - run: sha256sum kos-linux-x86_64 > kos-linux-x86_64.sha256
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-x86_64
           path: |
@@ -53,17 +53,17 @@ jobs:
             ext: .exe
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         # ponytail: third-party action; if compromised or deprecated, replace with raw actions/cache keyed on Cargo.lock hash
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '26'
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils && { which xdg-open >/dev/null 2>&1 && sudo ln -sf "$(which xdg-open)" /usr/bin/xdg-open || true; }
       - run: npm ci && npm run build
         working-directory: desktop
       - run: cargo build -p knowledge-cli --release
@@ -75,7 +75,7 @@ jobs:
       - if: runner.os == 'Windows'
         shell: bash
         run: sha256sum kos-${{ matrix.target }}.exe > kos-${{ matrix.target }}.exe.sha256
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
           path: |
@@ -86,8 +86,8 @@ jobs:
     needs: [build-linux, build-other]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: '*'
           merge-multiple: true
