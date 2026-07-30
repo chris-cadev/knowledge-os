@@ -5,23 +5,21 @@ use knowledge_core::features::component::{Component, ComponentType};
 use knowledge_core::features::entity::{Entity, EntityType};
 use knowledge_core::features::relationship::{Relationship, RelationshipType};
 use knowledge_core::ports::{
-    AiAdapter, Collection, CollectionRepository, ComponentRepository, EntityRepository,
-    EntityResolver, EntityVersion, Event, EventLog, EventNotifier, Plugin, RelationshipRepository,
-    SearchIndex, SearchQuery, SearchResult, StorageError, TransactionalWrite, TraversalConfig,
-    TraversalDirection, TraversalError, TraversalPort, TraversalQuery, TraversalResult,
-    ViewAdapter, ViewFilter, ViewOutput, ViewRegistry,
+    AiAdapter, Collection, CollectionRepository, ComponentRepository, ConversationRepository,
+    EntityRepository, EntityResolver, EntityVersion, Event, EventLog, EventNotifier, Plugin,
+    RelationshipRepository, SearchIndex, SearchQuery, SearchResult, StorageError,
+    TransactionalWrite, TraversalConfig, TraversalDirection, TraversalError, TraversalPort,
+    TraversalQuery, TraversalResult, ViewAdapter, ViewFilter, ViewOutput, ViewRegistry,
 };
-use knowledge_derivation::features::search::{
-    providers::create_from_config, AiConfig,
-};
-use knowledge_storage::adapters::sqlite::vector_store::SqliteVectorStore;
-use knowledge_import::features::importer::ImportAdapter;
-use knowledge_plugin::dynamic::load_plugins_from;
-use knowledge_plugin::registry::built_in_plugins;
+use knowledge_derivation::features::search::{providers::create_from_config, AiConfig};
 use knowledge_derivation::features::view::{
     graph::GraphViewAdapter, table::TableViewAdapter, timeline::TimelineViewAdapter,
     tree::TreeViewAdapter,
 };
+use knowledge_import::features::importer::ImportAdapter;
+use knowledge_plugin::dynamic::load_plugins_from;
+use knowledge_plugin::registry::built_in_plugins;
+use knowledge_storage::adapters::sqlite::vector_store::SqliteVectorStore;
 use knowledge_storage::adapters::sqlite::SqliteStore;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -353,6 +351,11 @@ enum Commands {
         #[command(subcommand)]
         action: CollectionCommands,
     },
+    /// Manage conversations
+    Conversation {
+        #[command(subcommand)]
+        action: ConversationCommands,
+    },
     /// Manage plugins
     Plugin {
         #[command(subcommand)]
@@ -412,6 +415,29 @@ enum ResolutionCommands {
     Undo {
         /// Merge audit entry ID to undo
         merge_id: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConversationCommands {
+    /// List all conversations
+    List,
+    /// Show a conversation with its messages
+    Get {
+        /// Conversation ID
+        id: String,
+    },
+    /// Rename a conversation
+    Rename {
+        /// Conversation ID
+        id: String,
+        /// New title
+        title: String,
+    },
+    /// Archive a conversation
+    Delete {
+        /// Conversation ID
+        id: String,
     },
 }
 
@@ -558,6 +584,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::View { view_type } => cmd_view(store, view_type).await,
         Commands::Collection { action } => cmd_collection(&store, action).await,
+        Commands::Conversation { action } => cmd_conversation(&store, action).await,
         Commands::Plugin { action } => match action {
             PluginCommands::List => cmd_plugin_list().await,
             PluginCommands::Info { name } => cmd_plugin_info(&name).await,
@@ -602,7 +629,17 @@ async fn cmd_import(
 
         match registry.get_importer("url") {
             Ok(importer) => {
-                match import_with_adapter(&store, importer, &path, ai_adapter, vector_store, auto_merge_threshold, review_threshold).await {
+                match import_with_adapter(
+                    &store,
+                    importer,
+                    &path,
+                    ai_adapter,
+                    vector_store,
+                    auto_merge_threshold,
+                    review_threshold,
+                )
+                .await
+                {
                     Ok(_) => {
                         println!("\nImported URL: {}", path_str);
                         pb.inc(1);
@@ -670,11 +707,22 @@ async fn cmd_import(
 
         let action = match registry.get_importer(importer_key) {
             Ok(importer) => {
-                import_with_adapter(&store, importer, file_path, ai_adapter, vector_store, auto_merge_threshold, review_threshold).await
+                import_with_adapter(
+                    &store,
+                    importer,
+                    file_path,
+                    ai_adapter,
+                    vector_store,
+                    auto_merge_threshold,
+                    review_threshold,
+                )
+                .await
             }
-            Err(_) => {
-                Err(format!("No importer available for .{} files. Supported formats: markdown, pdf", ext).into())
-            }
+            Err(_) => Err(format!(
+                "No importer available for .{} files. Supported formats: markdown, pdf",
+                ext
+            )
+            .into()),
         };
 
         match action {
@@ -1122,7 +1170,13 @@ async fn import_with_adapter(
                         entity_type: entity.entity_type.to_string(),
                         title: title.clone(),
                     };
-                    let _ = knowledge_core::ports::VectorStore::upsert(vs, &entity.id.to_string(), &vector, Some(metadata)).await;
+                    let _ = knowledge_core::ports::VectorStore::upsert(
+                        vs,
+                        &entity.id.to_string(),
+                        &vector,
+                        Some(metadata),
+                    )
+                    .await;
                 }
                 Err(e) => {
                     eprintln!("  Warning: embedding generation failed: {}", e);
@@ -1196,7 +1250,9 @@ async fn cmd_search(
                 min_score: None,
             });
 
-            match knowledge_core::ports::VectorStore::search(&*vector_store, &query_vec, 20, filter).await {
+            match knowledge_core::ports::VectorStore::search(&*vector_store, &query_vec, 20, filter)
+                .await
+            {
                 Ok(results) => results,
                 Err(e) => {
                     eprintln!("Warning: Vector search failed: {}", e);
@@ -1896,6 +1952,75 @@ async fn cmd_collection(
         }
     }
 
+    Ok(())
+}
+
+async fn cmd_conversation(
+    store: &Arc<SqliteStore>,
+    action: ConversationCommands,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match action {
+        ConversationCommands::List => {
+            let conversations = ConversationRepository::list_conversations(store.as_ref()).await?;
+            if conversations.is_empty() {
+                println!("No conversations found.");
+                return Ok(());
+            }
+            println!("Conversations ({}):\n", conversations.len());
+            for c in &conversations {
+                let preview = c.last_message_preview.as_deref().unwrap_or("(no messages)");
+                let last_at = c
+                    .last_message_at
+                    .map(|d| d.to_rfc3339())
+                    .unwrap_or_else(|| "never".to_string());
+                println!(
+                    "  {} — \"{}\" ({} messages, last: {})",
+                    c.id, c.title, c.message_count, last_at
+                );
+                if c.message_count > 0 {
+                    println!("    Preview: {}", preview);
+                }
+            }
+        }
+        ConversationCommands::Get { id } => {
+            let conv_id = Uuid::parse_str(&id)?;
+            let conv = ConversationRepository::get_conversation(store.as_ref(), conv_id)
+                .await?
+                .ok_or_else(|| format!("Conversation {} not found", conv_id))?;
+            println!("# {} ({})", conv.title, conv.id);
+            println!("Created: {}", conv.created_at);
+            println!("Messages ({}):\n", conv.messages.len());
+            for msg in &conv.messages {
+                let role_str = match msg.role {
+                    knowledge_core::ports::MessageRole::System => "system",
+                    knowledge_core::ports::MessageRole::User => "user",
+                    knowledge_core::ports::MessageRole::Assistant => "assistant",
+                };
+                println!("[{}] {}", role_str, msg.text);
+                if !msg.entity_refs.is_empty() {
+                    println!(
+                        "  References: {}",
+                        msg.entity_refs
+                            .iter()
+                            .map(|id| id.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
+                }
+                println!();
+            }
+        }
+        ConversationCommands::Rename { id, title } => {
+            let conv_id = Uuid::parse_str(&id)?;
+            ConversationRepository::rename_conversation(store.as_ref(), conv_id, &title).await?;
+            println!("Conversation {} renamed to \"{}\".", conv_id, title);
+        }
+        ConversationCommands::Delete { id } => {
+            let conv_id = Uuid::parse_str(&id)?;
+            ConversationRepository::archive_conversation(store.as_ref(), conv_id).await?;
+            println!("Conversation {} archived.", conv_id);
+        }
+    }
     Ok(())
 }
 

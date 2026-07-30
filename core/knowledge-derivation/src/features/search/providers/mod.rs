@@ -38,7 +38,9 @@ impl AiAdapter for MockAiAdapter {
 
         let mut vec = Vec::with_capacity(self.dimensions);
         for i in 0..self.dimensions {
-            let val = ((seed.wrapping_add((i as u64).wrapping_mul(0x9e3779b97f4a7c15)) & 0xFF) as f32 - 128.0)
+            let val = ((seed.wrapping_add((i as u64).wrapping_mul(0x9e3779b97f4a7c15)) & 0xFF)
+                as f32
+                - 128.0)
                 / 128.0;
             vec.push(val);
         }
@@ -112,7 +114,9 @@ pub fn create_from_config(config: &str) -> Result<Box<dyn AiAdapter>, AiError> {
         )));
     }
 
-    eprintln!("Warning: No AI provider configured and OPENAI_API_KEY not set. Using mock embedder.");
+    eprintln!(
+        "Warning: No AI provider configured and OPENAI_API_KEY not set. Using mock embedder."
+    );
     eprintln!("  Set OPENAI_API_KEY or configure via --ai-provider flag.");
     eprintln!("  Supported providers: mock://DIMS, openai://MODEL?api_key=KEY");
 

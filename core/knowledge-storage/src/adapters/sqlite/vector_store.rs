@@ -1,7 +1,5 @@
 use async_trait::async_trait;
-use knowledge_core::ports::{
-    VectorError, VectorFilter, VectorMetadata, VectorResult, VectorStore,
-};
+use knowledge_core::ports::{VectorError, VectorFilter, VectorMetadata, VectorResult, VectorStore};
 use rusqlite::params;
 
 use super::store::SqliteStore;
@@ -41,7 +39,11 @@ impl SqliteVectorStore {
 
     /// Compute cosine similarity between two vectors.
     fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-        let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| (*x as f64) * (*y as f64)).sum();
+        let dot: f64 = a
+            .iter()
+            .zip(b.iter())
+            .map(|(x, y)| (*x as f64) * (*y as f64))
+            .sum();
         let norm_a: f64 = a.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
         let norm_b: f64 = b.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
         if norm_a == 0.0 || norm_b == 0.0 {
@@ -63,14 +65,13 @@ impl VectorStore for SqliteVectorStore {
         let bytes = Self::encode(vector);
         let timestamp = chrono::Utc::now().to_rfc3339();
 
-        let model = metadata
-            .as_ref()
-            .map(|m| &*m.model)
-            .unwrap_or("default");
+        let model = metadata.as_ref().map(|m| &*m.model).unwrap_or("default");
 
-        let conn = self.store.conn.lock().map_err(|e| {
-            VectorError::Storage(format!("lock error: {}", e))
-        })?;
+        let conn = self
+            .store
+            .conn
+            .lock()
+            .map_err(|e| VectorError::Storage(format!("lock error: {}", e)))?;
 
         conn.execute(
             "INSERT OR REPLACE INTO embeddings (entity_id, model, vector, dimensions, created_at)
@@ -95,9 +96,11 @@ impl VectorStore for SqliteVectorStore {
             });
         }
 
-        let conn = self.store.conn.lock().map_err(|e| {
-            VectorError::Storage(format!("lock error: {}", e))
-        })?;
+        let conn = self
+            .store
+            .conn
+            .lock()
+            .map_err(|e| VectorError::Storage(format!("lock error: {}", e)))?;
 
         let min_score = filter.as_ref().and_then(|f| f.min_score);
         let filter_entity_types = filter.as_ref().and_then(|f| f.entity_types.as_ref());
@@ -155,16 +158,22 @@ impl VectorStore for SqliteVectorStore {
             });
         }
 
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         scored.truncate(k);
 
         Ok(scored)
     }
 
     async fn delete(&self, entity_id: &str) -> Result<(), VectorError> {
-        let conn = self.store.conn.lock().map_err(|e| {
-            VectorError::Storage(format!("lock error: {}", e))
-        })?;
+        let conn = self
+            .store
+            .conn
+            .lock()
+            .map_err(|e| VectorError::Storage(format!("lock error: {}", e)))?;
 
         conn.execute(
             "DELETE FROM embeddings WHERE entity_id = ?1",
@@ -176,9 +185,11 @@ impl VectorStore for SqliteVectorStore {
     }
 
     async fn rebuild(&self) -> Result<(), VectorError> {
-        let conn = self.store.conn.lock().map_err(|e| {
-            VectorError::Storage(format!("lock error: {}", e))
-        })?;
+        let conn = self
+            .store
+            .conn
+            .lock()
+            .map_err(|e| VectorError::Storage(format!("lock error: {}", e)))?;
 
         conn.execute("DELETE FROM embeddings", [])
             .map_err(|e| VectorError::Storage(format!("rebuild failed: {}", e)))?;
