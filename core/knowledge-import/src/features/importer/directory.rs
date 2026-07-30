@@ -26,14 +26,11 @@ impl DirectoryImporter {
         let mut files = Vec::new();
         if self.recursive {
             if let Some(ref gi) = self.ignore {
-                for entry in walkdir::WalkDir::new(path)
-                    .into_iter()
-                    .filter_entry(|e| {
-                        let is_dir = e.file_type().is_dir();
-                        let matched = gi.matched_path_or_any_parents(e.path(), is_dir);
-                        !matched.is_ignore()
-                    })
-                {
+                for entry in walkdir::WalkDir::new(path).into_iter().filter_entry(|e| {
+                    let is_dir = e.file_type().is_dir();
+                    let matched = gi.matched_path_or_any_parents(e.path(), is_dir);
+                    !matched.is_ignore()
+                }) {
                     let entry = match entry {
                         Ok(e) => e,
                         Err(e) => {
@@ -168,10 +165,7 @@ mod tests {
         std::fs::create_dir(&node_modules).unwrap();
         std::fs::write(node_modules.join("pkg.js"), "js").unwrap();
 
-        let gi = super::super::ignore_config::build_gitignore(
-            &["node_modules/"],
-            dir.path(),
-        );
+        let gi = super::super::ignore_config::build_gitignore(&["node_modules/"], dir.path());
         let importer = DirectoryImporter::new(true).with_ignore(gi);
         let files = importer.list_files(dir.path()).unwrap();
         assert_eq!(files.len(), 1);
@@ -184,10 +178,7 @@ mod tests {
         std::fs::write(dir.path().join("a.md"), "a").unwrap();
         std::fs::write(dir.path().join("cache.pyc"), "pyc").unwrap();
 
-        let gi = super::super::ignore_config::build_gitignore(
-            &["*.pyc"],
-            dir.path(),
-        );
+        let gi = super::super::ignore_config::build_gitignore(&["*.pyc"], dir.path());
         let importer = DirectoryImporter::new(true).with_ignore(gi);
         let files = importer.list_files(dir.path()).unwrap();
         assert_eq!(files.len(), 1);

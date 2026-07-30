@@ -21,7 +21,9 @@ pub fn build_gitignore<S: AsRef<str>>(patterns: &[S], root: &Path) -> Gitignore 
     for p in patterns {
         let _ = builder.add_line(None, p.as_ref());
     }
-    builder.build().expect("failed to build gitignore from patterns")
+    builder
+        .build()
+        .expect("failed to build gitignore from patterns")
 }
 
 pub fn load_ignore_file(path: &Path) -> Option<Gitignore> {
@@ -73,10 +75,18 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let gi = build_gitignore(DEFAULT_PATTERNS, dir.path());
 
-        assert!(gi.matched_path_or_any_parents(&dir.path().join(".git"), true).is_ignore());
-        assert!(gi.matched_path_or_any_parents(&dir.path().join("node_modules"), true).is_ignore());
-        assert!(gi.matched_path_or_any_parents(&dir.path().join("foo.pyc"), false).is_ignore());
-        assert!(!gi.matched_path_or_any_parents(&dir.path().join("notes.md"), false).is_ignore());
+        assert!(gi
+            .matched_path_or_any_parents(&dir.path().join(".git"), true)
+            .is_ignore());
+        assert!(gi
+            .matched_path_or_any_parents(&dir.path().join("node_modules"), true)
+            .is_ignore());
+        assert!(gi
+            .matched_path_or_any_parents(&dir.path().join("foo.pyc"), false)
+            .is_ignore());
+        assert!(!gi
+            .matched_path_or_any_parents(&dir.path().join("notes.md"), false)
+            .is_ignore());
     }
 
     #[test]
@@ -92,9 +102,15 @@ mod tests {
         fs::write(&kosignore, "target/\n*.log\n").unwrap();
 
         let gi = load_ignore_file(&kosignore).unwrap();
-        assert!(gi.matched_path_or_any_parents(&dir.path().join("target"), true).is_ignore());
-        assert!(gi.matched_path_or_any_parents(&dir.path().join("debug.log"), false).is_ignore());
-        assert!(!gi.matched_path_or_any_parents(&dir.path().join("notes.md"), false).is_ignore());
+        assert!(gi
+            .matched_path_or_any_parents(&dir.path().join("target"), true)
+            .is_ignore());
+        assert!(gi
+            .matched_path_or_any_parents(&dir.path().join("debug.log"), false)
+            .is_ignore());
+        assert!(!gi
+            .matched_path_or_any_parents(&dir.path().join("notes.md"), false)
+            .is_ignore());
     }
 
     #[test]
@@ -104,8 +120,12 @@ mod tests {
         fs::write(dir.path().join(".gitignore"), "*.log\n").unwrap();
 
         let gi = resolve_ignore(dir.path(), None);
-        assert!(gi.matched_path_or_any_parents(&dir.path().join("data.secret"), false).is_ignore());
-        assert!(!gi.matched_path_or_any_parents(&dir.path().join("debug.log"), false).is_ignore());
+        assert!(gi
+            .matched_path_or_any_parents(&dir.path().join("data.secret"), false)
+            .is_ignore());
+        assert!(!gi
+            .matched_path_or_any_parents(&dir.path().join("debug.log"), false)
+            .is_ignore());
     }
 
     #[test]
@@ -114,7 +134,9 @@ mod tests {
         fs::write(dir.path().join(".gitignore"), "*.log\n").unwrap();
 
         let gi = resolve_ignore(dir.path(), None);
-        assert!(gi.matched_path_or_any_parents(&dir.path().join("debug.log"), false).is_ignore());
+        assert!(gi
+            .matched_path_or_any_parents(&dir.path().join("debug.log"), false)
+            .is_ignore());
     }
 
     #[test]
@@ -125,7 +147,9 @@ mod tests {
         fs::write(&global, "*.tmp\n").unwrap();
 
         let gi = resolve_ignore(import_dir.path(), Some(&global));
-        assert!(gi.matched_path_or_any_parents(&import_dir.path().join("cache.tmp"), false).is_ignore());
+        assert!(gi
+            .matched_path_or_any_parents(&import_dir.path().join("cache.tmp"), false)
+            .is_ignore());
     }
 
     #[test]
@@ -133,7 +157,11 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let gi = resolve_ignore(dir.path(), None);
 
-        assert!(gi.matched_path_or_any_parents(&dir.path().join("node_modules"), true).is_ignore());
-        assert!(!gi.matched_path_or_any_parents(&dir.path().join("notes.md"), false).is_ignore());
+        assert!(gi
+            .matched_path_or_any_parents(&dir.path().join("node_modules"), true)
+            .is_ignore());
+        assert!(!gi
+            .matched_path_or_any_parents(&dir.path().join("notes.md"), false)
+            .is_ignore());
     }
 }

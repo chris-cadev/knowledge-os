@@ -22,9 +22,7 @@ pub async fn set_ignore_patterns(
 }
 
 #[tauri::command]
-pub async fn reset_ignore_patterns(
-    state: State<'_, AppState>,
-) -> Result<String, String> {
+pub async fn reset_ignore_patterns(state: State<'_, AppState>) -> Result<String, String> {
     let path = state.data_dir.join(".kosignore");
     let _ = std::fs::remove_file(&path);
     Ok(DEFAULT_PATTERNS.join("\n"))
