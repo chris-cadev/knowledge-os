@@ -363,6 +363,7 @@ All interfaces must meet WCAG 2.1 AA standards:
 
 ## Further Reading
 
+- [Interaction Design](../architecture/interaction-design.md) -- Interaction principles and user experience guidelines
 - [UI Philosophy](../architecture/ui-philosophy.md) -- Conceptual foundation for interfaces
 - [Mental Model](../architecture/mental-model.md) -- The projection model
 - [Composition](../architecture/composition.md) -- How entities map to view components

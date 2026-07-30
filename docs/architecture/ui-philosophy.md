@@ -270,7 +270,9 @@ Every interface follows accessibility standards:
 
 ## Further Reading
 
-- [Mental Model](mental-model.md) -- The conceptual foundation for projections
+- [Interaction Design](interaction-design.md) -- How users should feel and how interactions should behave
+- [UI Design System](../engineering/ui-design-system.md) -- Visual tokens and component specifications
+- [Mental Model](mental-model.md) -- The projection model
 - [Pipeline](pipeline.md) -- How views are rendered from canonical data
 - [AI](ai.md) -- How AI interfaces interact with the knowledge model
 - [Composition](composition.md) -- How entities map to view components

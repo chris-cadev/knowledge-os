@@ -40,6 +40,7 @@ docs/
     events.md                 Event-driven architecture
     ai.md                     AI as a system component
     ui-philosophy.md          User interface philosophy
+    interaction-design.md     Interaction design principles and heuristics
     extensibility.md          Plugin system and extension points
     scalability.md            Scaling strategies
     synchronization.md        Consistency and derived data updates
