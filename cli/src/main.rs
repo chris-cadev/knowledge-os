@@ -299,6 +299,9 @@ enum Commands {
         /// Format hint for structured preview (csv, json, xml, yaml)
         #[arg(long)]
         format: Option<String>,
+        /// Path to a .kosignore or .gitignore file with exclusion patterns
+        #[arg(long = "ignore-file")]
+        ignore_file: Option<String>,
     },
     /// Search entities
     Search {
@@ -551,6 +554,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             undo,
             import_id,
             format,
+            ignore_file,
         } => {
             cmd_import(
                 store.clone(),
@@ -567,6 +571,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 undo,
                 import_id,
                 format,
+                ignore_file,
             )
             .await
         }
@@ -645,6 +650,7 @@ async fn cmd_import(
     undo: bool,
     import_id: Option<String>,
     format: Option<String>,
+    ignore_file: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Handle undo
     if undo {
@@ -727,7 +733,21 @@ async fn cmd_import(
     // Collect files: single file, directory (recursive or flat)
     let mut all_files: Vec<std::path::PathBuf> = Vec::new();
     if path.is_dir() {
-        let dir_importer = knowledge_import::features::importer::DirectoryImporter::new(recursive);
+        let gi = if let Some(ref file) = ignore_file {
+            knowledge_import::features::importer::ignore_config::load_ignore_file(
+                std::path::Path::new(file),
+            )
+            .unwrap_or_else(|| {
+                knowledge_import::features::importer::ignore_config::build_gitignore(
+                    knowledge_import::features::importer::ignore_config::DEFAULT_PATTERNS,
+                    &path,
+                )
+            })
+        } else {
+            knowledge_import::features::importer::ignore_config::resolve_ignore(&path, None)
+        };
+        let dir_importer =
+            knowledge_import::features::importer::DirectoryImporter::new(recursive).with_ignore(gi);
         all_files = dir_importer.list_files(&path)?;
     } else {
         all_files.push(path);
