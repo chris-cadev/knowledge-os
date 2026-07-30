@@ -54,6 +54,18 @@ fn extract_role_and_text(data: Option<String>) -> (MessageRole, String) {
     .unwrap_or((MessageRole::User, String::new()))
 }
 
+fn extract_preview_text(data: &str) -> String {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
+        if let Some(content) = v.get("content").and_then(|c| c.as_str()) {
+            return content.to_string();
+        }
+        if let Some(text) = v.get("text").and_then(|t| t.as_str()) {
+            return text.to_string();
+        }
+    }
+    data.to_string()
+}
+
 fn extract_entity_ids(data: Option<String>) -> Vec<Uuid> {
     data.and_then(|d| {
         let v: serde_json::Value = serde_json::from_str(&d).ok()?;
@@ -123,7 +135,7 @@ impl ConversationRepository for SqliteStore {
 
                     let (last_message_preview, last_message_at) =
                         if let Some(content) = last_msg_content {
-                            let preview = content
+                            let preview = extract_preview_text(&content)
                                 .chars()
                                 .take(100)
                                 .collect::<String>()
