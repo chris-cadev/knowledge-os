@@ -1,19 +1,30 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
+use chrono::Utc;
 use knowledge_core::features::component::{Component, ComponentType};
-use knowledge_core::ports::{ComponentRepository, ImageInput, OcrBackend, OcrError, OcrResult};
+use knowledge_core::ports::{
+    ComponentRepository, Event, EventLog, EventType, ImageInput, OcrBackend, OcrError, OcrProvider,
+    OcrResult,
+};
 use uuid::Uuid;
 
 pub struct OcrPipeline {
     backend: Arc<dyn OcrBackend>,
     component_repo: Box<dyn ComponentRepository>,
+    event_log: Box<dyn EventLog>,
 }
 
 impl OcrPipeline {
-    pub fn new(backend: Arc<dyn OcrBackend>, component_repo: Box<dyn ComponentRepository>) -> Self {
+    pub fn new(
+        backend: Arc<dyn OcrBackend>,
+        component_repo: Box<dyn ComponentRepository>,
+        event_log: Box<dyn EventLog>,
+    ) -> Self {
         Self {
             backend,
             component_repo,
+            event_log,
         }
     }
 
@@ -46,19 +57,49 @@ impl OcrPipeline {
             .await
             .map_err(|e| OcrError::Provider(e.to_string()))?;
 
-        if existing.is_empty() {
+        let event_type = if existing.is_empty() {
             self.component_repo
                 .save(&content)
                 .await
                 .map_err(|e| OcrError::Provider(e.to_string()))?;
+            EventType::ComponentAdded
         } else {
             self.component_repo
                 .update_data(existing[0].id, content.data)
                 .await
                 .map_err(|e| OcrError::Provider(e.to_string()))?;
-        }
+            EventType::ComponentUpdated
+        };
+
+        let event = Event {
+            id: Uuid::new_v4(),
+            event_type,
+            entity_id,
+            timestamp: Utc::now(),
+            data: serde_json::json!({
+                "pipeline": "ocr",
+                "confidence": result.confidence,
+                "model": result.model,
+            }),
+        };
+        let _ = self.event_log.append(&event).await;
 
         Ok(result)
+    }
+}
+
+#[async_trait]
+impl OcrProvider for OcrPipeline {
+    async fn process_image(
+        &self,
+        entity_id: Uuid,
+        image_bytes: Vec<u8>,
+        mime_type: String,
+    ) -> Result<String, String> {
+        self.process_image(entity_id, image_bytes, mime_type)
+            .await
+            .map(|r| r.text)
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -67,6 +108,18 @@ mod tests {
     use super::*;
     use knowledge_core::features::component::Component;
     use knowledge_core::ports::StorageError;
+
+    struct MockEventLog;
+
+    #[async_trait]
+    impl EventLog for MockEventLog {
+        async fn append(&self, _event: &Event) -> Result<(), StorageError> {
+            Ok(())
+        }
+        async fn list_by_entity(&self, _entity_id: Uuid) -> Result<Vec<Event>, StorageError> {
+            Ok(vec![])
+        }
+    }
 
     struct MockComponentRepo;
 
@@ -118,7 +171,8 @@ mod tests {
     async fn pipeline_processes_image_and_updates_content() {
         let backend = Arc::new(super::super::mock::MockOcrBackend::new().with_text("OCR text"));
         let repo = Box::new(MockComponentRepo);
-        let pipeline = OcrPipeline::new(backend, repo);
+        let event_log = Box::new(MockEventLog);
+        let pipeline = OcrPipeline::new(backend, repo, event_log);
 
         let mut buf = std::io::Cursor::new(Vec::new());
         let img = image::ImageBuffer::from_fn(10, 10, |_x, _y| image::Luma([255u8]));

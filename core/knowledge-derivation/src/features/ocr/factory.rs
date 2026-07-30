@@ -1,4 +1,21 @@
-use knowledge_core::ports::{OcrBackend, OcrError};
+use std::sync::Arc;
+
+use knowledge_core::ports::{ComponentRepository, EventLog, OcrBackend, OcrError};
+
+use super::pipeline::OcrPipeline;
+
+pub fn create_ocr_pipeline(
+    config: &str,
+    component_repo: Box<dyn ComponentRepository>,
+    event_log: Box<dyn EventLog>,
+) -> Result<OcrPipeline, OcrError> {
+    let backend = create_ocr_backend(config)?;
+    Ok(OcrPipeline::new(
+        Arc::from(backend),
+        component_repo,
+        event_log,
+    ))
+}
 
 pub fn create_ocr_backend(config: &str) -> Result<Box<dyn OcrBackend>, OcrError> {
     if config == "mock" || config.starts_with("mock://") {
