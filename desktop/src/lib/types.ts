@@ -241,6 +241,27 @@ export interface MessageDisplay {
 
 export type FeedbackRating = "thumbs_up" | "thumbs_down";
 
+export interface ProviderConfig {
+  provider_kind: string;
+  model: string;
+  base_url: string | null;
+  api_key: string | null;
+}
+
+export interface ProviderStatus {
+  provider: string;
+  model: string;
+  base_url: string;
+  reachable: boolean;
+  latency_ms: number;
+}
+
+export interface TestResult {
+  success: boolean;
+  latency_ms: number;
+  error: string | null;
+}
+
 export type View =
   | "dashboard"
   | "browse"
@@ -251,4 +272,5 @@ export type View =
   | "timeline"
   | "import"
   | "search"
-  | "chat";
+  | "chat"
+  | "settings";

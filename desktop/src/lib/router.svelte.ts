@@ -26,6 +26,7 @@ export function initRouter() {
         "/import": "import",
         "/search": "search",
         "/chat": "chat",
+        "/settings": "settings",
       };
       state.currentView = viewMap[hash] ?? "dashboard";
     }
@@ -50,6 +51,7 @@ export function navigateTo(view: View, entityId?: string) {
       import: "/import",
       search: "/search",
       chat: "/chat",
+      settings: "/settings",
     };
     window.location.hash = hashMap[view] ?? "/";
   }

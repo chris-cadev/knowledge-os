@@ -30,6 +30,10 @@ pub struct ChatResult {
 }
 
 impl ChatPipeline {
+    pub fn set_chat_provider(&mut self, provider: Arc<dyn ChatCompletion>) {
+        self.chat_provider = provider;
+    }
+
     pub fn new(
         chat_provider: Arc<dyn ChatCompletion>,
         entity_repo: Arc<dyn EntityRepository>,

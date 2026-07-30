@@ -82,6 +82,8 @@ impl ImportAdapter for ImageImporter {
                     "size": size,
                 }),
             ),
+        ];
+
         if let Some(ref ocr) = self.ocr_provider {
             match ocr.process_image(entity.id, bytes, mime_type).await {
                 Ok(text) => {
