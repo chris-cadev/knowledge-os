@@ -21,6 +21,13 @@
       <span class="status-message">{app.statusMessage}</span>
     {:else}
       <span class="status-text">{app.entityCount} entit{app.entityCount === 1 ? "y" : "ies"}</span>
+      <span class="status-separator">|</span>
+      <span class="status-provider" class:reachable={app.providerReachable} class:unreachable={!app.providerReachable}>
+        {app.providerName}
+        {#if app.providerModel}
+          <span class="provider-model">({app.providerModel})</span>
+        {/if}
+      </span>
     {/if}
   </div>
   <div class="status-right">
@@ -57,6 +64,23 @@
 
   .status-text {
     color: var(--text-secondary);
+  }
+
+  .status-provider {
+    color: var(--text-secondary);
+  }
+
+  .status-provider.reachable {
+    color: var(--accent);
+  }
+
+  .status-provider.unreachable {
+    color: #e53e3e;
+  }
+
+  .provider-model {
+    font-size: 0.9em;
+    opacity: 0.7;
   }
 
   .status-right {

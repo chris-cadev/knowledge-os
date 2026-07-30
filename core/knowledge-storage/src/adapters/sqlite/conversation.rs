@@ -23,7 +23,12 @@ fn relationship_type_json(rt: &str) -> String {
 
 fn title_from_data(data: Option<String>) -> String {
     data.and_then(|d| serde_json::from_str::<serde_json::Value>(&d).ok())
-        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .map(|v| {
+            v.as_str()
+                .or_else(|| v.get("name").and_then(|n| n.as_str()))
+                .unwrap_or("Untitled")
+                .to_string()
+        })
         .unwrap_or_else(|| "Untitled".to_string())
 }
 
@@ -39,7 +44,8 @@ fn extract_role_and_text(data: Option<String>) -> (MessageRole, String) {
                     _ => MessageRole::System,
                 })
                 .unwrap_or(MessageRole::User),
-            v.get("text")
+            v.get("content")
+                .or_else(|| v.get("text"))
                 .and_then(|t| t.as_str())
                 .unwrap_or("")
                 .to_string(),
@@ -48,15 +54,29 @@ fn extract_role_and_text(data: Option<String>) -> (MessageRole, String) {
     .unwrap_or((MessageRole::User, String::new()))
 }
 
+fn extract_preview_text(data: &str) -> String {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
+        if let Some(content) = v.get("content").and_then(|c| c.as_str()) {
+            return content.to_string();
+        }
+        if let Some(text) = v.get("text").and_then(|t| t.as_str()) {
+            return text.to_string();
+        }
+    }
+    data.to_string()
+}
+
 fn extract_entity_ids(data: Option<String>) -> Vec<Uuid> {
     data.and_then(|d| {
         let v: serde_json::Value = serde_json::from_str(&d).ok()?;
-        v.get("entity_ids").and_then(|ids| {
-            ids.as_array()?
-                .iter()
-                .map(|id| Uuid::parse_str(id.as_str()?).ok())
-                .collect::<Option<Vec<_>>>()
-        })
+        v.get("refs")
+            .or_else(|| v.get("entity_ids"))
+            .and_then(|ids| {
+                ids.as_array()?
+                    .iter()
+                    .map(|id| Uuid::parse_str(id.as_str()?).ok())
+                    .collect::<Option<Vec<_>>>()
+            })
     })
     .unwrap_or_default()
 }
@@ -115,7 +135,7 @@ impl ConversationRepository for SqliteStore {
 
                     let (last_message_preview, last_message_at) =
                         if let Some(content) = last_msg_content {
-                            let preview = content
+                            let preview = extract_preview_text(&content)
                                 .chars()
                                 .take(100)
                                 .collect::<String>()

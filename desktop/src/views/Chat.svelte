@@ -6,6 +6,7 @@
     chatSend,
     chatSearchEntities,
     chatListConversations,
+    chatGetConversation,
     chatDeleteConversation,
     chatRenameConversation,
     chatStopStream,
@@ -120,6 +121,19 @@
     messages = [];
     errorMessage = null;
     try {
+      const detail = await chatGetConversation(id);
+      if (detail) {
+        messages = detail.messages.map((m) => {
+          const display: MessageDisplay = {
+            id: m.id,
+            role: m.role as "user" | "assistant" | "system",
+            content: m.text,
+            timestamp: m.created_at,
+          };
+          return display;
+        });
+        scrollToBottom();
+      }
     } catch (e) {
       errorMessage = `Failed to load conversation: ${e}`;
     } finally {

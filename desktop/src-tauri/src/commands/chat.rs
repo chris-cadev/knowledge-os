@@ -183,48 +183,25 @@ pub struct EntitySearchResult {
 pub async fn chat_list_conversations(
     state: State<'_, AppState>,
 ) -> Result<Vec<ConversationSummaryResponse>, String> {
-    let store = &*state.store;
-    use knowledge_core::ports::EntityRepository;
-    let entities = EntityRepository::find_by_type(store, "Conversation")
+    use knowledge_core::ports::ConversationRepository;
+    let conversations = state
+        .store
+        .list_conversations()
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut results = Vec::new();
-    for entity in entities {
-        use knowledge_core::ports::ComponentRepository;
-        let components = ComponentRepository::get(store, entity.id)
-            .await
-            .map_err(|e| e.to_string())?;
-        let title = components
-            .iter()
-            .find(|c| c.component_type == knowledge_core::features::component::ComponentType::Title)
-            .and_then(|c| c.data.get("name").and_then(|v| v.as_str()))
-            .unwrap_or("Untitled")
-            .to_string();
-        let last_message_preview = components
-            .iter()
-            .find(|c| {
-                c.component_type
-                    == knowledge_core::features::component::ComponentType::MessageContent
-            })
-            .and_then(|c| {
-                c.data
-                    .get("content")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.chars().take(100).collect::<String>())
-            });
-
-        results.push(ConversationSummaryResponse {
-            id: entity.id.to_string(),
-            title,
-            message_count: 0,
-            last_message_preview,
-            last_message_at: None,
-            created_at: entity.created_at.to_rfc3339(),
-            updated_at: entity.updated_at.to_rfc3339(),
-        });
-    }
-    Ok(results)
+    Ok(conversations
+        .into_iter()
+        .map(|c| ConversationSummaryResponse {
+            id: c.id.to_string(),
+            title: c.title,
+            message_count: c.message_count as usize,
+            last_message_preview: c.last_message_preview,
+            last_message_at: c.last_message_at.map(|d| d.to_rfc3339()),
+            created_at: c.created_at.to_rfc3339(),
+            updated_at: c.updated_at.to_rfc3339(),
+        })
+        .collect())
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -236,6 +213,68 @@ pub struct ConversationSummaryResponse {
     pub last_message_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MessageResponse {
+    pub id: String,
+    pub role: String,
+    pub text: String,
+    pub entity_refs: Vec<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ConversationDetailResponse {
+    pub id: String,
+    pub title: String,
+    pub messages: Vec<MessageResponse>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[tauri::command]
+pub async fn chat_get_conversation(
+    state: State<'_, AppState>,
+    conversation_id: String,
+) -> Result<Option<ConversationDetailResponse>, String> {
+    let id = Uuid::parse_str(&conversation_id).map_err(|e| e.to_string())?;
+    use knowledge_core::ports::ConversationRepository;
+    let store = &*state.store;
+    match store.get_conversation(id).await {
+        Ok(Some(conv)) => {
+            log::info!(
+                "get_conversation: found conv={}, {} messages",
+                conv.id,
+                conv.messages.len()
+            );
+            Ok(Some(ConversationDetailResponse {
+                id: conv.id.to_string(),
+                title: conv.title,
+                messages: conv
+                    .messages
+                    .into_iter()
+                    .map(|m| MessageResponse {
+                        id: m.id.to_string(),
+                        role: format!("{:?}", m.role).to_lowercase(),
+                        text: m.text,
+                        entity_refs: m.entity_refs.iter().map(|r| r.to_string()).collect(),
+                        created_at: m.created_at.to_rfc3339(),
+                    })
+                    .collect(),
+                created_at: conv.created_at.to_rfc3339(),
+                updated_at: conv.updated_at.to_rfc3339(),
+            }))
+        }
+        Ok(None) => {
+            log::info!("get_conversation: conv {} not found", conversation_id);
+            Ok(None)
+        }
+        Err(e) => {
+            log::error!("get_conversation: error for {}: {}", conversation_id, e);
+            Err(e.to_string())
+        }
+    }
 }
 
 #[tauri::command]

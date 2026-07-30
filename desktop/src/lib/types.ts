@@ -217,6 +217,22 @@ export interface ConversationSummary {
   updated_at: string;
 }
 
+export interface MessageDetail {
+  id: string;
+  role: string;
+  text: string;
+  entity_refs: string[];
+  created_at: string;
+}
+
+export interface ConversationDetail {
+  id: string;
+  title: string;
+  messages: MessageDetail[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChatState {
   conversations: ConversationSummary[];
   currentConversationId: string | null;
@@ -260,6 +276,13 @@ export interface TestResult {
   success: boolean;
   latency_ms: number;
   error: string | null;
+}
+
+export interface OcrProviderStatus {
+  backend: string;
+  model: string;
+  base_url: string;
+  reachable: boolean;
 }
 
 export type View =

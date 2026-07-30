@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   ChatSendResult,
   ConversationSummary,
+  ConversationDetail,
   EntitySearchResult,
   EntitySummary,
   EntityDetail,
@@ -20,6 +21,7 @@ import type {
   TimelineOutput,
   ProviderStatus,
   TestResult,
+  OcrProviderStatus,
 } from "./types.js";
 
 export async function listEntities(
@@ -201,6 +203,12 @@ export async function chatListConversations(): Promise<ConversationSummary[]> {
   return invoke("chat_list_conversations");
 }
 
+export async function chatGetConversation(
+  conversationId: string
+): Promise<ConversationDetail | null> {
+  return invoke("chat_get_conversation", { conversationId });
+}
+
 export async function chatDeleteConversation(
   conversationId: string
 ): Promise<void> {
@@ -261,4 +269,30 @@ export async function chatTestProvider(
     baseUrl: baseUrl ?? null,
     apiKey: apiKey ?? null,
   });
+}
+
+export async function resetProvider(): Promise<ProviderStatus> {
+  return invoke("reset_provider");
+}
+
+export async function setOcrProvider(
+  backend: string,
+  model: string,
+  baseUrl?: string | null,
+  apiKey?: string | null
+): Promise<OcrProviderStatus> {
+  return invoke("set_ocr_provider", {
+    backend,
+    model,
+    baseUrl: baseUrl ?? null,
+    apiKey: apiKey ?? null,
+  });
+}
+
+export async function getOcrProviderStatus(): Promise<OcrProviderStatus> {
+  return invoke("get_ocr_provider_status");
+}
+
+export async function resetOcrProvider(): Promise<OcrProviderStatus> {
+  return invoke("reset_ocr_provider");
 }

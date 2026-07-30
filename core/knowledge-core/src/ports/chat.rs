@@ -46,6 +46,7 @@ pub struct CitationSource {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum ResponseMode {
     Fast,
     Thinking,
@@ -156,4 +157,45 @@ pub trait ChatCompletion: Send + Sync {
         &self,
         request: ChatRequest,
     ) -> Result<Box<dyn Stream<Item = ChatDelta> + Send + Unpin>, ChatError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn response_mode_serializes_as_lowercase() {
+        assert_eq!(
+            serde_json::from_str::<ResponseMode>("\"fast\"").unwrap(),
+            ResponseMode::Fast
+        );
+        assert_eq!(
+            serde_json::from_str::<ResponseMode>("\"thinking\"").unwrap(),
+            ResponseMode::Thinking
+        );
+        assert_eq!(
+            serde_json::to_string(&ResponseMode::Fast).unwrap(),
+            "\"fast\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ResponseMode::Thinking).unwrap(),
+            "\"thinking\""
+        );
+    }
+
+    #[test]
+    fn message_role_serializes_as_lowercase() {
+        assert_eq!(
+            serde_json::from_str::<MessageRole>("\"system\"").unwrap(),
+            MessageRole::System
+        );
+        assert_eq!(
+            serde_json::from_str::<MessageRole>("\"user\"").unwrap(),
+            MessageRole::User
+        );
+        assert_eq!(
+            serde_json::from_str::<MessageRole>("\"assistant\"").unwrap(),
+            MessageRole::Assistant
+        );
+    }
 }
