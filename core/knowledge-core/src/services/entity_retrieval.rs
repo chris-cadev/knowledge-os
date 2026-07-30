@@ -187,6 +187,23 @@ impl EntityRetrievalService {
         Ok(summaries)
     }
 
+    pub async fn list(
+        &self,
+        entity_type: Option<&str>,
+    ) -> Result<Vec<EntitySummary>, StorageError> {
+        let entities = match entity_type {
+            Some(t) => self.entity_repo.find_by_type(t).await?,
+            None => self.entity_repo.list().await?,
+        };
+        let mut results = Vec::with_capacity(entities.len());
+        for entity in entities {
+            if let Some(summary) = self.entity_to_summary(entity.id).await? {
+                results.push(summary);
+            }
+        }
+        Ok(results)
+    }
+
     pub async fn traverse(
         &self,
         start: Uuid,

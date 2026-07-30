@@ -12,6 +12,10 @@
     chatSendFeedback,
   } from "../lib/api.js";
   import { ChatStreamSession } from "../lib/chat-stream.js";
+  import { builtinCommands, matchCommands } from "../lib/command-palette.js";
+  import type {
+    CommandDef,
+  } from "../lib/command-palette.js";
   import type {
     ChatMessage,
     Citation,
@@ -42,12 +46,26 @@
   let errorMessage = $state<string | null>(null);
 
   // --- Entity ref picker ---
-  let entityRefs = $state<string[]>([]);
-  let entityRefChips = $state<EntitySearchResult[]>([]);
+  let selectedEntityRefs = $state<Map<string, EntitySearchResult>>(new Map());
   let showEntityDropdown = $state(false);
   let entitySearchResults = $state<EntitySearchResult[]>([]);
   let entitySearchPrefix = $state("");
-  let entityInputValue = $state("");
+  let entityDropdownIndex = $state(0);
+
+  // --- Command palette ---
+  let showCommandPalette = $state(false);
+  let commandMatches = $state<CommandDef[]>([]);
+  let commandPaletteIndex = $state(0);
+
+  // --- Citation state ---
+  let citationTooltip = $state<{
+    x: number;
+    y: number;
+    citation: Citation;
+  } | null>(null);
+
+  // --- Collapsible sources ---
+  let expandedSources = $state<Set<string>>(new Set());
 
   // --- Context menus ---
   let contextMenuConvId = $state<string | null>(null);
@@ -114,8 +132,7 @@
     currentConversationId = null;
     messages = [];
     inputText = "";
-    entityRefs = [];
-    entityRefChips = [];
+    selectedEntityRefs = new Map();
     errorMessage = null;
     processingStatus = null;
   }
@@ -176,18 +193,19 @@
 
   // --- Entity ref picker ---
 
-  async function onEntityInput(e: Event) {
-    const value = (e.target as HTMLInputElement).value;
-    entityInputValue = value;
+  async function updateEntitySearch(value: string) {
+    const cursorPos = getCursorPosition();
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf("@");
 
-    const atIndex = value.lastIndexOf("@");
-    if (atIndex >= 0) {
-      const prefix = value.slice(atIndex + 1);
+    if (atIndex >= 0 && (atIndex === 0 || textBeforeCursor[atIndex - 1] === " ")) {
+      const prefix = textBeforeCursor.slice(atIndex + 1);
       entitySearchPrefix = prefix;
-      if (prefix.length >= 1) {
+      if (prefix.length >= 1 && !prefix.includes(" ")) {
         try {
           entitySearchResults = await chatSearchEntities(prefix);
           showEntityDropdown = entitySearchResults.length > 0;
+          entityDropdownIndex = 0;
         } catch {
           showEntityDropdown = false;
         }
@@ -199,21 +217,34 @@
     }
   }
 
-  function selectEntityRef(entity: EntitySearchResult) {
-    if (entityRefs.includes(entity.id)) return;
-    entityRefs = [...entityRefs, entity.id];
-    entityRefChips = [...entityRefChips, entity];
+  function getCursorPosition(): number {
+    const textarea = document.querySelector(".text-input") as HTMLTextAreaElement;
+    if (!textarea) return inputText.length;
+    return textarea.selectionStart ?? inputText.length;
+  }
 
-    const atIndex = entityInputValue.lastIndexOf("@");
+  function selectEntityRef(entity: EntitySearchResult) {
+    if (selectedEntityRefs.has(entity.id)) return;
+    selectedEntityRefs = new Map(selectedEntityRefs).set(entity.id, entity);
+
+    const cursorPos = getCursorPosition();
+    const textBeforeCursor = inputText.slice(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf("@");
     if (atIndex >= 0) {
-      entityInputValue = entityInputValue.slice(0, atIndex);
+      const before = inputText.slice(0, atIndex);
+      const after = inputText.slice(cursorPos);
+      const pill = `@${entity.entity_type}:${entity.title} `;
+      inputText = before + pill + after;
     }
     showEntityDropdown = false;
   }
 
-  function removeEntityRef(id: string) {
-    entityRefs = entityRefs.filter((r) => r !== id);
-    entityRefChips = entityRefChips.filter((c) => c.id !== id);
+  function getEntityRefIds(): string[] {
+    return Array.from(selectedEntityRefs.keys());
+  }
+
+  function isCommandInput(text: string): boolean {
+    return text.startsWith("/") && !text.startsWith("//");
   }
 
   // --- Send / Stream ---
@@ -222,6 +253,11 @@
     const text = inputText.trim();
     if (!text) return;
     if (streaming) return;
+
+    if (isCommandInput(text)) {
+      executeCommandText(text);
+      return;
+    }
 
     errorMessage = null;
     processingStatus = null;
@@ -235,8 +271,10 @@
     };
     messages = [...messages, userMsg];
     inputText = "";
-    entityInputValue = "";
+    selectedEntityRefs = new Map();
+    resetTextareaHeight();
 
+    const entityIds = getEntityRefIds();
     const assistantMsg: MessageDisplay = {
       id: `assistant-${msgId}`,
       role: "assistant",
@@ -255,7 +293,7 @@
       await session.start(
         currentConversationId,
         text,
-        entityRefs,
+        entityIds,
         { knowledge_graph: knowledgeGraph, web_search: webSearch },
         mode,
         {
@@ -293,8 +331,7 @@
             streaming = false;
             streamSession = null;
             processingStatus = null;
-            entityRefs = [];
-            entityRefChips = [];
+            selectedEntityRefs = new Map();
             currentConversationId = session.getConversationId();
             loadConversations();
             scrollToBottom();
@@ -323,7 +360,7 @@
       const result = await chatSend(
         currentConversationId,
         text,
-        entityRefs,
+        getEntityRefIds(),
         { knowledge_graph: knowledgeGraph, web_search: webSearch },
         mode
       );
@@ -337,8 +374,7 @@
       };
       messages = [...messages, assistantMsg];
       currentConversationId = result.conversation_id;
-      entityRefs = [];
-      entityRefChips = [];
+      selectedEntityRefs = new Map();
       loadConversations();
       scrollToBottom();
     } catch (e) {
@@ -372,6 +408,36 @@
       messages = messages.filter((m) => m.id !== lastUserMsg.id);
       sendMessage();
     }
+  }
+
+  // --- Command palette ---
+
+  function executeCommandText(text: string) {
+    const [cmd, ...args] = text.slice(1).split(/\s+/);
+    const match = builtinCommands.find((c) => c.name === `/${cmd}`);
+    if (match) {
+      match.action(args.join(" "));
+    }
+  }
+
+  function executeCommand(cmd: CommandDef) {
+    cmd.action();
+    showCommandPalette = false;
+    inputText = "";
+    resetTextareaHeight();
+  }
+
+  function updateCommandPalette(value: string) {
+    if (value.startsWith("/") && !value.startsWith("//")) {
+      const afterSlash = value.slice(1);
+      if (afterSlash.length === 0 || !afterSlash.includes(" ")) {
+        commandMatches = matchCommands(`/${afterSlash}`);
+        showCommandPalette = commandMatches.length > 0;
+        commandPaletteIndex = 0;
+        return;
+      }
+    }
+    showCommandPalette = false;
   }
 
   function clearStatusTimer() {
@@ -429,6 +495,76 @@
   }
 
   // --- Markdown rendering ---
+
+  function renderEntityPills(content: string): string {
+    let html = content;
+    html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    html = html.replace(/@(\w+):([^\s]+)/g, (_, type, title) => {
+      return `<span class="entity-pill"><span class="entity-pill-type">${type}</span><span class="entity-pill-title">${title}</span></span>`;
+    });
+
+    html = html.replace(/```([\s\S]*?)```/g, (_, code) => {
+      const escaped = code
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      return `<pre class="chat-code-block"><code>${escaped}</code></pre>`;
+    });
+
+    html = html.replace(/`([^`]+)`/g, '<code class="chat-inline-code">$1</code>');
+
+    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+
+    const lines = html.split("\n");
+    const result: string[] = [];
+    let inList = false;
+    let listType: "ul" | "ol" | null = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const ulMatch = line.match(/^(\s*)[-*+]\s+(.*)$/);
+      const olMatch = line.match(/^(\s*)\d+\.\s+(.*)$/);
+
+      if (ulMatch) {
+        if (!inList || listType !== "ul") {
+          if (inList) result.push(`</${listType}>`);
+          result.push("<ul>");
+          inList = true;
+          listType = "ul";
+        }
+        result.push(`<li>${ulMatch[2]}</li>`);
+      } else if (olMatch) {
+        if (!inList || listType !== "ol") {
+          if (inList) result.push(`</${listType}>`);
+          result.push("<ol>");
+          inList = true;
+          listType = "ol";
+        }
+        result.push(`<li>${olMatch[2]}</li>`);
+      } else if (line.trim() === "") {
+        if (inList) {
+          result.push(`</${listType}>`);
+          inList = false;
+          listType = null;
+        }
+        result.push("");
+      } else {
+        if (inList) {
+          result.push(`</${listType}>`);
+          inList = false;
+          listType = null;
+        }
+        result.push(`<p>${line}</p>`);
+      }
+    }
+    if (inList) {
+      result.push(`</${listType}>`);
+    }
+
+    return result.join("\n");
+  }
 
   function renderMarkdown(content: string): string {
     let html = content;
@@ -508,7 +644,7 @@
     html = html.replace(/\[(\d+)\]/g, (_, num) => {
       const citation = citations.find((c) => c.number === parseInt(num));
       if (citation) {
-        return `<sup class="chat-citation" data-entity-id="${citation.entity_id}" onclick="window.__chatCitationClick('${citation.entity_id}')">[${num}]</sup>`;
+        return `<sup class="chat-citation" data-entity-id="${citation.entity_id}" data-citation-number="${citation.number}">[${num}]</sup>`;
       }
       return `<sup class="chat-citation">[${num}]</sup>`;
     });
@@ -603,15 +739,157 @@
     }
   }
 
-  function openEntityDetail(entityId: string) {
-    navigateTo("detail", entityId);
+  async function onInput(e: Event) {
+    const value = (e.target as HTMLTextAreaElement).value;
+    inputText = value;
+    autoResizeTextarea(e.target as HTMLTextAreaElement);
+
+    showCommandPalette = false;
+    showEntityDropdown = false;
+
+    updateCommandPalette(value);
+    if (!showCommandPalette) {
+      await updateEntitySearch(value);
+    }
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (showCommandPalette && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
       e.preventDefault();
-      sendMessage();
+      const max = commandMatches.length;
+      if (e.key === "ArrowDown") {
+        commandPaletteIndex = (commandPaletteIndex + 1) % max;
+      } else {
+        commandPaletteIndex = (commandPaletteIndex - 1 + max) % max;
+      }
+      return;
     }
+
+    if (showEntityDropdown && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      e.preventDefault();
+      const max = entitySearchResults.length;
+      if (e.key === "ArrowDown") {
+        entityDropdownIndex = (entityDropdownIndex + 1) % max;
+      } else {
+        entityDropdownIndex = (entityDropdownIndex - 1 + max) % max;
+      }
+      return;
+    }
+
+    if (e.key === "Escape") {
+      if (showCommandPalette) {
+        showCommandPalette = false;
+        return;
+      }
+      if (showEntityDropdown) {
+        showEntityDropdown = false;
+        return;
+      }
+      return;
+    }
+
+    if (e.key === "Enter") {
+      if (showCommandPalette) {
+        e.preventDefault();
+        const cmd = commandMatches[commandPaletteIndex];
+        if (cmd) executeCommand(cmd);
+        return;
+      }
+      if (showEntityDropdown) {
+        e.preventDefault();
+        const entity = entitySearchResults[entityDropdownIndex];
+        if (entity) selectEntityRef(entity);
+        return;
+      }
+      if (!e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+        return;
+      }
+      return;
+    }
+
+    if (e.key === "Tab") {
+      if (showCommandPalette) {
+        e.preventDefault();
+        showCommandPalette = false;
+        return;
+      }
+      if (showEntityDropdown) {
+        e.preventDefault();
+        showEntityDropdown = false;
+        return;
+      }
+    }
+  }
+
+  function autoResizeTextarea(textarea: HTMLTextAreaElement) {
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+  }
+
+  function resetTextareaHeight() {
+    const textarea = document.querySelector(".text-input") as HTMLTextAreaElement | null;
+    if (textarea) {
+      textarea.style.height = "auto";
+    }
+  }
+
+  // --- Citation click / hover ---
+
+  function handleCitationClick(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    const citation = target.closest("[data-entity-id]") as HTMLElement | null;
+    if (citation) {
+      const entityId = citation.dataset.entityId;
+      if (entityId) {
+        navigateTo("detail", entityId);
+      }
+    }
+  }
+
+  function handleCitationMouseEnter(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    const el = target.closest("[data-entity-id]") as HTMLElement | null;
+    if (el) {
+      const entityId = el.dataset.entityId;
+      const num = el.dataset.citationNumber;
+      if (entityId && num) {
+        const msg = messages.find((m) =>
+          m.citations?.some((c) => c.entity_id === entityId && c.number === parseInt(num))
+        );
+        if (msg) {
+          const c = msg.citations!.find((c) => c.entity_id === entityId && c.number === parseInt(num));
+          if (c) {
+            citationTooltip = {
+              x: e.clientX,
+              y: e.clientY,
+              citation: c,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  function handleCitationMouseLeave() {
+    citationTooltip = null;
+  }
+
+  // --- Collapsible sources ---
+
+  function toggleSources(id: string) {
+    const next = new Set(expandedSources);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    expandedSources = next;
+  }
+
+  function openEntityDetail(entityId: string) {
+    navigateTo("detail", entityId);
   }
 
   // --- Actions ---
@@ -745,31 +1023,49 @@
           <div class="message" class:message-user={msg.role === "user"} class:message-assistant={msg.role === "assistant" || msg.role === "system"}>
             <div class="message-bubble">
               {#if msg.role === "user"}
-                <div class="message-content">
-                  {msg.content}
+                <div class="message-content chat-markdown">
+                  {@html renderEntityPills(msg.content)}
                 </div>
               {:else}
-                <div class="message-content chat-markdown">
+                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_no_noninteractive_element_interactions -->
+                <div
+                  class="message-content chat-markdown"
+                  onclick={handleCitationClick}
+                  onmouseenter={handleCitationMouseEnter}
+                  onmouseleave={handleCitationMouseLeave}
+                  role="document"
+                >
                   {@html renderWithCitations(msg.content, msg.citations)}
                 </div>
               {/if}
 
               <div class="message-timestamp">{formatTime(msg.timestamp)}</div>
 
-              <!-- Citations section -->
+              <!-- Collapsible sources footer -->
               {#if msg.citations && msg.citations.length > 0}
-                <div class="message-citations">
-                  <div class="citations-title">Sources</div>
-                  {#each msg.citations as citation}
-                    <button
-                      class="citation-item"
-                      onclick={() => openEntityDetail(citation.entity_id)}
-                    >
-                      <span class="citation-number">[{citation.number}]</span>
-                      <span class="citation-type">{citation.entity_type}</span>
-                      <span class="citation-title">{citation.title}</span>
-                    </button>
-                  {/each}
+                <div class="sources-footer">
+                  <button
+                    class="sources-toggle"
+                    onclick={() => toggleSources(msg.id)}
+                  >
+                    <span class="material-symbols-outlined sources-chevron" class:expanded={expandedSources.has(msg.id)}>chevron_right</span>
+                    View sources ({msg.citations.length})
+                  </button>
+                  {#if expandedSources.has(msg.id)}
+                    <div class="sources-list">
+                      {#each msg.citations as citation}
+                        <button
+                          class="source-item"
+                          onclick={() => openEntityDetail(citation.entity_id)}
+                        >
+                          <span class="source-number">[{citation.number}]</span>
+                          <span class="source-type">{citation.entity_type}</span>
+                          <span class="source-title">{citation.title}</span>
+                          <span class="source-snippet truncate">{citation.snippet}</span>
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
                 </div>
               {/if}
 
@@ -857,6 +1153,18 @@
       </div>
     {/if}
 
+    <!-- Citation tooltip -->
+    {#if citationTooltip}
+      <div
+        class="citation-tooltip"
+        style="left: {citationTooltip.x + 12}px; top: {citationTooltip.y - 10}px;"
+      >
+        <span class="tooltip-type">{citationTooltip.citation.entity_type}</span>
+        <span class="tooltip-title">{citationTooltip.citation.title}</span>
+        <span class="tooltip-snippet">{citationTooltip.citation.snippet}</span>
+      </div>
+    {/if}
+
     <!-- Error message -->
     {#if errorMessage}
       <div class="error-banner">
@@ -871,38 +1179,36 @@
 
     <!-- Input area -->
     <div class="input-area" class:input-area-streaming={streaming}>
-      <!-- Entity ref chips -->
-      {#if entityRefChips.length > 0}
-        <div class="entity-chips">
-          {#each entityRefChips as chip}
-            <span class="entity-chip">
-              <span class="chip-type">{chip.entity_type}</span>
-              <span class="chip-title">{chip.title}</span>
-              <button class="chip-remove" onclick={() => removeEntityRef(chip.id)}>
-                <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
-              </button>
-            </span>
+      <!-- Command palette dropdown -->
+      {#if showCommandPalette}
+        <div class="dropdown command-dropdown">
+          {#each commandMatches as cmd, i}
+            <button
+              class="dropdown-item"
+              class:dropdown-item-selected={i === commandPaletteIndex}
+              onclick={() => executeCommand(cmd)}
+            >
+              <span class="dropdown-item-name">{cmd.name}</span>
+              <span class="dropdown-item-args">{cmd.args}</span>
+              <span class="dropdown-item-desc">{cmd.description}</span>
+            </button>
+          {/each}
+        </div>
+      {:else if showEntityDropdown}
+        <div class="dropdown entity-dropdown">
+          {#each entitySearchResults as entity, i}
+            <button
+              class="dropdown-item"
+              class:dropdown-item-selected={i === entityDropdownIndex}
+              onclick={() => selectEntityRef(entity)}
+            >
+              <span class="dropdown-item-type">{entity.entity_type}</span>
+              <span class="dropdown-item-title">{entity.title}</span>
+              <span class="dropdown-item-preview truncate">{entity.preview}</span>
+            </button>
           {/each}
         </div>
       {/if}
-
-      <!-- Entity dropdown -->
-      <div class="entity-dropdown-container">
-        {#if showEntityDropdown}
-          <div class="entity-dropdown">
-            {#each entitySearchResults as entity}
-              <button
-                class="entity-dropdown-item"
-                onclick={() => selectEntityRef(entity)}
-              >
-                <span class="dropdown-item-type">{entity.entity_type}</span>
-                <span class="dropdown-item-title">{entity.title}</span>
-                <span class="dropdown-item-preview truncate">{entity.preview}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
 
       <!-- Input row: toggles -->
       <div class="input-toggles">
@@ -938,19 +1244,19 @@
         </div>
       </div>
 
-      <!-- Input row: text + button -->
+      <!-- Input row: textarea + button -->
       <div class="input-row">
         <div class="text-input-wrapper">
           <span class="material-symbols-outlined input-entity-icon">alternate_email</span>
-          <input
-            type="text"
+          <textarea
             class="text-input"
-            placeholder="Ask a question... (use @ to reference entities)"
-            bind:value={entityInputValue}
-            oninput={onEntityInput}
+            placeholder="Ask a question... (use @ to reference entities, / for commands)"
+            bind:value={inputText}
+            oninput={onInput}
             onkeydown={handleKeyDown}
             disabled={streaming}
-          />
+            rows={1}
+          ></textarea>
         </div>
         {#if streaming}
           <button class="stop-btn" onclick={stopStreaming} title="Stop generating">
@@ -960,7 +1266,7 @@
           <button
             class="send-btn"
             onclick={sendMessage}
-            disabled={streaming || !entityInputValue.trim()}
+            disabled={streaming || !inputText.trim()}
             title="Send message"
           >
             <span class="material-symbols-outlined">send</span>
@@ -1395,28 +1701,84 @@
     text-decoration: underline;
   }
 
-  .message-citations {
+  /* ===== Entity pills ===== */
+  .chat-markdown :global(.entity-pill) {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    background: var(--accent);
+    color: white;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+    vertical-align: middle;
+  }
+
+  .message-user .chat-markdown :global(.entity-pill) {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .chat-markdown :global(.entity-pill-type) {
+    font-weight: 700;
+    font-size: 10px;
+    opacity: 0.9;
+  }
+
+  .chat-markdown :global(.entity-pill-title) {
+    font-weight: 500;
+  }
+
+  /* ===== Sources footer ===== */
+  .sources-footer {
     margin-top: var(--spacing-sm);
     padding-top: var(--spacing-sm);
     border-top: 1px solid var(--border);
   }
 
-  .message-user .message-citations {
+  .message-user .sources-footer {
     border-top-color: rgba(255, 255, 255, 0.2);
   }
 
-  .citations-title {
+  .sources-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
     font-size: var(--font-size-sm);
-    font-weight: 600;
     color: var(--text-secondary);
-    margin-bottom: var(--spacing-xs);
+    padding: 2px 0;
+    transition: color var(--transition-fast);
   }
 
-  .message-user .citations-title {
+  .sources-toggle:hover {
+    color: var(--text-primary);
+  }
+
+  .message-user .sources-toggle {
     color: rgba(255, 255, 255, 0.7);
   }
 
-  .citation-item {
+  .message-user .sources-toggle:hover {
+    color: white;
+  }
+
+  .sources-chevron {
+    font-size: 16px;
+    transition: transform var(--transition-fast);
+  }
+
+  .sources-chevron.expanded {
+    transform: rotate(90deg);
+  }
+
+  .sources-list {
+    margin-top: var(--spacing-xs);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .source-item {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
@@ -1425,49 +1787,59 @@
     border-radius: var(--radius-sm);
     font-size: var(--font-size-sm);
     color: var(--text-primary);
+    text-align: left;
     transition: background var(--transition-fast);
   }
 
-  .citation-item:hover {
+  .source-item:hover {
     background: var(--color-surface-container-high);
   }
 
-  .message-user .citation-item {
+  .message-user .source-item {
     color: rgba(255, 255, 255, 0.9);
   }
 
-  .message-user .citation-item:hover {
+  .message-user .source-item:hover {
     background: rgba(255, 255, 255, 0.1);
   }
 
-  .citation-number {
+  .source-number {
     font-weight: 700;
     color: var(--accent);
     min-width: 24px;
+    flex-shrink: 0;
   }
 
-  .message-user .citation-number {
+  .message-user .source-number {
     color: rgba(255, 255, 255, 0.9);
   }
 
-  .citation-type {
-    font-weight: 500;
+  .source-type {
+    font-weight: 600;
     padding: 1px 6px;
     background: var(--color-surface-container-high);
     border-radius: var(--radius-sm);
     font-size: 11px;
+    flex-shrink: 0;
   }
 
-  .message-user .citation-type {
+  .message-user .source-type {
     background: rgba(255, 255, 255, 0.15);
   }
 
-  .citation-title {
+  .source-title {
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .source-snippet {
+    color: var(--text-secondary);
     flex: 1;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  }
+
+  .message-user .source-snippet {
+    color: rgba(255, 255, 255, 0.7);
   }
 
   /* ===== Feedback ===== */
@@ -1644,70 +2016,18 @@
     opacity: 0.7;
   }
 
-  /* ===== Entity chips ===== */
-  .entity-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-xs);
-  }
-
-  .entity-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    background: var(--accent);
-    color: white;
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-    line-height: 1.4;
-  }
-
-  .chip-type {
-    font-weight: 600;
-    font-size: 11px;
-    opacity: 0.9;
-  }
-
-  .chip-title {
-    font-weight: 500;
-  }
-
-  .chip-remove {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    color: white;
-    opacity: 0.8;
-    transition: opacity var(--transition-fast);
-  }
-
-  .chip-remove:hover {
-    opacity: 1;
-  }
-
-  /* ===== Entity dropdown ===== */
-  .entity-dropdown-container {
-    position: relative;
-  }
-
-  .entity-dropdown {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    right: 0;
-    max-height: 200px;
+  /* ===== Dropdown (shared between command palette and entity) ===== */
+  .dropdown {
+    max-height: 240px;
     overflow-y: auto;
     background: var(--color-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
     z-index: 50;
-    margin-bottom: 4px;
   }
 
-  .entity-dropdown-item {
+  .dropdown-item {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
@@ -1719,8 +2039,31 @@
     transition: background var(--transition-fast);
   }
 
-  .entity-dropdown-item:hover {
+  .dropdown-item:hover,
+  .dropdown-item-selected {
     background: var(--color-surface-container-high);
+  }
+
+  .dropdown-item-name {
+    font-weight: 600;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .dropdown-item-args {
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .dropdown-item-desc {
+    color: var(--text-secondary);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .dropdown-item-type {
@@ -1741,6 +2084,40 @@
     color: var(--text-secondary);
     flex: 1;
     min-width: 0;
+  }
+
+  /* ===== Citation tooltip ===== */
+  .citation-tooltip {
+    position: fixed;
+    z-index: 300;
+    background: var(--color-surface-container-high);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    box-shadow: var(--shadow-lg);
+    max-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    pointer-events: none;
+  }
+
+  .tooltip-type {
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .tooltip-title {
+    font-weight: 500;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+  }
+
+  .tooltip-snippet {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    line-height: 1.3;
   }
 
   /* ===== Input toggles ===== */
@@ -1826,9 +2203,9 @@
   .text-input-wrapper {
     flex: 1;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--spacing-sm);
-    padding: 0 var(--spacing-md);
+    padding: var(--spacing-xs) var(--spacing-md);
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -1843,6 +2220,7 @@
     color: var(--text-secondary);
     font-size: 20px;
     flex-shrink: 0;
+    margin-top: 10px;
   }
 
   .text-input {
@@ -1853,6 +2231,11 @@
     font-size: var(--font-size-md);
     outline: none;
     padding: 10px 0;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: none;
+    min-height: 24px;
+    max-height: 200px;
   }
 
   .text-input:disabled {
@@ -1862,6 +2245,15 @@
   .text-input::placeholder {
     color: var(--text-secondary);
     opacity: 0.6;
+  }
+
+  .text-input::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .text-input::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
   }
 
   .send-btn,

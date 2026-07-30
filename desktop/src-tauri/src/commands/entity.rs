@@ -1,5 +1,5 @@
 use knowledge_core::features::component::{Component, ComponentType};
-use knowledge_core::ports::{ComponentRepository, EntityRepository};
+use knowledge_core::ports::ComponentRepository;
 use tauri::State;
 use uuid::Uuid;
 
@@ -12,39 +12,23 @@ pub async fn list_entities(
     state: State<'_, AppState>,
     entity_type: Option<String>,
 ) -> Result<Vec<EntitySummary>, String> {
-    let store = &*state.store;
+    let results = state
+        .entity_retrieval
+        .list(entity_type.as_deref())
+        .await
+        .map_err(|e| e.to_string())?;
 
-    let entities = match &entity_type {
-        Some(t) => EntityRepository::find_by_type(store, t)
-            .await
-            .map_err(|e| e.to_string())?,
-        None => EntityRepository::list(store)
-            .await
-            .map_err(|e| e.to_string())?,
-    };
-
-    let mut result = Vec::with_capacity(entities.len());
-    for entity in entities {
-        let components = ComponentRepository::get(store, entity.id)
-            .await
-            .map_err(|e| e.to_string())?;
-        let title = components
-            .iter()
-            .find(|c| c.component_type == ComponentType::Title)
-            .and_then(|c| c.data.as_str().map(String::from))
-            .unwrap_or_else(|| "Untitled".to_string());
-
-        result.push(EntitySummary {
-            id: entity.id.to_string(),
-            entity_type: entity.entity_type.to_string(),
-            title,
-            is_active: entity.is_active,
-            created_at: entity.created_at.to_rfc3339(),
-            updated_at: entity.updated_at.to_rfc3339(),
-        });
-    }
-
-    Ok(result)
+    Ok(results
+        .into_iter()
+        .map(|s| EntitySummary {
+            id: s.id.to_string(),
+            entity_type: s.entity_type,
+            title: s.title,
+            is_active: true,
+            created_at: s.updated_at.to_rfc3339(),
+            updated_at: s.updated_at.to_rfc3339(),
+        })
+        .collect())
 }
 
 /// Get the source file path for an entity, if one exists.
