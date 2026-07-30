@@ -6,6 +6,7 @@ use uuid::Uuid;
 pub enum RelationshipType {
     References,
     HasMessage,
+    ReferencedBy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

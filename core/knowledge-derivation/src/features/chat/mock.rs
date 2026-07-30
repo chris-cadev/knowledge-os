@@ -29,14 +29,15 @@ impl ChatCompletion for MockChatAdapter {
         let chunks: Vec<String> = chunk_message(&message, 8);
         let total = chunks.len();
 
-        let delay = self.stream_delay_ms;
+        let delay_ms = self.stream_delay_ms;
+
         let stream = stream::unfold(
             (chunks.into_iter().enumerate(), citations, 0u64),
             move |(mut iter, citations, tick)| async move {
                 match iter.next() {
                     Some((i, chunk)) => {
-                        if delay > 0 {
-                            tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                        if delay_ms > 0 {
+                            tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
                         }
                         let citation = if i == 0 {
                             citations.first().map(|c| c.number)
@@ -101,11 +102,16 @@ fn chunk_message(msg: &str, size: usize) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::StreamExt;
 
     fn make_request(context_entities: Vec<EntityContext>) -> ChatRequest {
         ChatRequest {
-            system_prompt: "test".into(),
-            messages: vec![],
+            system_prompt: "You are a helpful assistant.".into(),
+            messages: vec![Message {
+                role: MessageRole::User,
+                content: "What do you know?".into(),
+                entity_refs: vec![],
+            }],
             context_entities,
             mode: ResponseMode::Fast,
             source_toggles: SourceToggles::default(),
@@ -163,16 +169,10 @@ mod tests {
             tags: vec![],
             relationships: vec![],
         }]);
-        use futures::StreamExt;
-        let mut stream = adapter.chat_stream(request).await.unwrap();
-        let mut count = 0;
-        while let Some(delta) = stream.next().await {
-            count += 1;
-            if delta.finished {
-                break;
-            }
-        }
-        assert!(count > 0);
+        let stream = adapter.chat_stream(request).await.unwrap();
+        let deltas: Vec<ChatDelta> = stream.collect().await;
+        assert!(!deltas.is_empty());
+        assert!(deltas.last().unwrap().finished);
     }
 
     #[tokio::test]
@@ -186,16 +186,14 @@ mod tests {
             tags: vec![],
             relationships: vec![],
         }]);
-        use futures::StreamExt;
-        let mut stream = adapter.chat_stream(request).await.unwrap();
-        let mut deltas = vec![];
-        while let Some(delta) = stream.next().await {
-            deltas.push(delta);
-        }
-        assert!(!deltas.is_empty());
-        assert!(deltas.last().unwrap().finished);
-        for d in deltas.iter().take(deltas.len() - 1) {
-            assert!(!d.finished);
+        let stream = adapter.chat_stream(request).await.unwrap();
+        let deltas: Vec<ChatDelta> = stream.collect().await;
+        for (i, delta) in deltas.iter().enumerate() {
+            if i == deltas.len() - 1 {
+                assert!(delta.finished);
+            } else {
+                assert!(!delta.finished);
+            }
         }
     }
 

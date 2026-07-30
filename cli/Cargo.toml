@@ -32,5 +32,6 @@ harness = false
 [dev-dependencies]
 assert_cmd = "2"
 cucumber = "0.23"
+rusqlite = { version = "0.32", features = ["bundled"] }
 tempfile = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

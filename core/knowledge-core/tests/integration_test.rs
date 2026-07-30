@@ -26,8 +26,10 @@ fn test_entity_types_cover_all_variants() {
         EntityType::new("Workspace"),
         EntityType::new("Decision"),
         EntityType::new("Note"),
+        EntityType::new("Conversation"),
+        EntityType::new("Message"),
     ];
-    assert_eq!(types.len(), 20);
+    assert_eq!(types.len(), 22);
 }
 
 #[test]
@@ -97,8 +99,12 @@ fn test_event_types_cover_canonical_set() {
         EventType::ComponentRemoved,
         EventType::RelationshipCreated,
         EventType::RelationshipArchived,
+        EventType::ConversationCreated,
+        EventType::MessageCreated,
+        EventType::EntityReferenced,
+        EventType::ChatContextRetrieved,
     ];
-    assert_eq!(types.len(), 10);
+    assert_eq!(types.len(), 14);
 }
 
 #[test]
@@ -137,6 +143,53 @@ fn test_resolution_candidate_fields() {
         structural_score: None,
     };
     assert_eq!(c.confidence, 1.0);
+}
+
+#[test]
+fn test_new_relationship_types() {
+    let has_msg = Relationship::new(
+        uuid::Uuid::new_v4(),
+        uuid::Uuid::new_v4(),
+        RelationshipType::HasMessage,
+    );
+    assert_eq!(has_msg.relationship_type, RelationshipType::HasMessage);
+    assert!(has_msg.is_active);
+
+    let ref_by = Relationship::new(
+        uuid::Uuid::new_v4(),
+        uuid::Uuid::new_v4(),
+        RelationshipType::ReferencedBy,
+    );
+    assert_eq!(ref_by.relationship_type, RelationshipType::ReferencedBy);
+}
+
+#[test]
+fn test_conversation_entity_type() {
+    let conv_type = EntityType::new("Conversation");
+    assert_eq!(conv_type.as_str(), "Conversation");
+    assert!(conv_type.is_known());
+
+    let msg_type = EntityType::new("Message");
+    assert_eq!(msg_type.as_str(), "Message");
+    assert!(msg_type.is_known());
+}
+
+#[test]
+fn test_new_component_types() {
+    let mc = ComponentType::MessageContent;
+    let er = ComponentType::EntityRefs;
+    assert_ne!(mc, er);
+}
+
+#[test]
+fn test_chat_types_accessible() {
+    let msg = Message {
+        role: MessageRole::User,
+        content: "hello".into(),
+        entity_refs: vec![],
+    };
+    assert_eq!(msg.role, MessageRole::User);
+    assert_eq!(msg.content, "hello");
 }
 
 #[test]

@@ -23,6 +23,9 @@ Events that represent changes to canonical data:
 | `EntityCreated`        | New entity added      | A new canonical entity is stored             |
 | `EntityUpdated`        | Entity modified       | Entity components or metadata changed        |
 | `EntityArchived`       | Entity soft-deleted   | Entity is marked as archived                 |
+| `ConversationCreated`  | New conversation      | A new chat conversation is created           |
+| `MessageCreated`       | New message           | A new message is added to a conversation     |
+| `EntityReferenced`     | Entity referenced     | An entity is referenced in a message         |
 | `RelationshipCreated`  | New relationship      | A typed edge between entities is established |
 | `RelationshipUpdated`  | Relationship modified | Relationship metadata or confidence changed  |
 | `RelationshipArchived` | Relationship removed  | A relationship is marked as inactive         |
@@ -41,6 +44,7 @@ Events that trigger derived data updates:
 | `SearchIndexed`           | Index updated           | Full-text index entry created or updated |
 | `GraphProjected`          | Graph updated           | Graph storage projection rebuilt         |
 | `RecommendationGenerated` | Recommendation computed | AI-generated suggestion produced         |
+| `ChatContextRetrieved`    | Context assembled       | Entities retrieved as chat context        |
 
 ---
 

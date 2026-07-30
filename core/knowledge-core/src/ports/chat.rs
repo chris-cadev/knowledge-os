@@ -1,8 +1,10 @@
 use async_trait::async_trait;
+use futures::Stream;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum MessageRole {
     System,
     User,
@@ -153,5 +155,5 @@ pub trait ChatCompletion: Send + Sync {
     async fn chat_stream(
         &self,
         request: ChatRequest,
-    ) -> Result<Box<dyn futures::Stream<Item = ChatDelta> + Send + Unpin>, ChatError>;
+    ) -> Result<Box<dyn Stream<Item = ChatDelta> + Send + Unpin>, ChatError>;
 }
