@@ -43,7 +43,7 @@ pub use opendocument::{
     OdgImporter, OdpImporter, OdsImporter, OdtImporter, OtpImporter, OtsImporter, OttImporter,
 };
 pub use pdf::PdfImporter;
-pub use plugins::{markdown_plugin, pdf_plugin, url_plugin, PluginAdapter};
+pub use plugins::{image_plugin, markdown_plugin, pdf_plugin, url_plugin, PluginAdapter};
 pub use pptx::PptxImporter;
 pub use structured::{CsvImporter, JsonImporter, XmlImporter, YamlImporter};
 pub use undo::{get_import_history, get_previous_hashes, record_import, undo_last_import};

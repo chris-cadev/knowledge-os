@@ -7,6 +7,8 @@ use knowledge_core::ports::{
     RelationshipRepository, SearchIndex, SearchQuery, SearchResult, StorageError, TraversalConfig,
     TraversalError, TraversalPort, TraversalQuery, TraversalResult,
 };
+use knowledge_core::services::entity_retrieval::EntityRetrievalService;
+use knowledge_derivation::features::chat::pipeline::ChatPipeline;
 use knowledge_storage::adapters::sqlite::SqliteStore;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -15,8 +17,12 @@ use uuid::Uuid;
 ///
 /// The inner `SqliteStore` already uses `Mutex<Connection>` for thread safety,
 /// so no additional synchronization is needed around the `Arc`.
+#[allow(dead_code)]
 pub struct AppState {
     pub store: Arc<SqliteStore>,
+    pub chat_pipeline: Arc<ChatPipeline>,
+    pub entity_retrieval: Arc<EntityRetrievalService>,
+    pub chat_provider_kind: String,
 }
 
 /// Wraps `Arc<SqliteStore>` to implement port traits for view adapter
