@@ -1,4 +1,5 @@
 mod commands;
+mod logger;
 mod wsl;
 
 use commands::provider::{self, load_provider_config};
@@ -22,14 +23,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
-
             let data_dir = app.path().app_data_dir().map_err(|e| {
                 Box::new(std::io::Error::other(format!(
                     "failed to resolve app data dir: {}",
@@ -42,6 +35,18 @@ pub fn run() {
                     e
                 ))) as Box<dyn std::error::Error>
             })?;
+
+            logger::init(&data_dir).map_err(|e| {
+                Box::new(std::io::Error::other(format!(
+                    "failed to initialize logger: {}",
+                    e
+                ))) as Box<dyn std::error::Error>
+            })?;
+
+            logger::install_tauri_bridge(app.handle().clone());
+
+            log::info!("app.starting: data_dir={:?}", data_dir);
+
             let db_path = data_dir.join("knowledge.db");
 
             let store = Arc::new(
