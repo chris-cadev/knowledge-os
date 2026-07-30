@@ -4,6 +4,7 @@ pub mod clipboard;
 pub mod database;
 pub mod directory;
 pub mod docx;
+pub mod ignore_config;
 pub mod email;
 pub mod image;
 pub mod iwork;
