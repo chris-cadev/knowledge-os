@@ -240,30 +240,40 @@ pub async fn chat_get_conversation(
 ) -> Result<Option<ConversationDetailResponse>, String> {
     let id = Uuid::parse_str(&conversation_id).map_err(|e| e.to_string())?;
     use knowledge_core::ports::ConversationRepository;
-    match state
-        .store
-        .get_conversation(id)
-        .await
-        .map_err(|e| e.to_string())?
-    {
-        Some(conv) => Ok(Some(ConversationDetailResponse {
-            id: conv.id.to_string(),
-            title: conv.title,
-            messages: conv
-                .messages
-                .into_iter()
-                .map(|m| MessageResponse {
-                    id: m.id.to_string(),
-                    role: format!("{:?}", m.role).to_lowercase(),
-                    text: m.text,
-                    entity_refs: m.entity_refs.iter().map(|r| r.to_string()).collect(),
-                    created_at: m.created_at.to_rfc3339(),
-                })
-                .collect(),
-            created_at: conv.created_at.to_rfc3339(),
-            updated_at: conv.updated_at.to_rfc3339(),
-        })),
-        None => Ok(None),
+    let store = &*state.store;
+    match store.get_conversation(id).await {
+        Ok(Some(conv)) => {
+            log::info!(
+                "get_conversation: found conv={}, {} messages",
+                conv.id,
+                conv.messages.len()
+            );
+            Ok(Some(ConversationDetailResponse {
+                id: conv.id.to_string(),
+                title: conv.title,
+                messages: conv
+                    .messages
+                    .into_iter()
+                    .map(|m| MessageResponse {
+                        id: m.id.to_string(),
+                        role: format!("{:?}", m.role).to_lowercase(),
+                        text: m.text,
+                        entity_refs: m.entity_refs.iter().map(|r| r.to_string()).collect(),
+                        created_at: m.created_at.to_rfc3339(),
+                    })
+                    .collect(),
+                created_at: conv.created_at.to_rfc3339(),
+                updated_at: conv.updated_at.to_rfc3339(),
+            }))
+        }
+        Ok(None) => {
+            log::info!("get_conversation: conv {} not found", conversation_id);
+            Ok(None)
+        }
+        Err(e) => {
+            log::error!("get_conversation: error for {}: {}", conversation_id, e);
+            Err(e.to_string())
+        }
     }
 }
 
