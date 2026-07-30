@@ -164,6 +164,9 @@ impl ChatPipeline {
         let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel::<ChatStreamEvent>();
 
         let provider = self.chat_provider.clone();
+        let entity_repo = self.entity_repo.clone();
+        let component_repo = self.component_repo.clone();
+        let relationship_repo = self.relationship_repo.clone();
 
         tokio::spawn(async move {
             let mut cancel_rx = cancel_rx;
@@ -212,8 +215,19 @@ impl ChatPipeline {
                     citations =
                         super::citations::extract_citations(&message_buffer, &context_entities);
 
+                    let assistant_id = persist_assistant_message(
+                        &entity_repo,
+                        &component_repo,
+                        &relationship_repo,
+                        conv_id,
+                        &message_buffer,
+                        &citations,
+                    )
+                    .await
+                    .unwrap_or_else(|_| uuid::Uuid::new_v4());
+
                     let _ = event_tx.send(ChatStreamEvent::Done {
-                        assistant_message_id: uuid::Uuid::new_v4(),
+                        assistant_message_id: assistant_id,
                         citations,
                     });
                 }
@@ -417,6 +431,45 @@ impl ChatPipeline {
             .collect();
         self.build_context_for_entities(&ids).await
     }
+}
+
+async fn persist_assistant_message(
+    entity_repo: &Arc<dyn EntityRepository>,
+    component_repo: &Arc<dyn ComponentRepository>,
+    relationship_repo: &Arc<dyn RelationshipRepository>,
+    conversation_id: Uuid,
+    content: &str,
+    citations: &[CitationSource],
+) -> Result<Uuid, StorageError> {
+    let entity = Entity::new(EntityType::new("Message"));
+    let msg_id = entity.id;
+
+    let content_component = Component::new(
+        msg_id,
+        ComponentType::MessageContent,
+        serde_json::json!({
+            "role": "assistant",
+            "content": content,
+        }),
+    );
+
+    let cited_ids: Vec<String> = citations.iter().map(|c| c.entity_id.to_string()).collect();
+    let refs_component = Component::new(
+        msg_id,
+        ComponentType::EntityRefs,
+        serde_json::json!({
+            "refs": cited_ids,
+        }),
+    );
+
+    entity_repo.save(&entity).await?;
+    component_repo.save(&content_component).await?;
+    component_repo.save(&refs_component).await?;
+
+    let relationship = Relationship::new(conversation_id, msg_id, RelationshipType::HasMessage);
+    relationship_repo.save(&relationship).await?;
+
+    Ok(msg_id)
 }
 
 fn role_to_str(role: &MessageRole) -> &str {

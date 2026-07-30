@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   ChatSendResult,
   ConversationSummary,
+  ConversationDetail,
   EntitySearchResult,
   EntitySummary,
   EntityDetail,
@@ -200,6 +201,12 @@ export async function chatSearchEntities(
 
 export async function chatListConversations(): Promise<ConversationSummary[]> {
   return invoke("chat_list_conversations");
+}
+
+export async function chatGetConversation(
+  conversationId: string
+): Promise<ConversationDetail | null> {
+  return invoke("chat_get_conversation", { conversationId });
 }
 
 export async function chatDeleteConversation(

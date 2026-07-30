@@ -106,6 +106,7 @@ pub fn run() {
             commands::chat::chat_stream,
             commands::chat::chat_search_entities,
             commands::chat::chat_list_conversations,
+            commands::chat::chat_get_conversation,
             commands::chat::chat_delete_conversation,
             commands::chat::chat_rename_conversation,
             commands::chat::chat_stop_stream,
