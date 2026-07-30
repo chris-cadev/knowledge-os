@@ -25,6 +25,8 @@ impl EntityType {
         "Workspace",
         "Decision",
         "Note",
+        "Conversation",
+        "Message",
     ];
 
     pub fn new(type_name: &str) -> Self {

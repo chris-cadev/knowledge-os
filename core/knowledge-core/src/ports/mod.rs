@@ -1,6 +1,8 @@
 pub use ai::*;
+pub use chat::*;
 pub use collection::*;
 pub use component::*;
+pub use conversation::*;
 pub use entity::*;
 pub use error::*;
 pub use event::*;
@@ -16,8 +18,10 @@ pub use vector::*;
 pub use view::*;
 
 mod ai;
+mod chat;
 mod collection;
 mod component;
+pub(crate) mod conversation;
 mod entity;
 pub(crate) mod error;
 mod event;

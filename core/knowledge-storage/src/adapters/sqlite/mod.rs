@@ -2,6 +2,7 @@ pub use store::*;
 
 pub(crate) mod collection;
 pub(crate) mod component;
+pub(crate) mod conversation;
 pub(crate) mod entity;
 pub(crate) mod event;
 pub(crate) mod relationship;
