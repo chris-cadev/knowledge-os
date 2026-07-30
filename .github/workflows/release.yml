@@ -39,12 +39,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-13
-            target: macos-x86_64
-            ext: ''
           - os: macos-latest
             target: macos-aarch64
             ext: ''
+            cross_target: x86_64-apple-darwin
+            cross_name: macos-x86_64
           - os: ubuntu-24.04-arm
             target: linux-aarch64
             ext: ''
@@ -75,6 +74,12 @@ jobs:
       - if: runner.os == 'Windows'
         shell: bash
         run: sha256sum kos-${{ matrix.target }}.exe > kos-${{ matrix.target }}.exe.sha256
+      - if: matrix.cross_target != ''
+        run: |
+          rustup target add ${{ matrix.cross_target }}
+          cargo build -p knowledge-cli --release --target ${{ matrix.cross_target }}
+          cp target/${{ matrix.cross_target }}/release/kos kos-${{ matrix.cross_name }}
+          sha256sum kos-${{ matrix.cross_name }} > kos-${{ matrix.cross_name }}.sha256
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
