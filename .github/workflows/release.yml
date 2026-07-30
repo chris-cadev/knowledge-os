@@ -114,6 +114,8 @@ jobs:
             kos-linux-x86_64 kos-linux-aarch64 kos-macos-x86_64 kos-macos-aarch64 kos-windows-x86_64.exe *.sha256
           # ponytail: bundle formats may not exist depending on platform/tooling
           if [ -d target/release/bundle ]; then
-            find target/release/bundle -type f -exec \
-              gh release upload "$GITHUB_REF_NAME" {} \;
+            find target/release/bundle -type f \( \
+              -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \
+              -o -name "*.dmg" -o -name "*.msi" -o -name "*-setup.exe" \
+            \) -exec gh release upload "$GITHUB_REF_NAME" {} \;
           fi
