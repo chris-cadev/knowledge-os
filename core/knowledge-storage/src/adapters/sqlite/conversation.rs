@@ -23,12 +23,7 @@ fn relationship_type_json(rt: &str) -> String {
 
 fn title_from_data(data: Option<String>) -> String {
     data.and_then(|d| serde_json::from_str::<serde_json::Value>(&d).ok())
-        .map(|v| {
-            v.as_str()
-                .or_else(|| v.get("name").and_then(|n| n.as_str()))
-                .unwrap_or("Untitled")
-                .to_string()
-        })
+        .and_then(|v| v.as_str().map(String::from))
         .unwrap_or_else(|| "Untitled".to_string())
 }
 
@@ -207,10 +202,7 @@ impl ConversationRepository for SqliteStore {
             .optional()
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        let title = title_data
-            .as_ref()
-            .map(|_| title_from_data(title_data.clone()))
-            .unwrap_or_else(|| "Untitled".to_string());
+        let title = title_from_data(title_data);
 
         let mut msg_stmt = conn
             .prepare(
