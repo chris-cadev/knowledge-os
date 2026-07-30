@@ -33,6 +33,8 @@ pub async fn chat_send(
 
     let result = state
         .chat_pipeline
+        .lock()
+        .await
         .chat(conv_id, &message, &entity_refs, &toggles, mode)
         .await
         .map_err(|e| e.to_string())?;
@@ -70,6 +72,8 @@ pub async fn chat_stream(
 
     let handle = state
         .chat_pipeline
+        .lock()
+        .await
         .chat_stream(conv_id, &message, &entity_refs, &toggles, mode)
         .await
         .map_err(|e| e.to_string())?;

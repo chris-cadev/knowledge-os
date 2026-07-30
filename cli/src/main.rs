@@ -6,7 +6,7 @@ use knowledge_core::features::entity::{Entity, EntityType};
 use knowledge_core::features::relationship::{Relationship, RelationshipType};
 use knowledge_core::ports::{
     AiAdapter, Collection, CollectionRepository, ComponentRepository, ConversationRepository,
-    EntityRepository, EntityResolver, EntityVersion, Event, EventLog, EventNotifier, Plugin,
+    EntityRepository, EntityResolver, EntityVersion, Event, EventLog, EventNotifier,
     RelationshipRepository, SearchIndex, SearchQuery, SearchResult, StorageError,
     TransactionalWrite, TraversalConfig, TraversalDirection, TraversalError, TraversalPort,
     TraversalQuery, TraversalResult, ViewAdapter, ViewFilter, ViewOutput, ViewRegistry,

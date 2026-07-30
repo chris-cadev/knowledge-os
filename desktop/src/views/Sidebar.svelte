@@ -21,6 +21,7 @@
     { view: "chat", label: "Chat", icon: "chat" },
     { view: "import", label: "Import", icon: "file_upload" },
     { view: "search", label: "Search", icon: "search" },
+    { view: "settings", label: "Settings", icon: "settings" },
   ];
 
   function isActive(view: View): boolean {

@@ -18,6 +18,8 @@ import type {
   TreeOutput,
   TableOutput,
   TimelineOutput,
+  ProviderStatus,
+  TestResult,
 } from "./types.js";
 
 export async function listEntities(
@@ -225,4 +227,38 @@ export async function chatSendFeedback(feedback: {
   comment?: string;
 }): Promise<void> {
   return invoke("chat_send_feedback", { feedback });
+}
+
+// === Provider Configuration API ===
+
+export async function setProvider(
+  providerKind: string,
+  model: string,
+  baseUrl?: string | null,
+  apiKey?: string | null
+): Promise<ProviderStatus> {
+  return invoke("set_provider", {
+    providerKind,
+    model,
+    baseUrl: baseUrl ?? null,
+    apiKey: apiKey ?? null,
+  });
+}
+
+export async function getProvidersStatus(): Promise<ProviderStatus> {
+  return invoke("get_providers_status");
+}
+
+export async function chatTestProvider(
+  providerKind: string,
+  model: string,
+  baseUrl?: string | null,
+  apiKey?: string | null
+): Promise<TestResult> {
+  return invoke("chat_test_provider", {
+    providerKind,
+    model,
+    baseUrl: baseUrl ?? null,
+    apiKey: apiKey ?? null,
+  });
 }

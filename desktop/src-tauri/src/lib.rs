@@ -1,11 +1,12 @@
 mod commands;
 mod wsl;
 
+use commands::provider::{self, load_provider_config};
 use commands::AppState;
 use commands::StoreWrapper;
 use knowledge_core::ports::{
-    ChatCompletion, ComponentRepository, EntityRepository, RelationshipRepository, SearchIndex,
-    TraversalPort, VectorStore,
+    ComponentRepository, EntityRepository, RelationshipRepository, SearchIndex, TraversalPort,
+    VectorStore,
 };
 use knowledge_core::services::entity_retrieval::EntityRetrievalService;
 use knowledge_derivation::features::chat::pipeline::ChatPipeline;
@@ -13,12 +14,7 @@ use knowledge_derivation::features::search::vector_store::InMemoryVectorStore;
 use knowledge_storage::adapters::sqlite::SqliteStore;
 use std::sync::Arc;
 use tauri::Manager;
-
-fn create_chat_provider() -> Result<Arc<dyn ChatCompletion>, String> {
-    Ok(Arc::new(
-        knowledge_derivation::features::chat::mock::MockChatAdapter::default(),
-    ))
-}
+use tokio::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -70,17 +66,23 @@ pub fn run() {
             let vector_store: Arc<dyn VectorStore> = Arc::new(InMemoryVectorStore::new(128));
             let traversal_port: Arc<dyn TraversalPort> = wrapper.clone();
 
-            let chat_provider = create_chat_provider()?;
-            let chat_provider_kind = "mock".to_string();
+            let config = tauri::async_runtime::block_on(load_provider_config(&data_dir));
+            let chat_provider_kind = config.provider_kind.clone();
+            let (chat_provider, _kind) = provider::create_chat_provider_from_config(&config)
+                .unwrap_or_else(|_| {
+                    let mock =
+                        knowledge_derivation::features::chat::mock::MockChatAdapter::default();
+                    (Arc::new(mock), "mock".to_string())
+                });
 
-            let chat_pipeline = Arc::new(ChatPipeline::new(
+            let chat_pipeline = Arc::new(Mutex::new(ChatPipeline::new(
                 chat_provider,
                 entity_repo.clone(),
                 component_repo.clone(),
                 relationship_repo.clone(),
                 search_index.clone(),
                 vector_store,
-            ));
+            )));
 
             let entity_retrieval = Arc::new(EntityRetrievalService::new(
                 entity_repo,
@@ -94,7 +96,8 @@ pub fn run() {
                 store,
                 chat_pipeline,
                 entity_retrieval,
-                chat_provider_kind,
+                chat_provider_kind: Arc::new(Mutex::new(chat_provider_kind)),
+                data_dir,
             });
             Ok(())
         })
@@ -107,6 +110,9 @@ pub fn run() {
             commands::chat::chat_rename_conversation,
             commands::chat::chat_stop_stream,
             commands::chat::chat_send_feedback,
+            commands::provider::set_provider,
+            commands::provider::get_providers_status,
+            commands::provider::chat_test_provider,
             commands::entity::list_entities,
             commands::entity::get_entity_detail,
             commands::entity::get_entity_source,

@@ -13,6 +13,7 @@ pub mod chat;
 pub mod entity;
 pub mod file;
 pub mod import;
+pub mod provider;
 pub mod search;
 pub mod view;
 

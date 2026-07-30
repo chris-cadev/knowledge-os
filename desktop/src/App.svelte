@@ -15,6 +15,7 @@
   import Import from "./views/Import.svelte";
   import Search from "./views/Search.svelte";
   import Chat from "./views/Chat.svelte";
+  import Settings from "./views/Settings.svelte";
 
   initTheme();
   initRouter();
@@ -33,6 +34,7 @@
     import: Import,
     search: Search,
     chat: Chat,
+    settings: Settings,
   };
 
   let CurrentView = $derived(views[state.currentView] ?? Dashboard);

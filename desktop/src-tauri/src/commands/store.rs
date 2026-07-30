@@ -10,7 +10,9 @@ use knowledge_core::ports::{
 use knowledge_core::services::entity_retrieval::EntityRetrievalService;
 use knowledge_derivation::features::chat::pipeline::ChatPipeline;
 use knowledge_storage::adapters::sqlite::SqliteStore;
+use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 /// Shared application state managed by Tauri.
@@ -20,9 +22,10 @@ use uuid::Uuid;
 #[allow(dead_code)]
 pub struct AppState {
     pub store: Arc<SqliteStore>,
-    pub chat_pipeline: Arc<ChatPipeline>,
+    pub chat_pipeline: Arc<Mutex<ChatPipeline>>,
     pub entity_retrieval: Arc<EntityRetrievalService>,
-    pub chat_provider_kind: String,
+    pub chat_provider_kind: Arc<Mutex<String>>,
+    pub data_dir: PathBuf,
 }
 
 /// Wraps `Arc<SqliteStore>` to implement port traits for view adapter
