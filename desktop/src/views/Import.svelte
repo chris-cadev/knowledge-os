@@ -62,6 +62,36 @@
     }
   });
 
+  const tabs = ["files", "url", "clipboard", "database"] as const;
+  type TabId = (typeof tabs)[number];
+  let tabButtons: HTMLElement[] = [];
+
+  function focusTab(idx: number) {
+    tabButtons[idx]?.focus();
+  }
+
+  function handleTabKeydown(e: KeyboardEvent) {
+    if (e.ctrlKey && e.key >= "1" && e.key <= "4") {
+      e.preventDefault();
+      const idx = Number(e.key) - 1;
+      activeTab = tabs[idx];
+      focusTab(idx);
+      return;
+    }
+    const idx = tabs.indexOf(activeTab as TabId);
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      const next = (idx + 1) % tabs.length;
+      activeTab = tabs[next];
+      focusTab(next);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      const prev = (idx - 1 + tabs.length) % tabs.length;
+      activeTab = tabs[prev];
+      focusTab(prev);
+    }
+  }
+
   function toggleError(i: number) {
     if (showErrors.has(i)) {
       showErrors.delete(i);
@@ -309,10 +339,14 @@
   <h2>Import Knowledge</h2>
 
   <!-- Tabs -->
-  <div class="tabs">
+  <div class="tabs" role="tablist" onkeydown={handleTabKeydown}>
     <button
       class="tab"
       class:active={activeTab === "files"}
+      role="tab"
+      aria-selected={activeTab === "files"}
+      tabindex={activeTab === "files" ? 0 : -1}
+      bind:this={tabButtons[0]}
       onclick={() => (activeTab = "files")}
     >
       <span class="material-symbols-outlined">folder</span>
@@ -321,6 +355,10 @@
     <button
       class="tab"
       class:active={activeTab === "url"}
+      role="tab"
+      aria-selected={activeTab === "url"}
+      tabindex={activeTab === "url" ? 0 : -1}
+      bind:this={tabButtons[1]}
       onclick={() => (activeTab = "url")}
     >
       <span class="material-symbols-outlined">language</span>
@@ -329,6 +367,10 @@
     <button
       class="tab"
       class:active={activeTab === "clipboard"}
+      role="tab"
+      aria-selected={activeTab === "clipboard"}
+      tabindex={activeTab === "clipboard" ? 0 : -1}
+      bind:this={tabButtons[2]}
       onclick={() => (activeTab = "clipboard")}
     >
       <span class="material-symbols-outlined">content_paste</span>
@@ -337,6 +379,10 @@
     <button
       class="tab"
       class:active={activeTab === "database"}
+      role="tab"
+      aria-selected={activeTab === "database"}
+      tabindex={activeTab === "database" ? 0 : -1}
+      bind:this={tabButtons[3]}
       onclick={() => (activeTab = "database")}
     >
       <span class="material-symbols-outlined">storage</span>
