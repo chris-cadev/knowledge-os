@@ -24,6 +24,22 @@ pub async fn open_in_default_app(app: tauri::AppHandle, path: String) -> Result<
         .map_err(|e| format!("failed to open file: {}", e))
 }
 
+/// Open a URL in the OS default browser.
+///
+/// When running inside WSL, delegates to the Windows host via `cmd.exe start`
+/// so that URLs open in the Windows default browser. On other platforms, uses
+/// `tauri-plugin-opener` for native cross-platform behavior.
+#[tauri::command]
+pub async fn open_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    if wsl::is_wsl() {
+        return wsl::open_url_with_windows_host(&url).await;
+    }
+
+    app.opener()
+        .open_url(&url, None::<&str>)
+        .map_err(|e| format!("failed to open URL: {}", e))
+}
+
 /// Reveal a file in the OS file manager.
 ///
 /// When running inside WSL, delegates to the Windows host via
