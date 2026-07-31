@@ -104,6 +104,8 @@ Proposed --> Accepted --> [Deprecated | Superseded]
 | ADR-0026 | [Pluggable OCR Backend with Image Blobs as Canonical and OCR Text as Derived](adr-0026.md) | Proposed | 2026-07-29 | PRD-0007                                                                              |
 | ADR-0027 | [Universal Import with Database Connectors and Column Mapping](adr-0027.md) | Proposed | 2026-07-29 | PRD-0007                                                                              |
 | ADR-0028 | [MCP-Compatible Service Architecture for Chat and Entity Retrieval](adr-0028.md) | Proposed | 2026-07-29 | PRD-0007                                                                              |
+| ADR-0029 | [Centralized Entity Type Color Mapping via CSS Custom Properties](adr-0029.md) | Proposed | 2026-07-30 | PRD-0008                                                                              |
+| ADR-0030 | [Shared Frontend Component Library for View Consistency](adr-0030.md) | Proposed | 2026-07-30 | PRD-0008                                                                              |
 
 ---
 

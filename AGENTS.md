@@ -46,7 +46,7 @@ docs/
     synchronization.md        Consistency and derived data updates
     architectural-principles.md  Consolidated architectural invariants (Part VI)
     adrs/                     Architecture Decision Records
-      adr-0001.md through adr-0006.md
+      adr-0001.md through adr-0030.md
   reference/                  Glossary and specifications
     glossary.md               Every project term, defined once (Part XIV)
   research/                   Landscape analysis and evidence
@@ -66,6 +66,21 @@ docs/
       prd-0002-rich-import-and-resolution.md Rich import and resolution
       prd-0003-graph-exploration-and-plugins.md Graph exploration, views, and plugin system
       prd-0004-implementation-gaps.md Cross-PRD audit and remaining work
+      prd-0008-desktop-ux-overhaul.md Desktop UX overhaul — design system compliance and accessibility
+    ux-audits/                Per-view UX audit reports against interaction design principles
+      audit-dashboard.md      Dashboard view audit
+      audit-browser.md        Browser view audit
+      audit-detail.md         Detail view audit
+      audit-graph.md          Graph view audit
+      audit-tree.md           Tree view audit
+      audit-table.md          Table view audit
+      audit-timeline.md       Timeline view audit
+      audit-import.md         Import view audit
+      audit-search.md         Search view audit
+      audit-chat.md           Chat view audit
+      audit-settings.md       Settings view audit
+      audit-sidebar.md        Sidebar audit
+      audit-statusbar.md      StatusBar audit
   guides/                     How-to guides
     plugin-development.md     How to build plugins
     ai-agent-guidelines.md    How AI agents work
