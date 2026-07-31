@@ -1,47 +1,56 @@
 <script lang="ts">
   import { getState } from "../lib/state.svelte.js";
   import { onMount, onDestroy } from "svelte";
-  import { getGraphView } from "../lib/api.js";
-  import { startSimulation, type SimulationNode } from "../lib/graph-layout.js";
+  import { getGraphView, listEntities } from "../lib/api.js";
+  import { startSimulation } from "../lib/graph-layout.js";
   import { navigateTo } from "../lib/router.svelte.js";
-  import type { GraphNode, GraphEdge } from "../lib/types.js";
+  import { getEntityTypeColor } from "../lib/theme.svelte.js";
+  import EntityPicker from "../components/EntityPicker.svelte";
+  import TypeFilterDropdown from "../components/TypeFilterDropdown.svelte";
+  import type { GraphNode, GraphEdge, EntitySummary } from "../lib/types.js";
 
   const app = getState();
 
-  // Graph data
   let nodes = $state<GraphNode[]>([]);
   let edges = $state<GraphEdge[]>([]);
   let loading = $state(false);
 
-  // Controls
   let startId = $state(app.selectedEntityId || "");
+  let focusTitle = $state("");
   let depth = $state(2);
   let entityTypeFilter = $state("");
+  let availableTypes = $state<string[]>([]);
 
-  // Inspector
   let selectedNode = $state<GraphNode | null>(null);
 
-  // SVG state
   let svgEl = $state<SVGSVGElement | null>(null);
   let svgGroup = $state<SVGGElement | null>(null);
 
-  // Transform state (pan/zoom)
   let transformX = $state(0);
   let transformY = $state(0);
   let transformScale = $state(1);
   let isPanning = $state(false);
   let panStart = { x: 0, y: 0 };
 
-  // Simulation
   let sim: ReturnType<typeof startSimulation> | null = null;
   let animationId: number | null = null;
 
-  onMount(async () => {
-    await loadGraph();
+  let legendTypes = $derived(
+    [...new Set(nodes.map((n) => n.entity_type))].sort()
+  );
 
-    // If navigated from detail view with an entity ID
-    if (app.selectedEntityId && !startId) {
+  onMount(async () => {
+    try {
+      const entities = await listEntities();
+      availableTypes = [...new Set(entities.map((e) => e.entity_type))].sort();
+    } catch {
+      availableTypes = [];
+    }
+
+    if (app.selectedEntityId) {
       startId = app.selectedEntityId;
+      await loadGraph();
+    } else {
       await loadGraph();
     }
   });
@@ -75,10 +84,14 @@
       edges = data.edges;
       selectedNode = null;
 
+      if (startId && !focusTitle) {
+        const startNode = nodes.find((n) => n.id === startId);
+        if (startNode) focusTitle = startNode.title;
+      }
+
       if (nodes.length > 0) {
         sim = startSimulation(nodes, edges);
         sim.onTick(() => {
-          // Use rAF to batch updates
           if (animationId === null) {
             animationId = requestAnimationFrame(() => {
               animationId = null;
@@ -94,12 +107,17 @@
     }
   }
 
+  function handleEntitySelect(entity: EntitySummary) {
+    startId = entity.id;
+    focusTitle = entity.title;
+    loadGraph();
+  }
+
   function updateSvgPositions() {
     if (!svgGroup || !sim) return;
 
     const positions = sim.getPositions();
 
-    // Update node positions
     for (const n of positions.nodes) {
       const el = svgGroup.querySelector(`[data-node-id="${n.id}"]`) as SVGGElement | null;
       if (el) {
@@ -107,25 +125,31 @@
       }
     }
 
-    // Update edge positions
     for (const e of positions.edges) {
-      const el = svgGroup.querySelector(`[data-edge-src="${e.source}"][data-edge-tgt="${e.target}"]`) as SVGLineElement | null;
-      if (el) {
-        // Find source/target nodes
-        const srcNode = positions.nodes.find((n) => n.id === e.source);
-        const tgtNode = positions.nodes.find((n) => n.id === e.target);
-        if (srcNode && tgtNode) {
-          el.setAttribute("x1", String(srcNode.x));
-          el.setAttribute("y1", String(srcNode.y));
-          el.setAttribute("x2", String(tgtNode.x));
-          el.setAttribute("y2", String(tgtNode.y));
+      const lineEl = svgGroup.querySelector(`[data-edge-src="${e.source}"][data-edge-tgt="${e.target}"]`) as SVGLineElement | null;
+      const srcNode = positions.nodes.find((n) => n.id === e.source);
+      const tgtNode = positions.nodes.find((n) => n.id === e.target);
+
+      if (lineEl && srcNode && tgtNode) {
+        lineEl.setAttribute("x1", String(srcNode.x));
+        lineEl.setAttribute("y1", String(srcNode.y));
+        lineEl.setAttribute("x2", String(tgtNode.x));
+        lineEl.setAttribute("y2", String(tgtNode.y));
+      }
+
+      if (srcNode && tgtNode) {
+        const labelEl = svgGroup.querySelector(`[data-edge-label-src="${e.source}"][data-edge-label-tgt="${e.target}"]`) as SVGTextElement | null;
+        if (labelEl) {
+          const midX = (srcNode.x + tgtNode.x) / 2;
+          const midY = (srcNode.y + tgtNode.y) / 2;
+          labelEl.setAttribute("x", String(midX));
+          labelEl.setAttribute("y", String(midY - 4));
         }
       }
     }
   }
 
   function onSvgMouseDown(e: MouseEvent) {
-    // Start panning on background click (not on node)
     const target = e.target as SVGElement;
     if (target === svgEl || target.classList.contains("canvas-bg")) {
       isPanning = true;
@@ -170,35 +194,16 @@
 
   function onNodeDoubleClick(node: GraphNode) {
     startId = node.id;
+    focusTitle = node.title;
     loadGraph();
-  }
-
-  function getNodeColor(entityType: string): string {
-    const colorMap: Record<string, string> = {
-      Concept: "#004ac6",
-      Person: "#22c55e",
-      Organization: "#f59e0b",
-      Project: "#8b5cf6",
-      Book: "#06b6d4",
-      Paper: "#ec4899",
-      Article: "#f97316",
-      Video: "#ef4444",
-      Tool: "#14b8a6",
-      Technology: "#6366f1",
-    };
-    return colorMap[entityType] || "#737686";
   }
 </script>
 
 <div class="graph-container">
-  <!-- Traversal Controls -->
   <div class="traversal-controls">
-    <input
-      type="text"
-      placeholder="Entity ID..."
-      bind:value={startId}
-      class="control-input"
-    />
+    <div class="picker-wrapper">
+      <EntityPicker onSelect={handleEntitySelect} placeholder="Search entity to explore..." />
+    </div>
     <label class="control-label">
       Depth:
       <input
@@ -207,14 +212,14 @@
         max="5"
         bind:value={depth}
         class="depth-slider"
+        aria-label="Graph depth"
       />
       <span class="depth-value">{depth}</span>
     </label>
-    <input
-      type="text"
-      placeholder="Type filter..."
-      bind:value={entityTypeFilter}
-      class="control-input small"
+    <TypeFilterDropdown
+      value={entityTypeFilter}
+      options={availableTypes}
+      onchange={(v) => { entityTypeFilter = v; loadGraph(); }}
     />
     <button class="btn btn-primary" onclick={loadGraph} disabled={loading}>
       <span class="material-symbols-outlined">explore</span>
@@ -222,7 +227,6 @@
     </button>
   </div>
 
-  <!-- SVG Canvas -->
   <div class="canvas-wrapper">
     {#if loading}
       <div class="loading-overlay">
@@ -234,7 +238,7 @@
     {#if nodes.length === 0 && !loading}
       <div class="empty-state">
         <span class="material-symbols-outlined empty-icon">bubble_chart</span>
-        <p>Enter an entity ID and click Explore to visualize the knowledge graph.</p>
+        <p>Search for an entity above to explore its knowledge graph connections. Double-click any node to re-center the graph on it.</p>
       </div>
     {/if}
 
@@ -250,15 +254,12 @@
       role="img"
       aria-label="Knowledge graph visualization"
     >
-      <!-- Background -->
       <rect class="canvas-bg" width="100%" height="100%" />
 
-      <!-- Transformed group -->
       <g
         bind:this={svgGroup}
         transform="translate({transformX},{transformY}) scale({transformScale})"
       >
-        <!-- Edges -->
         {#each edges as edge (edge.source + edge.target)}
           <line
             data-edge-src={edge.source}
@@ -271,9 +272,21 @@
             stroke="var(--color-outline-variant)"
             stroke-width="1.5"
           />
+          <text
+            data-edge-label-src={edge.source}
+            data-edge-label-tgt={edge.target}
+            class="edge-label"
+            x="0"
+            y="0"
+            text-anchor="middle"
+            fill="var(--text-secondary)"
+            font-size="9"
+            font-family="var(--font-sans)"
+          >
+            {edge.relationship_type}
+          </text>
         {/each}
 
-        <!-- Nodes -->
         {#each nodes as node (node.id)}
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
           <g
@@ -290,7 +303,7 @@
           >
             <circle
               r="16"
-              fill={getNodeColor(node.entity_type)}
+              fill={getEntityTypeColor(node.entity_type)}
               stroke="var(--color-surface)"
               stroke-width="2"
               class="node-circle"
@@ -309,54 +322,52 @@
       </g>
     </svg>
 
-    <!-- Zoom Controls -->
     <div class="zoom-controls">
-      <button class="zoom-btn" onclick={zoomIn} title="Zoom in">
+      <button class="zoom-btn" onclick={zoomIn} title="Zoom in" aria-label="Zoom in">
         <span class="material-symbols-outlined">add</span>
       </button>
-      <button class="zoom-btn" onclick={zoomOut} title="Zoom out">
+      <button class="zoom-btn" onclick={zoomOut} title="Zoom out" aria-label="Zoom out">
         <span class="material-symbols-outlined">remove</span>
       </button>
-      <button class="zoom-btn" onclick={resetZoom} title="Reset zoom">
+      <button class="zoom-btn" onclick={resetZoom} title="Reset zoom" aria-label="Reset zoom">
         <span class="material-symbols-outlined">center_focus_strong</span>
       </button>
     </div>
 
-    <!-- Breadcrumb -->
     {#if startId}
       <div class="breadcrumb">
         <span class="material-symbols-outlined">my_location</span>
-        <span class="text-muted">Focus: {startId.slice(0, 8)}...</span>
+        <span class="text-muted">Focus: {focusTitle || startId.slice(0, 8) + "..."}</span>
         <span class="text-muted">Depth: {depth}</span>
         <span class="text-muted">{nodes.length} nodes</span>
       </div>
     {/if}
 
-    <!-- Legend -->
-    <div class="legend">
-      <span class="legend-title">Legend</span>
-      {#each ["Concept", "Person", "Paper", "Article", "Book", "Tool", "Project"] as type}
-        <span class="legend-item">
-          <span class="legend-dot" style="background: {getNodeColor(type)}"></span>
-          {type}
-        </span>
-      {/each}
-    </div>
+    {#if legendTypes.length > 0}
+      <div class="legend">
+        <span class="legend-title">Legend</span>
+        {#each legendTypes as type}
+          <span class="legend-item">
+            <span class="legend-dot" style="background: {getEntityTypeColor(type)}"></span>
+            {type}
+          </span>
+        {/each}
+      </div>
+    {/if}
   </div>
 
-  <!-- Entity Inspector Panel -->
   {#if selectedNode}
     <div class="entity-inspector">
       <div class="inspector-header">
         <h3>Entity</h3>
-        <button class="close-btn" onclick={() => (selectedNode = null)}>
+        <button class="close-btn" onclick={() => (selectedNode = null)} aria-label="Close inspector">
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
       <div class="inspector-body">
         <div class="inspector-row">
           <span class="label">Type</span>
-          <span class="type-badge">{selectedNode.entity_type}</span>
+          <span class="type-badge" style="background: {getEntityTypeColor(selectedNode.entity_type)}">{selectedNode.entity_type}</span>
         </div>
         <div class="inspector-row">
           <span class="label">Title</span>
@@ -367,16 +378,16 @@
           <span class="mono">{selectedNode.id.slice(0, 12)}...</span>
         </div>
       </div>
-        <div class="inspector-actions">
-          <button class="btn btn-small" onclick={() => { const n = selectedNode!; navigateTo("detail", n.id); }}>
-            <span class="material-symbols-outlined">open_in_new</span>
-            View Details
-          </button>
-          <button class="btn btn-small" onclick={() => { const n = selectedNode!; startId = n.id; loadGraph(); }}>
-            <span class="material-symbols-outlined">explore</span>
-            Explore from Here
-          </button>
-        </div>
+      <div class="inspector-actions">
+        <button class="btn btn-small" onclick={() => { const n = selectedNode!; navigateTo("detail", n.id); }}>
+          <span class="material-symbols-outlined">open_in_new</span>
+          View Details
+        </button>
+        <button class="btn btn-small" onclick={() => { const n = selectedNode!; startId = n.id; focusTitle = n.title; loadGraph(); }}>
+          <span class="material-symbols-outlined">explore</span>
+          Explore from Here
+        </button>
+      </div>
     </div>
   {/if}
 </div>
@@ -402,19 +413,10 @@
     flex-wrap: wrap;
   }
 
-  .control-input {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: var(--font-size-body-sm);
-    font-family: var(--font-mono);
+  .picker-wrapper {
     min-width: 200px;
-  }
-
-  .control-input.small {
-    min-width: 120px;
+    max-width: 320px;
+    flex: 1;
   }
 
   .control-label {
@@ -513,6 +515,12 @@
     stroke-width: 3;
     stroke: var(--accent);
     filter: brightness(1.2);
+  }
+
+  .edge-label {
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.7;
   }
 
   .loading-overlay,
@@ -696,7 +704,6 @@
   .type-badge {
     display: inline-block;
     padding: 1px 6px;
-    background: var(--accent);
     color: white;
     border-radius: var(--radius-sm);
     font-size: 10px;
