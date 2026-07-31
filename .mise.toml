@@ -128,6 +128,15 @@ run = "cargo fmt -p knowledge-api"
 description = "Run the desktop app (Tauri dev)"
 run = "cargo tauri dev"
 
+[tasks.desktop-serve]
+description = "Run the desktop app (Tauri dev)"
+run = "bun --cwd=desktop install ; bun --cwd=desktop run dev"
+
+[tasks.desktop-tmux]
+description = "Run the desktop app and server in a tmux session (mise desktop and mise desktop-serve)"
+run = "tmux new-session -d -s mise 'mise desktop-serve' && tmux split-window -h 'mise desktop' && tmux attach-session -d -t mise"
+
+
 # ── Mobile ─────────────────────────────────────────────────
 
 [tasks.build-mobile]
