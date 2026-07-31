@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { getState } from "../lib/state.svelte.js";
   import { navigateTo } from "../lib/router.svelte.js";
   import type { View } from "../lib/types.js";
@@ -24,12 +25,19 @@
     { view: "settings", label: "Settings", icon: "settings" },
   ];
 
-  function isActive(view: View): boolean {
-    return state.currentView === view;
+  let collapsed = $state<boolean>(false);
+
+  onMount(() => {
+    collapsed = sessionStorage.getItem("sidebar-collapsed") === "true";
+  });
+
+  function toggleCollapse() {
+    collapsed = !collapsed;
+    sessionStorage.setItem("sidebar-collapsed", String(collapsed));
   }
 </script>
 
-<aside class="sidebar">
+<aside class="sidebar" class:collapsed>
   <div class="logo">
     <h1 class="logo-title">Knowledge OS</h1>
     <span class="logo-subtitle">v0.1.0 SYSTEM CORE</span>
@@ -39,14 +47,20 @@
     {#each navItems as item}
       <button
         class="nav-item"
-        class:active={isActive(item.view)}
+        class:active={state.currentView === item.view}
         onclick={() => navigateTo(item.view)}
+        title={collapsed ? item.label : undefined}
+        aria-current={state.currentView === item.view ? "page" : false}
       >
         <span class="nav-icon material-symbols-outlined">{item.icon}</span>
         <span class="nav-label">{item.label}</span>
       </button>
     {/each}
   </nav>
+
+  <button class="collapse-toggle" onclick={toggleCollapse} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+    <span class="collapse-icon material-symbols-outlined">chevron_left</span>
+  </button>
 
   <div class="sidebar-footer">
     <div class="status-bar">
@@ -66,6 +80,29 @@
     padding: var(--space-8) 0;
     border-right: 1px solid var(--color-sidebar-border);
     user-select: none;
+    transition: width var(--transition-fast), min-width var(--transition-fast);
+  }
+
+  .sidebar.collapsed {
+    --sidebar-width: 48px;
+  }
+
+  .sidebar.collapsed .logo,
+  .sidebar.collapsed .sidebar-footer {
+    display: none;
+  }
+
+  .sidebar.collapsed .nav-item {
+    justify-content: center;
+    padding: 14px 0;
+  }
+
+  .sidebar.collapsed .nav-label {
+    display: none;
+  }
+
+  .sidebar.collapsed .collapse-icon {
+    transform: rotate(180deg);
   }
 
   .logo {
@@ -146,6 +183,24 @@
 
   .nav-label {
     flex: 1;
+  }
+
+  .collapse-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: var(--space-3) 0;
+    color: var(--color-sidebar-subtitle);
+    transition: color var(--transition-fast);
+  }
+
+  .collapse-toggle:hover {
+    color: var(--color-sidebar-text-hover);
+  }
+
+  .collapse-icon {
+    transition: transform var(--transition-fast);
   }
 
   .sidebar-footer {
