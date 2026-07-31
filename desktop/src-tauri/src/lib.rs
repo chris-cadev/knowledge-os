@@ -128,6 +128,7 @@ pub fn run() {
             commands::entity::get_entity_source,
             commands::file::open_in_default_app,
             commands::file::open_source_folder,
+            commands::file::open_url,
             commands::ignore_config::get_ignore_patterns,
             commands::ignore_config::set_ignore_patterns,
             commands::ignore_config::reset_ignore_patterns,

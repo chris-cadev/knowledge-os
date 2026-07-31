@@ -159,6 +159,10 @@ export async function openSourceFolder(path: string): Promise<void> {
   return invoke("open_source_folder", { path });
 }
 
+export async function openUrl(url: string): Promise<void> {
+  return invoke("open_url", { url });
+}
+
 // === Chat API ===
 
 export async function chatSend(

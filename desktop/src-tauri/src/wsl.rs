@@ -122,6 +122,24 @@ pub async fn open_file_with_windows_host(path: &str) -> Result<(), String> {
     }
 }
 
+/// Open a URL in the Windows host's default browser.
+pub async fn open_url_with_windows_host(url: &str) -> Result<(), String> {
+    let status = tokio::process::Command::new("cmd.exe")
+        .args(["/C", "start", "", url])
+        .status()
+        .await
+        .map_err(|e| format!("failed to launch Windows host browser: {}", e))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Windows host browser exited with status: {}",
+            status
+        ))
+    }
+}
+
 /// Reveal a file in the Windows host's file explorer.
 ///
 /// `explorer.exe /select,<path>` commonly returns exit code 1 even when it

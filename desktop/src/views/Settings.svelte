@@ -12,8 +12,13 @@
     getIgnorePatterns,
     setIgnorePatterns,
     resetIgnorePatterns,
+    openUrl,
   } from "../lib/api.js";
-  import type { ProviderStatus, TestResult, OcrProviderStatus } from "../lib/types.js";
+  import type {
+    ProviderStatus,
+    TestResult,
+    OcrProviderStatus,
+  } from "../lib/types.js";
 
   const app = getState();
 
@@ -57,7 +62,10 @@
   const chatProviderOptions = [
     { value: "mock", label: "Mock (offline, no setup)" },
     { value: "ollama", label: "Ollama (local, free)" },
-    { value: "openai-compatible", label: "OpenAI-compatible (LM Studio, vLLM, etc.)" },
+    {
+      value: "openai-compatible",
+      label: "OpenAI-compatible (LM Studio, vLLM, etc.)",
+    },
   ];
 
   const chatModelHints: Record<string, string> = {
@@ -124,17 +132,19 @@
   }
 
   function labelForProvider(kind: string): string {
-    const found = chatProviderOptions.find(o => o.value === kind);
-    return found ? found.label.split(" ")[0] : kind.charAt(0).toUpperCase() + kind.slice(1);
+    const found = chatProviderOptions.find((o) => o.value === kind);
+    return found
+      ? found.label.split(" ")[0]
+      : kind.charAt(0).toUpperCase() + kind.slice(1);
   }
 
   function providerLabel(kind: string): string {
-    const found = chatProviderOptions.find(o => o.value === kind);
+    const found = chatProviderOptions.find((o) => o.value === kind);
     return found ? found.label : kind;
   }
 
   function ocrLabel(backend: string): string {
-    const found = ocrBackendOptions.find(o => o.value === backend);
+    const found = ocrBackendOptions.find((o) => o.value === backend);
     return found ? found.label : backend;
   }
 
@@ -142,7 +152,12 @@
   function canSaveChat(): boolean {
     if (chatProviderKind === "mock") return true;
     if (!chatModel.trim()) return false;
-    if (chatProviderKind === "openai-compatible" && !chatApiKey.trim() && !chatBaseUrl.match(/^https?:\/\/localhost/)) return false;
+    if (
+      chatProviderKind === "openai-compatible" &&
+      !chatApiKey.trim() &&
+      !chatBaseUrl.match(/^https?:\/\/localhost/)
+    )
+      return false;
     return true;
   }
 
@@ -161,7 +176,12 @@
     if (!canSaveChat()) return;
     chatSaving = true;
     try {
-      const result = await setProvider(chatProviderKind, chatModel, chatBaseUrl || null, chatApiKey || null);
+      const result = await setProvider(
+        chatProviderKind,
+        chatModel,
+        chatBaseUrl || null,
+        chatApiKey || null,
+      );
       chatStatus = result;
       chatSaved = true;
       app.providerName = labelForProvider(chatProviderKind);
@@ -169,7 +189,9 @@
       dirty = false;
       statusMessage = `Chat provider saved: ${providerLabel(chatProviderKind)}`;
       statusLevel = "success";
-      setTimeout(() => { chatSaved = false; }, 3000);
+      setTimeout(() => {
+        chatSaved = false;
+      }, 3000);
     } catch (e) {
       statusMessage = `Failed to save: ${e}`;
       statusLevel = "error";
@@ -184,7 +206,12 @@
     chatTesting = true;
     chatTestResult = null;
     try {
-      chatTestResult = await chatTestProvider(chatProviderKind, chatModel, chatBaseUrl || null, chatApiKey || null);
+      chatTestResult = await chatTestProvider(
+        chatProviderKind,
+        chatModel,
+        chatBaseUrl || null,
+        chatApiKey || null,
+      );
       lastTestTime = new Date().toLocaleTimeString();
       app.providerReachable = chatTestResult.success;
       if (chatTestResult.success) {
@@ -230,11 +257,18 @@
     if (!canSaveOcr()) return;
     ocrSaving = true;
     try {
-      ocrStatus = await setOcrProvider(ocrBackend, ocrModel, ocrBaseUrl || null, ocrApiKey || null);
+      ocrStatus = await setOcrProvider(
+        ocrBackend,
+        ocrModel,
+        ocrBaseUrl || null,
+        ocrApiKey || null,
+      );
       ocrSaved = true;
       statusMessage = `OCR backend saved: ${ocrLabel(ocrBackend)}`;
       statusLevel = "success";
-      setTimeout(() => { ocrSaved = false; }, 3000);
+      setTimeout(() => {
+        ocrSaved = false;
+      }, 3000);
     } catch (e) {
       statusMessage = `Failed to save OCR config: ${e}`;
       statusLevel = "error";
@@ -302,24 +336,108 @@
     dirty = true;
   }
 
+  // ── Section navigation ─────────────────────────────────────
+  const sections = [
+    { id: "chat-provider", label: "Chat Provider" },
+    { id: "ocr", label: "OCR Text Extraction" },
+    { id: "import-exclusions", label: "Import Exclusions" },
+    { id: "help", label: "Help" },
+  ];
+
+  let activeSection = $state("chat-provider");
+
+  // ── Section flash highlight ─────────────────────────────────
+  let flashSection = $state<string | null>(null);
+  let flashNonce = $state(0);
+  let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function scrollToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+    if (flashTimer) clearTimeout(flashTimer);
+    flashSection = id;
+    flashNonce += 1;
+    flashTimer = setTimeout(() => {
+      flashSection = null;
+    }, 1000);
+  }
+
+  function openExternal(url: string) {
+    openUrl(url);
+  }
+
   // ── Mark dirty on change ─────────────────────────────────────
-  function markDirty() { dirty = true; }
+  function markDirty() {
+    dirty = true;
+  }
 
   // ── Load on mount ────────────────────────────────────────────
-  $effect(() => { loadAllStatus(); });
+  $effect(() => {
+    loadAllStatus();
+  });
+
+  $effect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            activeSection = entry.target.id;
+          }
+        }
+      },
+      { rootMargin: "-20% 0px -70% 0px" },
+    );
+
+    for (const section of sections) {
+      const el = document.getElementById(section.id);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  });
 </script>
 
 <div class="settings" role="region" aria-label="Settings">
-  <header class="settings-header">
-    <h2>Settings</h2>
-    <p class="text-muted">Configure AI providers for chat and OCR text extraction.</p>
-  </header>
+  <div class="top-patch"></div>
+  <div class="settings-top">
+    <header class="settings-header">
+      <h2>Settings</h2>
+      <p class="text-muted">
+        Configure AI providers for chat and OCR text extraction.
+      </p>
+    </header>
+
+    <nav class="section-nav" aria-label="Settings sections">
+      {#each sections as section}
+        <a
+          href="#{section.id}"
+          class="section-nav-link"
+          class:active={activeSection === section.id}
+          onclick={(e) => {
+            e.preventDefault();
+            scrollToSection(section.id);
+          }}
+        >
+          {section.label}
+        </a>
+      {/each}
+    </nav>
+  </div>
 
   {#if statusMessage}
-    <div class="status-alert" class:info={statusLevel === "info"} class:success={statusLevel === "success"} class:error={statusLevel === "error"}
-      role="alert" aria-live="polite">
+    <div
+      class="status-alert"
+      class:info={statusLevel === "info"}
+      class:success={statusLevel === "success"}
+      class:error={statusLevel === "error"}
+      role="alert"
+      aria-live="polite"
+    >
       <span class="material-symbols-outlined">
-        {statusLevel === "success" ? "check_circle" : statusLevel === "error" ? "error" : "info"}
+        {statusLevel === "success"
+          ? "check_circle"
+          : statusLevel === "error"
+            ? "error"
+            : "info"}
       </span>
       <span>{statusMessage}</span>
     </div>
@@ -329,7 +447,10 @@
   <section class="status-summary" aria-label="Current provider status">
     <div class="summary-card">
       <span class="summary-label">Chat</span>
-      <span class="summary-value" class:reachable={chatTestResult?.success ?? true}>
+      <span
+        class="summary-value"
+        class:reachable={chatTestResult?.success ?? true}
+      >
         {app.providerName}
       </span>
       {#if app.providerModel}
@@ -349,27 +470,43 @@
   </section>
 
   <!-- ── Chat Provider Section (F6.6 Progressive disclosure) ── -->
-  <section class="section" aria-label="Chat provider configuration">
-    <div class="section-header">
-      <h3>Chat Provider</h3>
-      {#if chatSaved}
-        <span class="saved-badge" role="status" aria-live="polite">Saved</span>
-      {/if}
-      {#if dirty}
-        <span class="dirty-badge" role="status">Unsaved</span>
-      {/if}
-    </div>
+  <section
+    id="chat-provider"
+    class="section"
+    aria-label="Chat provider configuration"
+  >
+    {#key flashSection === "chat-provider" ? flashNonce : null}
+      <div
+        class="section-header"
+        class:flash={flashSection === "chat-provider"}
+      >
+        <h3>Chat Provider</h3>
+        {#if chatSaved}
+          <span class="saved-badge" role="status" aria-live="polite">Saved</span
+          >
+        {/if}
+        {#if dirty}
+          <span class="dirty-badge" role="status">Unsaved</span>
+        {/if}
+      </div>
+    {/key}
 
     <div class="quick-start" aria-label="Quick start presets">
       <span class="quick-start-label" id="presets-label">Quick start:</span>
       <div class="preset-buttons" role="group" aria-labelledby="presets-label">
-        <button class="preset-btn" onclick={() => applyPreset("ollama")}
-          aria-label="Use Ollama default configuration">
+        <button
+          class="preset-btn"
+          onclick={() => applyPreset("ollama")}
+          aria-label="Use Ollama default configuration"
+        >
           <span class="material-symbols-outlined">smart_toy</span>
           Ollama
         </button>
-        <button class="preset-btn" onclick={() => applyPreset("lm-studio")}
-          aria-label="Use LM Studio default configuration">
+        <button
+          class="preset-btn"
+          onclick={() => applyPreset("lm-studio")}
+          aria-label="Use LM Studio default configuration"
+        >
           <span class="material-symbols-outlined">terminal</span>
           LM Studio
         </button>
@@ -380,13 +517,19 @@
       <label for="chat-provider-kind">
         Provider <span class="required" aria-hidden="true">*</span>
       </label>
-      <select id="chat-provider-kind" bind:value={chatProviderKind} onchange={markDirty}
-        aria-describedby="chat-provider-hint">
+      <select
+        id="chat-provider-kind"
+        bind:value={chatProviderKind}
+        onchange={markDirty}
+        aria-describedby="chat-provider-hint"
+      >
         {#each chatProviderOptions as opt}
           <option value={opt.value}>{opt.label}</option>
         {/each}
       </select>
-      <p id="chat-provider-hint" class="field-hint">Choose where AI responses come from. Mock works offline without setup.</p>
+      <p id="chat-provider-hint" class="field-hint">
+        Choose where AI responses come from. Mock works offline without setup.
+      </p>
     </div>
 
     {#if chatProviderKind !== "mock"}
@@ -394,33 +537,59 @@
         <label for="chat-model">
           Model <span class="required" aria-hidden="true">*</span>
         </label>
-        <input id="chat-model" type="text" bind:value={chatModel} oninput={markDirty}
+        <input
+          id="chat-model"
+          type="text"
+          bind:value={chatModel}
+          oninput={markDirty}
           placeholder={chatModelHints[chatProviderKind]}
           aria-describedby="chat-model-hint"
-          aria-required="true" />
+          aria-required="true"
+        />
         <p id="chat-model-hint" class="field-hint">
-          {chatProviderKind === "ollama" ? "Model name you downloaded with `ollama pull`." : "Model name from your provider."}
+          {chatProviderKind === "ollama"
+            ? "Model name you downloaded with `ollama pull`."
+            : "Model name from your provider."}
           Examples: {chatModelHints[chatProviderKind]}
         </p>
       </div>
 
       <!-- Collapsible advanced (F6.6) -->
-      <button class="advanced-toggle" onclick={() => { showChatAdvanced = !showChatAdvanced; }}
+      <button
+        class="advanced-toggle"
+        onclick={() => {
+          showChatAdvanced = !showChatAdvanced;
+        }}
         aria-expanded={showChatAdvanced}
-        aria-controls="chat-advanced-section">
-        <span class="material-symbols-outlined">{showChatAdvanced ? "expand_less" : "expand_more"}</span>
+        aria-controls="chat-advanced-section"
+      >
+        <span class="material-symbols-outlined"
+          >{showChatAdvanced ? "expand_less" : "expand_more"}</span
+        >
         Advanced
       </button>
 
       {#if showChatAdvanced}
-        <div id="chat-advanced-section" class="advanced-section" role="region" aria-label="Chat advanced settings">
+        <div
+          id="chat-advanced-section"
+          class="advanced-section"
+          role="region"
+          aria-label="Chat advanced settings"
+        >
           <div class="field">
             <label for="chat-base-url">Base URL</label>
-            <input id="chat-base-url" type="text" bind:value={chatBaseUrl} oninput={markDirty}
+            <input
+              id="chat-base-url"
+              type="text"
+              bind:value={chatBaseUrl}
+              oninput={markDirty}
               placeholder={chatUrlDefaults[chatProviderKind]}
-              aria-describedby="chat-url-hint" />
+              aria-describedby="chat-url-hint"
+            />
             <p id="chat-url-hint" class="field-hint">
-              {chatProviderKind === "ollama" ? "Ollama server address. Default: http://localhost:11434" : "OpenAI-compatible endpoint URL. Default: https://api.openai.com/v1"}
+              {chatProviderKind === "ollama"
+                ? "Ollama server address. Default: http://localhost:11434"
+                : "OpenAI-compatible endpoint URL. Default: https://api.openai.com/v1"}
             </p>
           </div>
 
@@ -428,50 +597,84 @@
             <div class="field">
               <label for="chat-api-key">API Key</label>
               <div class="api-key-row">
-                <input id="chat-api-key" type={showChatApiKey ? "text" : "password"}
-                  bind:value={chatApiKey} oninput={markDirty}
+                <input
+                  id="chat-api-key"
+                  type={showChatApiKey ? "text" : "password"}
+                  bind:value={chatApiKey}
+                  oninput={markDirty}
                   placeholder="sk-..."
                   autocomplete="off"
-                  aria-describedby="chat-key-hint" />
-                <button class="icon-btn" onclick={() => { showChatApiKey = !showChatApiKey; }}
-                  aria-label={showChatApiKey ? "Hide API key" : "Show API key"}>
+                  aria-describedby="chat-key-hint"
+                />
+                <button
+                  class="icon-btn"
+                  onclick={() => {
+                    showChatApiKey = !showChatApiKey;
+                  }}
+                  aria-label={showChatApiKey ? "Hide API key" : "Show API key"}
+                >
                   <span class="material-symbols-outlined">
                     {showChatApiKey ? "visibility_off" : "visibility"}
                   </span>
                 </button>
                 {#if chatApiKey}
-                  <button class="icon-btn" onclick={() => { chatApiKey = ""; markDirty(); }}
-                    aria-label="Clear API key">
+                  <button
+                    class="icon-btn"
+                    onclick={() => {
+                      chatApiKey = "";
+                      markDirty();
+                    }}
+                    aria-label="Clear API key"
+                  >
                     <span class="material-symbols-outlined">close</span>
                   </button>
                 {/if}
               </div>
-              <p id="chat-key-hint" class="field-hint">Required for cloud providers. Leave blank for local (LM Studio, vLLM).</p>
+              <p id="chat-key-hint" class="field-hint">
+                Required for cloud providers. Leave blank for local (LM Studio,
+                vLLM).
+              </p>
             </div>
           {/if}
         </div>
       {/if}
 
       <div class="actions">
-        <button class="btn btn-primary" onclick={handleSaveChat}
+        <button
+          class="btn btn-primary"
+          onclick={handleSaveChat}
           disabled={chatSaving || !canSaveChat()}
-          aria-busy={chatSaving}>
+          aria-busy={chatSaving}
+        >
           {chatSaving ? "Saving..." : "Save"}
         </button>
-        <button class="btn btn-secondary" onclick={handleTestChat}
+        <button
+          class="btn btn-secondary"
+          onclick={handleTestChat}
           disabled={chatTesting || !canTestChat()}
-          aria-busy={chatTesting}>
+          aria-busy={chatTesting}
+        >
           {chatTesting ? "Testing..." : "Test Connection"}
         </button>
-        <button class="btn btn-danger-outline" onclick={() => { showResetConfirm = true; }}
-          aria-label="Reset to default provider">
+        <button
+          class="btn btn-danger-outline"
+          onclick={() => {
+            showResetConfirm = true;
+          }}
+          aria-label="Reset to default provider"
+        >
           Reset to Default
         </button>
       </div>
 
       {#if chatTestResult}
-        <div class="test-result" class:success={chatTestResult.success} class:failure={!chatTestResult.success}
-          role="alert" aria-live="polite">
+        <div
+          class="test-result"
+          class:success={chatTestResult.success}
+          class:failure={!chatTestResult.success}
+          role="alert"
+          aria-live="polite"
+        >
           <span class="material-symbols-outlined">
             {chatTestResult.success ? "check_circle" : "error"}
           </span>
@@ -484,7 +687,11 @@
               {/if}
             </span>
             {#if chatTestResult.success}
-              <span class="test-latency" class:fast={chatTestResult.latency_ms < 500} class:slow={chatTestResult.latency_ms >= 2000}>
+              <span
+                class="test-latency"
+                class:fast={chatTestResult.latency_ms < 500}
+                class:slow={chatTestResult.latency_ms >= 2000}
+              >
                 {chatTestResult.latency_ms}ms
               </span>
             {:else}
@@ -496,13 +703,36 @@
 
       {#if showResetConfirm}
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_no_noninteractive_element_interactions -->
-        <div class="modal-overlay" onclick={() => { showResetConfirm = false; }} role="presentation">
-          <div class="modal" role="dialog" aria-modal="true" aria-label="Confirm reset" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+        <div
+          class="modal-overlay"
+          onclick={() => {
+            showResetConfirm = false;
+          }}
+          role="presentation"
+        >
+          <div
+            class="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm reset"
+            tabindex="-1"
+            onclick={(e) => e.stopPropagation()}
+          >
             <h4>Reset Chat Provider?</h4>
-            <p>This will switch back to the Mock provider. Your conversations will not be affected.</p>
+            <p>
+              This will switch back to the Mock provider. Your conversations
+              will not be affected.
+            </p>
             <div class="modal-actions">
-              <button class="btn btn-primary" onclick={handleResetChat}>Reset</button>
-              <button class="btn btn-secondary" onclick={() => { showResetConfirm = false; }}>Cancel</button>
+              <button class="btn btn-primary" onclick={handleResetChat}
+                >Reset</button
+              >
+              <button
+                class="btn btn-secondary"
+                onclick={() => {
+                  showResetConfirm = false;
+                }}>Cancel</button
+              >
             </div>
           </div>
         </div>
@@ -513,11 +743,39 @@
       <div class="info-card" role="status">
         <span class="material-symbols-outlined info-icon">info</span>
         <div>
-          <p><strong>Mock provider is active.</strong> Responses are simulated — no real AI involved.</p>
-          <p>To use a real AI provider, select Ollama or OpenAI-compatible above, or use a preset:</p>
+          <p>
+            <strong>Mock provider is active.</strong> Responses are simulated — no
+            real AI involved.
+          </p>
+          <p>
+            To use a real AI provider, select Ollama or OpenAI-compatible above,
+            or use a preset:
+          </p>
           <ul class="info-links">
-            <li><a href="https://ollama.com" target="_blank" rel="noopener">Download Ollama</a> — free, local, no API key needed</li>
-            <li><a href="https://lmstudio.ai" target="_blank" rel="noopener">Download LM Studio</a> — free, local, OpenAI-compatible</li>
+            <li>
+              <a
+                href="https://ollama.com"
+                target="_blank"
+                rel="noopener"
+                onclick={(e) => {
+                  e.preventDefault();
+                  openExternal("https://ollama.com");
+                }}
+                >Download Ollama</a
+              > — free, local, no API key needed
+            </li>
+            <li>
+              <a
+                href="https://lmstudio.ai"
+                target="_blank"
+                rel="noopener"
+                onclick={(e) => {
+                  e.preventDefault();
+                  openExternal("https://lmstudio.ai");
+                }}
+                >Download LM Studio</a
+              > — free, local, OpenAI-compatible
+            </li>
           </ul>
         </div>
       </div>
@@ -525,29 +783,38 @@
   </section>
 
   <!-- ── OCR Provider Section (F6.4 Consistency) ──────────── -->
-  <section class="section" aria-label="OCR provider configuration">
-    <div class="section-header">
-      <h3>OCR Text Extraction</h3>
-      {#if ocrSaved}
-        <span class="saved-badge" role="status" aria-live="polite">Saved</span>
-      {/if}
-    </div>
+  <section id="ocr" class="section" aria-label="OCR provider configuration">
+    {#key flashSection === "ocr" ? flashNonce : null}
+      <div class="section-header" class:flash={flashSection === "ocr"}>
+        <h3>OCR Text Extraction</h3>
+        {#if ocrSaved}
+          <span class="saved-badge" role="status" aria-live="polite">Saved</span
+          >
+        {/if}
+      </div>
+    {/key}
 
     <div class="field">
       <label for="ocr-backend">
         Backend <span class="required" aria-hidden="true">*</span>
       </label>
-      <select id="ocr-backend" bind:value={ocrBackend}
-        aria-describedby="ocr-backend-hint">
+      <select
+        id="ocr-backend"
+        bind:value={ocrBackend}
+        aria-describedby="ocr-backend-hint"
+      >
         {#each ocrBackendOptions as opt}
           <option value={opt.value}>{opt.label}</option>
         {/each}
       </select>
       <p id="ocr-backend-hint" class="field-hint">
-        {ocrBackend === "mock" ? "For testing only. No real text extraction." :
-         ocrBackend === "tesseract" ? "Fast, CPU-only, works offline. Best for simple documents." :
-         ocrBackend === "ollama" ? "Higher accuracy on complex layouts. Requires Ollama with a vision model." :
-         "Highest accuracy. Requires an API key for cloud providers."}
+        {ocrBackend === "mock"
+          ? "For testing only. No real text extraction."
+          : ocrBackend === "tesseract"
+            ? "Fast, CPU-only, works offline. Best for simple documents."
+            : ocrBackend === "ollama"
+              ? "Higher accuracy on complex layouts. Requires Ollama with a vision model."
+              : "Highest accuracy. Requires an API key for cloud providers."}
       </p>
     </div>
 
@@ -556,39 +823,71 @@
         <label for="ocr-model">
           Model <span class="required" aria-hidden="true">*</span>
         </label>
-        <input id="ocr-model" type="text" bind:value={ocrModel}
+        <input
+          id="ocr-model"
+          type="text"
+          bind:value={ocrModel}
           placeholder={ocrModelHints[ocrBackend]}
-          aria-describedby="ocr-model-hint" />
-        <p id="ocr-model-hint" class="field-hint">Examples: {ocrModelHints[ocrBackend]}</p>
+          aria-describedby="ocr-model-hint"
+        />
+        <p id="ocr-model-hint" class="field-hint">
+          Examples: {ocrModelHints[ocrBackend]}
+        </p>
       </div>
 
       {#if ocrBackend !== "tesseract"}
-        <button class="advanced-toggle" onclick={() => { showOcrAdvanced = !showOcrAdvanced; }}
+        <button
+          class="advanced-toggle"
+          onclick={() => {
+            showOcrAdvanced = !showOcrAdvanced;
+          }}
           aria-expanded={showOcrAdvanced}
-          aria-controls="ocr-advanced-section">
-          <span class="material-symbols-outlined">{showOcrAdvanced ? "expand_less" : "expand_more"}</span>
+          aria-controls="ocr-advanced-section"
+        >
+          <span class="material-symbols-outlined"
+            >{showOcrAdvanced ? "expand_less" : "expand_more"}</span
+          >
           Advanced
         </button>
 
         {#if showOcrAdvanced}
-          <div id="ocr-advanced-section" class="advanced-section" role="region" aria-label="OCR advanced settings">
+          <div
+            id="ocr-advanced-section"
+            class="advanced-section"
+            role="region"
+            aria-label="OCR advanced settings"
+          >
             <div class="field">
               <label for="ocr-base-url">Base URL</label>
-              <input id="ocr-base-url" type="text" bind:value={ocrBaseUrl}
+              <input
+                id="ocr-base-url"
+                type="text"
+                bind:value={ocrBaseUrl}
                 placeholder={ocrUrlDefaults[ocrBackend]}
-                aria-describedby="ocr-url-hint" />
-              <p id="ocr-url-hint" class="field-hint">Default: {ocrUrlDefaults[ocrBackend]}</p>
+                aria-describedby="ocr-url-hint"
+              />
+              <p id="ocr-url-hint" class="field-hint">
+                Default: {ocrUrlDefaults[ocrBackend]}
+              </p>
             </div>
 
             {#if ocrBackend === "api"}
               <div class="field">
                 <label for="ocr-api-key">API Key</label>
                 <div class="api-key-row">
-                  <input id="ocr-api-key" type={showOcrApiKey ? "text" : "password"}
+                  <input
+                    id="ocr-api-key"
+                    type={showOcrApiKey ? "text" : "password"}
                     bind:value={ocrApiKey}
-                    autocomplete="off" />
-                  <button class="icon-btn" onclick={() => { showOcrApiKey = !showOcrApiKey; }}
-                    aria-label={showOcrApiKey ? "Hide API key" : "Show API key"}>
+                    autocomplete="off"
+                  />
+                  <button
+                    class="icon-btn"
+                    onclick={() => {
+                      showOcrApiKey = !showOcrApiKey;
+                    }}
+                    aria-label={showOcrApiKey ? "Hide API key" : "Show API key"}
+                  >
                     <span class="material-symbols-outlined">
                       {showOcrApiKey ? "visibility_off" : "visibility"}
                     </span>
@@ -601,8 +900,11 @@
       {/if}
 
       <div class="actions">
-        <button class="btn btn-primary" onclick={handleSaveOcr}
-          disabled={ocrSaving || !canSaveOcr()}>
+        <button
+          class="btn btn-primary"
+          onclick={handleSaveOcr}
+          disabled={ocrSaving || !canSaveOcr()}
+        >
           {ocrSaving ? "Saving..." : "Save"}
         </button>
         <button class="btn btn-danger-outline" onclick={handleResetOcr}>
@@ -615,21 +917,39 @@
       <div class="info-card" role="status">
         <span class="material-symbols-outlined info-icon">info</span>
         <div>
-          <p><strong>OCR is set to Mock.</strong> Text will not be extracted from images.</p>
-          <p>For real OCR, select Tesseract (local, no setup), Ollama vision, or an API provider above.</p>
+          <p>
+            <strong>OCR is set to Mock.</strong> Text will not be extracted from
+            images.
+          </p>
+          <p>
+            For real OCR, select Tesseract (local, no setup), Ollama vision, or
+            an API provider above.
+          </p>
         </div>
       </div>
     {/if}
   </section>
 
   <!-- ── Import Exclusions ──────────────────────────────────── -->
-  <section class="section" aria-label="Import exclusion patterns">
-    <div class="section-header">
-      <h3>Import Exclusions</h3>
-    </div>
+  <section
+    id="import-exclusions"
+    class="section"
+    aria-label="Import exclusion patterns"
+  >
+    {#key flashSection === "import-exclusions" ? flashNonce : null}
+      <div
+        class="section-header"
+        class:flash={flashSection === "import-exclusions"}
+      >
+        <h3>Import Exclusions</h3>
+      </div>
+    {/key}
     <p class="section-desc">
-      Patterns use gitignore syntax — one per line, lines starting with <code>#</code> are comments.
-      If no patterns are configured and the import directory contains a <code>.gitignore</code>, it is used as fallback.
+      Patterns use gitignore syntax — one per line, lines starting with <code
+        >#</code
+      >
+      are comments. If no patterns are configured and the import directory
+      contains a <code>.gitignore</code>, it is used as fallback.
     </p>
     <textarea
       class="ignore-textarea"
@@ -639,7 +959,11 @@
       aria-label="Exclusion patterns"
     ></textarea>
     <div class="actions">
-      <button class="btn btn-primary" onclick={handleSaveIgnore} disabled={ignoreSaving}>
+      <button
+        class="btn btn-primary"
+        onclick={handleSaveIgnore}
+        disabled={ignoreSaving}
+      >
         {ignoreSaving ? "Saving..." : "Save"}
       </button>
       <button class="btn btn-danger-outline" onclick={handleResetIgnore}>
@@ -652,28 +976,58 @@
   </section>
 
   <!-- ── Help Section (Nielsen #10, F6.10) ──────────────────── -->
-  <section class="section help-section" aria-label="Help and documentation">
-    <h3>Need Help?</h3>
+  <section
+    id="help"
+    class="section help-section"
+    aria-label="Help and documentation"
+  >
+    {#key flashSection === "help" ? flashNonce : null}
+      <div class="section-header" class:flash={flashSection === "help"}>
+        <h3>Need Help?</h3>
+      </div>
+    {/key}
     <div class="help-grid">
-      <a href="/docs/guides/install-ollama.html" class="help-card" target="_blank" rel="noopener">
+      <a
+        href="https://docs.ollama.com/quickstart"
+        class="help-card"
+        target="_blank"
+        rel="noopener"
+        onclick={(e) => {
+          e.preventDefault();
+          openExternal("https://docs.ollama.com/quickstart");
+        }}
+      >
         <span class="material-symbols-outlined">smart_toy</span>
         <div>
           <strong>Install Ollama</strong>
           <span class="help-desc">Step-by-step guide for local AI setup</span>
         </div>
       </a>
-      <a href="/docs/guides/install-lm-studio.html" class="help-card" target="_blank" rel="noopener">
+      <a
+        href="https://lmstudio.ai/docs/app/basics"
+        class="help-card"
+        target="_blank"
+        rel="noopener"
+        onclick={(e) => {
+          e.preventDefault();
+          openExternal("https://lmstudio.ai/docs/app/basics");
+        }}
+      >
         <span class="material-symbols-outlined">terminal</span>
         <div>
           <strong>Install LM Studio</strong>
-          <span class="help-desc">Run local models with an OpenAI-compatible server</span>
+          <span class="help-desc"
+            >Run local models with an OpenAI-compatible server</span
+          >
         </div>
       </a>
       <button class="help-card" onclick={() => navigateTo("chat")}>
         <span class="material-symbols-outlined">chat</span>
         <div>
           <strong>Open Chat</strong>
-          <span class="help-desc">Start a conversation with your knowledge graph</span>
+          <span class="help-desc"
+            >Start a conversation with your knowledge graph</span
+          >
         </div>
       </button>
     </div>
@@ -683,7 +1037,7 @@
 <style>
   .settings {
     max-width: 680px;
-    padding-bottom: var(--space-12);
+    padding-bottom: calc(100vh - 150px);
   }
 
   .settings-header {
@@ -695,7 +1049,54 @@
     margin-bottom: var(--spacing-xs);
   }
 
+  .top-patch {
+    height: var(--space-6);
+    top: 0;
+    position: fixed;
+    z-index: 10;
+    width: 100%;
+    background: var(--bg-primary, var(--bg));
+  }
+
+  .settings-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-primary, var(--bg));
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .section-nav {
+    display: flex;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) 0;
+  }
+
+  .section-nav-link {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .section-nav-link:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+  }
+
+  .section-nav-link.active {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    font-weight: 600;
+  }
+
   .section {
+    scroll-margin-top: 132px;
     margin-top: var(--spacing-xl);
     padding-top: var(--spacing-lg);
     border-top: 1px solid var(--border);
@@ -706,12 +1107,35 @@
     align-items: center;
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-md);
+    border-radius: var(--radius-md);
+    padding: 4px 8px;
+    margin: -4px -8px;
+    padding-bottom: 8px;
   }
 
   .section-header h3 {
     font-size: var(--font-size-lg);
     color: var(--text-primary);
     margin: 0;
+  }
+
+  .section-header.flash {
+    animation: section-flash 1s ease-out;
+  }
+
+  @keyframes section-flash {
+    0% {
+      background-color: color-mix(in srgb, var(--accent) 25%, transparent);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .section-header.flash {
+      animation: none;
+    }
   }
 
   .section-desc {
@@ -1002,6 +1426,7 @@
     gap: var(--spacing-sm);
     margin-top: var(--spacing-lg);
     flex-wrap: wrap;
+    padding-bottom: var(--spacing-md);
   }
 
   .btn {
