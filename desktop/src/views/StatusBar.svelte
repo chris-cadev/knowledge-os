@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getState } from "../lib/state.svelte.js";
   import { getTheme } from "../lib/theme.svelte.js";
+  import { navigateTo } from "../lib/router.svelte.js";
 
   const app = getState();
   const theme = getTheme();
@@ -18,22 +19,31 @@
 <div class="status-bar">
   <div class="status-left">
     {#if app.statusMessage}
-      <span class="status-message">{app.statusMessage}</span>
+      <span class="status-message" aria-live="polite">{app.statusMessage}</span>
     {:else}
       <span class="status-text">{app.entityCount} entit{app.entityCount === 1 ? "y" : "ies"}</span>
       <span class="status-separator">|</span>
-      <span class="status-provider" class:reachable={app.providerReachable} class:unreachable={!app.providerReachable}>
+      <button
+        class="status-provider"
+        class:reachable={app.providerReachable}
+        class:unreachable={!app.providerReachable}
+        onclick={() => navigateTo("settings")}
+        aria-label={app.providerReachable ? `${app.providerName} connected, click to open settings` : `${app.providerName} disconnected, click to open settings`}
+      >
+        <span class="status-provider-label">{app.providerReachable ? "Connected" : "Disconnected"}</span>
         {app.providerName}
         {#if app.providerModel}
           <span class="provider-model">({app.providerModel})</span>
         {/if}
-      </span>
+      </button>
     {/if}
   </div>
   <div class="status-right">
     <span class="status-view">{app.currentView}</span>
     <span class="status-separator">|</span>
-    <span class="status-theme">{theme.isDark ? "🌙" : "☀️"}</span>
+    <span class="material-symbols-outlined status-theme-icon" aria-label={theme.isDark ? "Dark mode" : "Light mode"}>
+      {theme.isDark ? "dark_mode" : "light_mode"}
+    </span>
   </div>
 </div>
 
@@ -67,7 +77,23 @@
   }
 
   .status-provider {
+    all: unset;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     color: var(--text-secondary);
+    border-radius: var(--radius-sm, 4px);
+  }
+
+  .status-provider:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .status-provider-label {
+    font-size: 0.85em;
+    opacity: 0.8;
   }
 
   .status-provider.reachable {
@@ -75,7 +101,7 @@
   }
 
   .status-provider.unreachable {
-    color: #e53e3e;
+    color: var(--color-error);
   }
 
   .provider-model {
@@ -97,7 +123,7 @@
     color: var(--border);
   }
 
-  .status-theme {
-    font-size: 12px;
+  .status-theme-icon {
+    font-size: 16px;
   }
 </style>
