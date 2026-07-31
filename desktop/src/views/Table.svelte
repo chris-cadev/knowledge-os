@@ -1,9 +1,12 @@
 <script lang="ts">
   import { getState } from "../lib/state.svelte.js";
   import { onMount } from "svelte";
-  import { getTableView } from "../lib/api.js";
+  import { getTableView, listEntities } from "../lib/api.js";
   import { navigateTo } from "../lib/router.svelte.js";
   import type { TableRow } from "../lib/types.js";
+  import TypeBadge from "../components/TypeBadge.svelte";
+  import TypeFilterDropdown from "../components/TypeFilterDropdown.svelte";
+  import SkeletonLoader from "../components/SkeletonLoader.svelte";
 
   const app = getState();
 
@@ -13,6 +16,10 @@
   let sortDirection = $state<"asc" | "desc">("asc");
   let entityTypeFilter = $state("");
   let searchQuery = $state("");
+  let typeOptions = $state<string[]>([]);
+  let focusedRowIndex = $state(-1);
+
+  let containerEl: HTMLDivElement;
 
   const columnDefs: Array<{ key: keyof TableRow; label: string }> = [
     { key: "entity_type", label: "Type" },
@@ -23,8 +30,18 @@
   ];
 
   onMount(async () => {
+    await loadTypeOptions();
     await loadTable();
   });
+
+  async function loadTypeOptions() {
+    try {
+      const entities = await listEntities();
+      typeOptions = [...new Set(entities.map((e) => e.entity_type))].sort();
+    } catch {
+      typeOptions = [];
+    }
+  }
 
   async function loadTable() {
     loading = true;
@@ -38,6 +55,11 @@
     }
   }
 
+  function handleFilterChange(value: string) {
+    entityTypeFilter = value;
+    loadTable();
+  }
+
   function handleSort(col: keyof TableRow) {
     if (sortColumn === col) {
       sortDirection = sortDirection === "asc" ? "desc" : "asc";
@@ -46,6 +68,11 @@
       sortDirection = "asc";
     }
     loadTable();
+  }
+
+  function getAriaSort(col: keyof TableRow): string | undefined {
+    if (sortColumn !== col) return undefined;
+    return sortDirection === "asc" ? "ascending" : "descending";
   }
 
   function getSortedRows(): TableRow[] {
@@ -72,55 +99,90 @@
     return String(val);
   }
 
-  function renderHeaderLabel(key: keyof TableRow): string {
-    const def = columnDefs.find((d) => d.key === key);
-    return def?.label ?? key;
+  function handleKeydown(e: KeyboardEvent) {
+    const sortedRows = sorted;
+    if (sortedRows.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      focusedRowIndex = Math.min(focusedRowIndex + 1, sortedRows.length - 1);
+      focusCurrentRow();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      focusedRowIndex = Math.max(focusedRowIndex - 1, 0);
+      focusCurrentRow();
+    } else if (e.key === "Enter" && focusedRowIndex >= 0 && focusedRowIndex < sortedRows.length) {
+      e.preventDefault();
+      selectEntity(sortedRows[focusedRowIndex].entity_id);
+    } else if (e.key === "Escape") {
+      focusedRowIndex = -1;
+    }
+  }
+
+  function focusCurrentRow() {
+    const rowEls = containerEl?.querySelectorAll(".entity-row");
+    if (rowEls && focusedRowIndex >= 0 && focusedRowIndex < rowEls.length) {
+      (rowEls[focusedRowIndex] as HTMLElement).focus();
+    }
+  }
+
+  function handleRetry() {
+    loadTable();
   }
 
   let sorted = $derived(getSortedRows());
 </script>
 
-<div class="table-view">
+<div
+  class="table-view"
+  bind:this={containerEl}
+  tabindex="0"
+  role="region"
+  aria-label="Table view"
+  onkeydown={handleKeydown}
+>
   <div class="table-header">
-    <h2>Table View</h2>
+    <h2>Table View <span class="entity-count text-muted">({rows.length})</span></h2>
     <div class="controls">
       <div class="search-wrapper">
+        <label for="table-search" class="sr-only">Search rows</label>
         <span class="material-symbols-outlined search-icon">search</span>
         <input
+          id="table-search"
           type="text"
           placeholder="Search rows..."
           bind:value={searchQuery}
           class="search-input"
         />
       </div>
-      <select
-        bind:value={entityTypeFilter}
-        onchange={loadTable}
-        class="filter-select"
-      >
-        <option value="">All types</option>
-        {#each columnDefs as col}
-          {#if col.key === "entity_type"}
-            <!-- placeholder; real filter fetched server-side -->
-          {/if}
-        {/each}
-      </select>
+      <TypeFilterDropdown
+        value={entityTypeFilter}
+        options={typeOptions}
+        onchange={handleFilterChange}
+      />
     </div>
   </div>
 
   {#if loading}
-    <p class="text-muted">Loading...</p>
+    <SkeletonLoader variant="table" count={8} />
   {:else if rows.length === 0}
-    <p class="text-muted">No entities found.</p>
+    <div class="empty-state">
+      <p class="text-muted">No entities found.</p>
+      <button class="btn btn-primary" onclick={handleRetry}>Retry</button>
+    </div>
   {:else}
     <div class="table-container">
-      <table class="entity-table">
+      <table class="entity-table" role="table">
         <thead>
           <tr>
             {#each columnDefs as col}
               <th
                 class="sortable"
+                role="columnheader"
+                aria-sort={getAriaSort(col.key)}
                 onclick={() => handleSort(col.key)}
+                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSort(col.key); } }}
+                tabindex="0"
               >
                 <span>{col.label}</span>
                 {#if sortColumn === col.key}
@@ -134,19 +196,30 @@
           </tr>
         </thead>
         <tbody>
-          {#each sorted as row (row.entity_id)}
+          {#each sorted as row, i (row.entity_id)}
             <tr
               class="entity-row"
-              ondblclick={() => selectEntity(row.entity_id)}
+              class:focused={focusedRowIndex === i}
+              role="row"
+              tabindex="-1"
+              onclick={() => selectEntity(row.entity_id)}
+              onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); selectEntity(row.entity_id); } }}
             >
               {#each columnDefs as col}
-                <td>{renderValue(row[col.key])}</td>
+                <td>
+                  {#if col.key === "entity_type"}
+                    <TypeBadge type={row.entity_type} />
+                  {:else}
+                    {renderValue(row[col.key])}
+                  {/if}
+                </td>
               {/each}
               <td>
                 <button
                   class="btn btn-ghost btn-small"
-                  onclick={() => selectEntity(row.entity_id)}
+                  onclick={(e) => { e.stopPropagation(); selectEntity(row.entity_id); }}
                   title="View details"
+                  aria-label="View details for {row.title}"
                 >
                   <span class="material-symbols-outlined">open_in_new</span>
                 </button>
@@ -157,13 +230,40 @@
       </table>
     </div>
 
-    <div class="table-footer text-muted">
+    <div class="table-footer text-muted" role="status" aria-live="polite">
       Showing {sorted.length} of {rows.length} entities
     </div>
   {/if}
 </div>
 
 <style>
+  .table-view {
+    outline: none;
+  }
+
+  .table-view:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .entity-count {
+    font-size: var(--font-size-body-sm);
+    font-weight: normal;
+  }
+
   .table-header {
     display: flex;
     align-items: center;
@@ -207,13 +307,9 @@
     width: 220px;
   }
 
-  .filter-select {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-card);
-    color: var(--text-primary);
-    font-size: var(--font-size-body-sm);
+  .search-input:focus {
+    outline: none;
+    border-color: var(--accent);
   }
 
   .table-container {
@@ -247,6 +343,12 @@
     color: var(--accent);
   }
 
+  .sortable:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm);
+  }
+
   .sort-icon {
     font-size: 16px;
     vertical-align: middle;
@@ -271,9 +373,27 @@
     background: var(--bg-secondary);
   }
 
+  .entity-row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    background: var(--bg-secondary);
+  }
+
+  .entity-row.focused {
+    background: var(--bg-secondary);
+  }
+
   .actions-col {
     width: 60px;
     text-align: center;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-2xl) 0;
   }
 
   .table-footer {
