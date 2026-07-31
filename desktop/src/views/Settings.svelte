@@ -12,7 +12,7 @@
     getIgnorePatterns,
     setIgnorePatterns,
     resetIgnorePatterns,
-    openUrl,
+    openInDefaultApp,
   } from "../lib/api.js";
   import type {
     ProviderStatus,
@@ -362,7 +362,7 @@
   }
 
   function openExternal(url: string) {
-    openUrl(url);
+    openInDefaultApp(url);
   }
 
   // ── Mark dirty on change ─────────────────────────────────────
