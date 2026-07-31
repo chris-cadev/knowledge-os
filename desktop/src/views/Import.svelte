@@ -23,7 +23,47 @@
 
   const app = getState();
 
-  let activeTab = $state<"files" | "url" | "clipboard" | "database">("files");
+  const TAB_IDS = ["files", "url", "clipboard", "database"] as const;
+  type TabId = (typeof TAB_IDS)[number];
+
+  const ACTIVE_TAB_KEY = "kos:import:activeTab";
+  const RECURSIVE_KEY = "kos:import:recursive";
+
+  function readPref(key: string): string | null {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  function writePref(key: string, value: string): void {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  function initialActiveTab(): TabId {
+    const saved = readPref(ACTIVE_TAB_KEY);
+    return saved !== null && TAB_IDS.includes(saved as TabId) ? (saved as TabId) : "files";
+  }
+
+  function initialRecursive(): boolean {
+    return readPref(RECURSIVE_KEY) === "true";
+  }
+
+  let activeTab = $state<TabId>(initialActiveTab());
+  let recursive = $state(initialRecursive());
+
+  $effect(() => {
+    writePref(ACTIVE_TAB_KEY, activeTab);
+  });
+
+  $effect(() => {
+    writePref(RECURSIVE_KEY, String(recursive));
+  });
 
   // Shared state
   let importing = $state(false);
@@ -33,13 +73,27 @@
 
   // Files tab
   let dropZoneEl = $state<HTMLElement | null>(null);
-  let recursive = $state(false);
   let directoryPreview = $state<DirectoryPreview | null>(null);
   let previewLoading = $state(false);
 
   // URL tab
   let urlInput = $state("");
   let urlFetching = $state(false);
+  let urlError = $state<string | null>(null);
+
+  function validateUrl(input: string): string | null {
+    if (!input.trim()) return null;
+    let parsed: URL;
+    try {
+      parsed = new URL(input.trim());
+    } catch {
+      return "Enter a valid URL, including the http:// or https:// scheme.";
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "Only http:// and https:// URLs are supported.";
+    }
+    return null;
+  }
 
   // Clipboard tab
   let clipboardContent = $state("");
@@ -224,6 +278,12 @@
   // ---- URL Tab ----
   async function handleUrlImport() {
     if (!urlInput.trim() || urlFetching) return;
+    const validationError = validateUrl(urlInput);
+    if (validationError) {
+      urlError = validationError;
+      return;
+    }
+    urlError = null;
     urlFetching = true;
     importing = true;
     progressItems = [];
@@ -433,9 +493,12 @@
           <input
             type="url"
             class="input"
+            class:input-error={urlError !== null}
             placeholder="https://example.com/article"
             bind:value={urlInput}
             disabled={urlFetching}
+            aria-invalid={urlError !== null}
+            oninput={() => (urlError = null)}
           />
           <button
             class="btn btn-primary"
@@ -451,6 +514,12 @@
             {/if}
           </button>
         </div>
+        {#if urlError}
+          <p class="input-error-text" role="alert">
+            <span class="material-symbols-outlined error-icon">error</span>
+            {urlError}
+          </p>
+        {/if}
       </div>
 
     {:else if activeTab === "clipboard"}
@@ -461,6 +530,24 @@
             <span class="badge">HTML detected</span>
           {/if}
         </p>
+        <div class="format-toggle" role="group" aria-label="Clipboard format">
+          <button
+            class="format-toggle-btn"
+            class:active={clipboardFormat === "text"}
+            aria-pressed={clipboardFormat === "text"}
+            onclick={() => (clipboardFormat = "text")}
+          >
+            Text
+          </button>
+          <button
+            class="format-toggle-btn"
+            class:active={clipboardFormat === "html"}
+            aria-pressed={clipboardFormat === "html"}
+            onclick={() => (clipboardFormat = "html")}
+          >
+            HTML
+          </button>
+        </div>
         <textarea
           class="clipboard-textarea"
           placeholder="Paste text or HTML here..."
@@ -833,6 +920,50 @@
     background: var(--bg-card);
     color: var(--text-primary);
     font-size: var(--font-size-body-sm);
+  }
+
+  .input-error {
+    border-color: var(--danger);
+  }
+
+  .input-error:focus {
+    outline-color: var(--danger);
+  }
+
+  .input-error-text {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    color: var(--danger);
+    font-size: var(--font-size-sm);
+  }
+
+  .format-toggle {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .format-toggle-btn {
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--bg-card);
+    border: none;
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    transition: background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .format-toggle-btn + .format-toggle-btn {
+    border-left: 1px solid var(--border);
+  }
+
+  .format-toggle-btn.active {
+    background: var(--accent);
+    color: white;
   }
 
   .clipboard-textarea {
