@@ -13,6 +13,7 @@
     chatSendFeedback,
   } from "../lib/api.js";
   import { ChatStreamSession } from "../lib/chat-stream.js";
+  import { getEntityTypeColor } from "../lib/theme.svelte.js";
   import { builtinCommands, matchCommands } from "../lib/command-palette.js";
   import type {
     CommandDef,
@@ -515,7 +516,8 @@
     html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
     html = html.replace(/@(\w+):([^\s]+)/g, (_, type, title) => {
-      return `<span class="entity-pill"><span class="entity-pill-type">${type}</span><span class="entity-pill-title">${title}</span></span>`;
+      const color = getEntityTypeColor(type);
+      return `<span class="entity-pill" style="background: ${color}"><span class="entity-pill-type">${type}</span><span class="entity-pill-title">${title}</span></span>`;
     });
 
     html = html.replace(/```([\s\S]*?)```/g, (_, code) => {
@@ -1032,7 +1034,7 @@
         </div>
       </div>
     {:else}
-      <div class="messages-container" bind:this={messagesContainer}>
+      <div class="messages-container" bind:this={messagesContainer} aria-live="polite">
         {#each messages as msg}
           <div class="message" class:message-user={msg.role === "user"} class:message-assistant={msg.role === "assistant" || msg.role === "system"}>
             <div class="message-bubble">
@@ -1061,6 +1063,7 @@
                   <button
                     class="sources-toggle"
                     onclick={() => toggleSources(msg.id)}
+                    aria-expanded={expandedSources.has(msg.id)}
                   >
                     <span class="material-symbols-outlined sources-chevron" class:expanded={expandedSources.has(msg.id)}>chevron_right</span>
                     View sources ({msg.citations.length})
@@ -1073,7 +1076,7 @@
                           onclick={() => openEntityDetail(citation.entity_id)}
                         >
                           <span class="source-number">[{citation.number}]</span>
-                          <span class="source-type">{citation.entity_type}</span>
+                          <span class="source-type" style="background: {getEntityTypeColor(citation.entity_type)}; color: white">{citation.entity_type}</span>
                           <span class="source-title">{citation.title}</span>
                           <span class="source-snippet truncate">{citation.snippet}</span>
                         </button>
@@ -1173,7 +1176,7 @@
         class="citation-tooltip"
         style="left: {citationTooltip.x + 12}px; top: {citationTooltip.y - 10}px;"
       >
-        <span class="tooltip-type">{citationTooltip.citation.entity_type}</span>
+        <span class="tooltip-type" style="color: {getEntityTypeColor(citationTooltip.citation.entity_type)}">{citationTooltip.citation.entity_type}</span>
         <span class="tooltip-title">{citationTooltip.citation.title}</span>
         <span class="tooltip-snippet">{citationTooltip.citation.snippet}</span>
       </div>
@@ -1216,7 +1219,7 @@
               class:dropdown-item-selected={i === entityDropdownIndex}
               onclick={() => selectEntityRef(entity)}
             >
-              <span class="dropdown-item-type">{entity.entity_type}</span>
+              <span class="dropdown-item-type" style="background: {getEntityTypeColor(entity.entity_type)}; color: white">{entity.entity_type}</span>
               <span class="dropdown-item-title">{entity.title}</span>
               <span class="dropdown-item-preview truncate">{entity.preview}</span>
             </button>
@@ -1721,7 +1724,6 @@
     align-items: center;
     gap: 3px;
     padding: 1px 6px;
-    background: var(--accent);
     color: white;
     border-radius: var(--radius-sm);
     font-size: var(--font-size-sm);
@@ -1730,7 +1732,7 @@
   }
 
   .message-user .chat-markdown :global(.entity-pill) {
-    background: rgba(255, 255, 255, 0.2);
+    opacity: 0.85;
   }
 
   .chat-markdown :global(.entity-pill-type) {
@@ -1831,14 +1833,9 @@
   .source-type {
     font-weight: 600;
     padding: 1px 6px;
-    background: var(--color-surface-container-high);
     border-radius: var(--radius-sm);
     font-size: 11px;
     flex-shrink: 0;
-  }
-
-  .message-user .source-type {
-    background: rgba(255, 255, 255, 0.15);
   }
 
   .source-title {
@@ -2083,7 +2080,6 @@
   .dropdown-item-type {
     font-weight: 600;
     padding: 1px 6px;
-    background: var(--color-surface-container-high);
     border-radius: var(--radius-sm);
     font-size: 11px;
     flex-shrink: 0;
