@@ -112,6 +112,20 @@
   --shadow-sm: var(--elevation-1);
   --shadow-md: var(--elevation-2);
   --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.1);
+
+  /* ===== Entity Type Colors ===== */
+  --color-entity-concept: #8B5CF6;
+  --color-entity-person: #EC4899;
+  --color-entity-organization: #F59E0B;
+  --color-entity-project: #6366F1;
+  --color-entity-paper: #3B82F6;
+  --color-entity-book: #06B6D4;
+  --color-entity-tool: #10B981;
+  --color-entity-technology: #6366F1;
+  --color-entity-decision: #EF4444;
+  --color-entity-event: #F97316;
+  --color-entity-collection: #14B8A6;
+  --color-entity-default: #64748B;
 }
 
 /* ===== Dark Theme ===== */
@@ -211,4 +225,14 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ===== Skeleton Pulse Animation ===== */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
