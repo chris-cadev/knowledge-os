@@ -302,11 +302,41 @@
     dirty = true;
   }
 
+  // ── Section navigation ─────────────────────────────────────
+  const sections = [
+    { id: "chat-provider", label: "Chat Provider" },
+    { id: "ocr", label: "OCR Text Extraction" },
+    { id: "import-exclusions", label: "Import Exclusions" },
+    { id: "help", label: "Help" },
+  ];
+
+  let activeSection = $state("chat-provider");
+
   // ── Mark dirty on change ─────────────────────────────────────
   function markDirty() { dirty = true; }
 
   // ── Load on mount ────────────────────────────────────────────
   $effect(() => { loadAllStatus(); });
+
+  $effect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            activeSection = entry.target.id;
+          }
+        }
+      },
+      { rootMargin: "-20% 0px -70% 0px" },
+    );
+
+    for (const section of sections) {
+      const el = document.getElementById(section.id);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  });
 </script>
 
 <div class="settings" role="region" aria-label="Settings">
@@ -324,6 +354,17 @@
       <span>{statusMessage}</span>
     </div>
   {/if}
+
+  <nav class="section-nav" aria-label="Settings sections">
+    {#each sections as section}
+      <a href="#{section.id}"
+         class="section-nav-link"
+         class:active={activeSection === section.id}
+         onclick={(e) => { e.preventDefault(); document.getElementById(section.id)?.scrollIntoView({ behavior: "smooth" }); }}>
+        {section.label}
+      </a>
+    {/each}
+  </nav>
 
   <!-- ── Current Status Summary (F6.1, F6.11) ────────────── -->
   <section class="status-summary" aria-label="Current provider status">
@@ -349,7 +390,7 @@
   </section>
 
   <!-- ── Chat Provider Section (F6.6 Progressive disclosure) ── -->
-  <section class="section" aria-label="Chat provider configuration">
+  <section id="chat-provider" class="section" aria-label="Chat provider configuration">
     <div class="section-header">
       <h3>Chat Provider</h3>
       {#if chatSaved}
@@ -525,7 +566,7 @@
   </section>
 
   <!-- ── OCR Provider Section (F6.4 Consistency) ──────────── -->
-  <section class="section" aria-label="OCR provider configuration">
+  <section id="ocr" class="section" aria-label="OCR provider configuration">
     <div class="section-header">
       <h3>OCR Text Extraction</h3>
       {#if ocrSaved}
@@ -623,7 +664,7 @@
   </section>
 
   <!-- ── Import Exclusions ──────────────────────────────────── -->
-  <section class="section" aria-label="Import exclusion patterns">
+  <section id="import-exclusions" class="section" aria-label="Import exclusion patterns">
     <div class="section-header">
       <h3>Import Exclusions</h3>
     </div>
@@ -652,7 +693,7 @@
   </section>
 
   <!-- ── Help Section (Nielsen #10, F6.10) ──────────────────── -->
-  <section class="section help-section" aria-label="Help and documentation">
+  <section id="help" class="section help-section" aria-label="Help and documentation">
     <h3>Need Help?</h3>
     <div class="help-grid">
       <a href="/docs/guides/install-ollama.html" class="help-card" target="_blank" rel="noopener">
@@ -695,7 +736,42 @@
     margin-bottom: var(--spacing-xs);
   }
 
+  .section-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) 0;
+    background: var(--bg-primary, var(--bg));
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .section-nav-link {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .section-nav-link:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+  }
+
+  .section-nav-link.active {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    font-weight: 600;
+  }
+
   .section {
+    scroll-margin-top: 56px;
     margin-top: var(--spacing-xl);
     padding-top: var(--spacing-lg);
     border-top: 1px solid var(--border);
