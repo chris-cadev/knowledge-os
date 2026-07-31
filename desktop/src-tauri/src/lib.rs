@@ -126,6 +126,7 @@ pub fn run() {
             commands::entity::list_entities,
             commands::entity::get_entity_detail,
             commands::entity::get_entity_source,
+            commands::entity::toggle_entity_active,
             commands::file::open_in_default_app,
             commands::file::open_source_folder,
             commands::ignore_config::get_ignore_patterns,

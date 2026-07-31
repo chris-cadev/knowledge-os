@@ -32,6 +32,8 @@ pub struct RelationshipInfo {
     pub target_id: String,
     pub source_title: String,
     pub target_title: String,
+    pub source_type: String,
+    pub target_type: String,
     pub is_active: bool,
 }
 

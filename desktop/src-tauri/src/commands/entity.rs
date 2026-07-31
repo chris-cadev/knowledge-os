@@ -1,5 +1,5 @@
 use knowledge_core::features::component::{Component, ComponentType};
-use knowledge_core::ports::ComponentRepository;
+use knowledge_core::ports::{ComponentRepository, EntityRepository};
 use tauri::State;
 use uuid::Uuid;
 
@@ -116,10 +116,12 @@ pub async fn get_entity_detail(
         .map(|r| RelationshipInfo {
             id: r.id.to_string(),
             relationship_type: r.relationship_type.clone(),
-            source_id: String::new(),
+            source_id: detail.id.to_string(),
             target_id: r.peer_id.to_string(),
             source_title: String::new(),
             target_title: r.peer_title.clone(),
+            source_type: detail.entity_type.clone(),
+            target_type: r.peer_type.clone(),
             is_active: r.is_active,
         })
         .collect();
@@ -137,9 +139,11 @@ pub async fn get_entity_detail(
             id: r.id.to_string(),
             relationship_type: r.relationship_type.clone(),
             source_id: r.peer_id.to_string(),
-            target_id: String::new(),
+            target_id: detail.id.to_string(),
             source_title: r.peer_title.clone(),
             target_title: String::new(),
+            source_type: r.peer_type.clone(),
+            target_type: detail.entity_type.clone(),
             is_active: r.is_active,
         })
         .collect();
@@ -167,4 +171,27 @@ pub async fn get_entity_detail(
         events: events_info,
         versions: vec![],
     })
+}
+
+#[tauri::command]
+pub async fn toggle_entity_active(state: State<'_, AppState>, id: String) -> Result<bool, String> {
+    let store = &*state.store;
+    let entity_id = Uuid::parse_str(&id).map_err(|e| format!("invalid entity ID: {}", e))?;
+
+    let mut entity = EntityRepository::get(store, entity_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "entity not found".to_string())?;
+
+    if entity.is_active {
+        entity.archive();
+    } else {
+        entity.restore();
+    }
+
+    EntityRepository::save(store, &entity)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(entity.is_active)
 }
