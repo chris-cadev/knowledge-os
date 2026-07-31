@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { listEntities } from "../lib/api.js";
   import { navigateTo } from "../lib/router.svelte.js";
+  import { getEntityTypeColor } from "../lib/theme.svelte.js";
   import type { EntitySummary } from "../lib/types.js";
 
   type LoadState = "loading" | "stalled" | "error" | "success";
@@ -86,18 +87,6 @@
     return "Older";
   }
 
-  let typeColorMap: Record<string, string> = {};
-  const typeColors = [
-    "#3b82f6", "#10b981", "#f59e0b", "#ef4444",
-    "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16",
-  ];
-
-  function getTypeColor(type: string): string {
-    if (typeColorMap[type]) return typeColorMap[type];
-    const idx = Object.keys(typeColorMap).length % typeColors.length;
-    typeColorMap[type] = typeColors[idx];
-    return typeColorMap[type];
-  }
 
   let grouped = $derived.by(() => {
     const groups: Record<string, EntitySummary[]> = {};
@@ -148,7 +137,7 @@
             {#each group.items as item (item.id + item.created_at)}
               <div class="timeline-entry">
                 <div class="timeline-marker">
-                  <div class="timeline-dot" style="background: {getTypeColor(item.entity_type)}"></div>
+                  <div class="timeline-dot" style="background: {getEntityTypeColor(item.entity_type)}"></div>
                   {#if item !== group.items[group.items.length - 1]}
                     <div class="timeline-line"></div>
                   {/if}
@@ -157,7 +146,7 @@
                   onkeydown={(e) => { if (e.key === 'Enter') selectEntity(item.id); }}
                   role="button" tabindex="0" aria-label={item.title}>
                   <div class="entry-header">
-                    <span class="type-badge" style="background: {getTypeColor(item.entity_type)}">{item.entity_type}</span>
+                    <span class="type-badge" style="background: {getEntityTypeColor(item.entity_type)}">{item.entity_type}</span>
                     <span class="timestamp">{formatDate(item.created_at)}</span>
                   </div>
                   <div class="entry-title">{item.title}</div>
@@ -197,7 +186,7 @@
             {#each group.items as item (item.id + item.created_at)}
               <div class="timeline-entry">
                 <div class="timeline-marker">
-                  <div class="timeline-dot" style="background: {getTypeColor(item.entity_type)}"></div>
+                  <div class="timeline-dot" style="background: {getEntityTypeColor(item.entity_type)}"></div>
                   {#if item !== group.items[group.items.length - 1]}
                     <div class="timeline-line"></div>
                   {/if}
@@ -206,7 +195,7 @@
                   onkeydown={(e) => { if (e.key === 'Enter') selectEntity(item.id); }}
                   role="button" tabindex="0" aria-label={item.title}>
                   <div class="entry-header">
-                    <span class="type-badge" style="background: {getTypeColor(item.entity_type)}">{item.entity_type}</span>
+                    <span class="type-badge" style="background: {getEntityTypeColor(item.entity_type)}">{item.entity_type}</span>
                     <span class="timestamp">{formatDate(item.created_at)}</span>
                   </div>
                   <div class="entry-title">{item.title}</div>
@@ -245,7 +234,7 @@
           {#each group.items as item (item.id + item.created_at)}
             <div class="timeline-entry">
               <div class="timeline-marker">
-                <div class="timeline-dot" style="background: {getTypeColor(item.entity_type)}"></div>
+                <div class="timeline-dot" style="background: {getEntityTypeColor(item.entity_type)}"></div>
                 {#if item !== group.items[group.items.length - 1]}
                   <div class="timeline-line"></div>
                 {/if}
@@ -254,7 +243,7 @@
                 onkeydown={(e) => { if (e.key === 'Enter') selectEntity(item.id); }}
                 role="button" tabindex="0" aria-label={item.title}>
                 <div class="entry-header">
-                  <span class="type-badge" style="background: {getTypeColor(item.entity_type)}">{item.entity_type}</span>
+                  <span class="type-badge" style="background: {getEntityTypeColor(item.entity_type)}">{item.entity_type}</span>
                   <span class="timestamp">{formatDate(item.created_at)}</span>
                 </div>
                 <div class="entry-title">{item.title}</div>
