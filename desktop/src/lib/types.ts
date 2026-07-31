@@ -76,6 +76,13 @@ export interface ImportProgressResult {
   errors: ImportError[];
 }
 
+export interface ConnectionInfo {
+  server_version: string;
+  database_name: string;
+  reachable: boolean;
+  latency_ms: number;
+}
+
 export interface DirectoryPreview {
   file_count: number;
   total_size_bytes: number;

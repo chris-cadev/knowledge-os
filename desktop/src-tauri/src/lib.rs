@@ -135,6 +135,7 @@ pub fn run() {
             commands::import::import_url,
             commands::import::import_clipboard,
             commands::import::import_database,
+            commands::import::import_database_test_connection,
             commands::import::import_file_recursive,
             commands::import::import_image,
             commands::import::undo_import,

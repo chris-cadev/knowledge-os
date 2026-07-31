@@ -1,6 +1,6 @@
 use knowledge_core::ports::{
-    ComponentRepository, DatabaseSource, Event, EventType, RelationshipRepository, SearchIndex,
-    TransactionalWrite,
+    ComponentRepository, ConnectionInfo, DatabaseSource, Event, EventType, RelationshipRepository,
+    SearchIndex, TransactionalWrite,
 };
 use knowledge_import::features::importer::database::{
     MySqlDatabaseSource, PostgresDatabaseSource, SqliteDatabaseSource,
@@ -642,46 +642,7 @@ pub async fn import_database(
     );
 
     let store = &*state.store;
-    let source: Box<dyn DatabaseSource> = if connection_string.starts_with("sqlite")
-        || connection_string.starts_with("file:")
-        || !connection_string.contains("://")
-    {
-        let path = if connection_string.starts_with("sqlite:///") {
-            let p = connection_string.trim_start_matches("sqlite:///");
-            let p = p.trim_end_matches("?mode=rwc");
-            std::path::PathBuf::from(p)
-        } else {
-            std::path::PathBuf::from(&connection_string)
-        };
-        log::debug!(
-            "import.database.type_detected: correlation_id={}, type=sqlite, path={:?}",
-            correlation_id,
-            path
-        );
-        Box::new(SqliteDatabaseSource::new(path))
-    } else if connection_string.starts_with("postgres")
-        || connection_string.starts_with("postgresql")
-    {
-        log::debug!(
-            "import.database.type_detected: correlation_id={}, type=postgres",
-            correlation_id
-        );
-        Box::new(PostgresDatabaseSource::new(connection_string.clone()))
-    } else if connection_string.starts_with("mysql") {
-        log::debug!(
-            "import.database.type_detected: correlation_id={}, type=mysql",
-            correlation_id
-        );
-        Box::new(MySqlDatabaseSource::new(connection_string.clone()))
-    } else {
-        log::debug!(
-            "import.database.type_defaulted: correlation_id={}, type=sqlite",
-            correlation_id
-        );
-        Box::new(SqliteDatabaseSource::new(std::path::PathBuf::from(
-            &connection_string,
-        )))
-    };
+    let source = database_source_for(&connection_string);
 
     let available_tables = source.list_tables().await.map_err(|e| {
         log::error!(
@@ -864,6 +825,59 @@ pub async fn import_database(
         merged: 0,
         errors,
     })
+}
+
+fn database_source_for(connection_string: &str) -> Box<dyn DatabaseSource> {
+    if connection_string.starts_with("sqlite")
+        || connection_string.starts_with("file:")
+        || !connection_string.contains("://")
+    {
+        let path = if connection_string.starts_with("sqlite:///") {
+            let p = connection_string.trim_start_matches("sqlite:///");
+            let p = p.trim_end_matches("?mode=rwc");
+            std::path::PathBuf::from(p)
+        } else {
+            std::path::PathBuf::from(connection_string)
+        };
+        log::debug!(
+            "import.database.type_detected: type=sqlite, path={:?}",
+            path
+        );
+        Box::new(SqliteDatabaseSource::new(path))
+    } else if connection_string.starts_with("postgres")
+        || connection_string.starts_with("postgresql")
+    {
+        log::debug!("import.database.type_detected: type=postgres");
+        Box::new(PostgresDatabaseSource::new(connection_string.to_string()))
+    } else if connection_string.starts_with("mysql") {
+        log::debug!("import.database.type_detected: type=mysql");
+        Box::new(MySqlDatabaseSource::new(connection_string.to_string()))
+    } else {
+        log::debug!("import.database.type_defaulted: type=sqlite");
+        Box::new(SqliteDatabaseSource::new(std::path::PathBuf::from(
+            connection_string,
+        )))
+    }
+}
+
+/// Test a database connection without importing any data.
+#[tauri::command]
+pub async fn import_database_test_connection(
+    connection_string: String,
+) -> Result<ConnectionInfo, String> {
+    log::info!(
+        "import.database.test_connection.started: connection={}",
+        connection_string
+    );
+    let source = database_source_for(&connection_string);
+    let info = source.test_connection().await.map_err(|e| e.to_string())?;
+    log::info!(
+        "import.database.test_connection.completed: reachable={}, latency_ms={}, server_version={}",
+        info.reachable,
+        info.latency_ms,
+        info.server_version
+    );
+    Ok(info)
 }
 
 /// Import files from a directory recursively.

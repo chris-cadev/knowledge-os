@@ -5,6 +5,7 @@
     importUrl,
     importClipboard,
     importDatabase,
+    testDatabaseConnection,
     importFileRecursive,
     importImage,
     undoImport,
@@ -104,6 +105,8 @@
   let dbConnStr = $state("");
   let dbTablesInput = $state("");
   let dbImporting = $state(false);
+  let dbTesting = $state(false);
+  let dbTestResult = $state<{ ok: boolean; message: string } | null>(null);
 
   // Conflict detection
   let conflicts = $state<string[]>([]);
@@ -342,6 +345,27 @@
   }
 
   // ---- Database Tab ----
+  async function handleTestConnection() {
+    if (!dbConnStr.trim() || dbTesting) return;
+    dbTesting = true;
+    dbTestResult = null;
+    try {
+      const info = await testDatabaseConnection(dbConnStr.trim());
+      if (info.reachable) {
+        dbTestResult = {
+          ok: true,
+          message: `Connected to ${info.database_name} (${info.server_version}) in ${info.latency_ms}ms`,
+        };
+      } else {
+        dbTestResult = { ok: false, message: "Could not reach the database." };
+      }
+    } catch (e) {
+      dbTestResult = { ok: false, message: `${e}` };
+    } finally {
+      dbTesting = false;
+    }
+  }
+
   async function handleDatabaseImport() {
     if (!dbConnStr.trim() || dbImporting) return;
     dbImporting = true;
@@ -586,7 +610,8 @@
               class="input"
               placeholder="sqlite:///path/to/db.db or postgres://user:pass@host/db"
               bind:value={dbConnStr}
-              disabled={dbImporting}
+              disabled={dbImporting || dbTesting}
+              oninput={() => (dbTestResult = null)}
             />
           </label>
           <label>
@@ -599,19 +624,48 @@
               disabled={dbImporting}
             />
           </label>
-          <button
-            class="btn btn-primary"
-            onclick={handleDatabaseImport}
-            disabled={!dbConnStr.trim() || dbImporting}
-          >
-            {#if dbImporting}
-              <span class="material-symbols-outlined spinning">sync</span>
-              Importing...
-            {:else}
-              <span class="material-symbols-outlined">storage</span>
-              Import from Database
-            {/if}
-          </button>
+          <div class="db-actions">
+            <button
+              class="btn btn-secondary"
+              onclick={handleTestConnection}
+              disabled={!dbConnStr.trim() || dbImporting || dbTesting}
+            >
+              {#if dbTesting}
+                <span class="material-symbols-outlined spinning">sync</span>
+                Testing...
+              {:else}
+                <span class="material-symbols-outlined">link</span>
+                Test Connection
+              {/if}
+            </button>
+            <button
+              class="btn btn-primary"
+              onclick={handleDatabaseImport}
+              disabled={!dbConnStr.trim() || dbImporting || dbTesting}
+            >
+              {#if dbImporting}
+                <span class="material-symbols-outlined spinning">sync</span>
+                Importing...
+              {:else}
+                <span class="material-symbols-outlined">storage</span>
+                Import from Database
+              {/if}
+            </button>
+          </div>
+          {#if dbTestResult}
+            <p
+              class="db-test-result"
+              class:success={dbTestResult.ok}
+              class:error={!dbTestResult.ok}
+              role="status"
+              aria-live="polite"
+            >
+              <span class="material-symbols-outlined">
+                {dbTestResult.ok ? "check_circle" : "error"}
+              </span>
+              {dbTestResult.message}
+            </p>
+          {/if}
         </div>
       </div>
     {/if}
@@ -996,6 +1050,28 @@
     gap: var(--spacing-xs);
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
+  }
+
+  .db-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+  }
+
+  .db-test-result {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    margin: 0;
+  }
+
+  .db-test-result.success {
+    color: var(--success, #2e7d32);
+  }
+
+  .db-test-result.error {
+    color: var(--danger);
   }
 
   /* Progress List */
