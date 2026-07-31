@@ -111,6 +111,10 @@ export async function getEntityDetail(id: string): Promise<EntityDetail> {
   return invoke("get_entity_detail", { id });
 }
 
+export async function toggleEntityActive(id: string): Promise<boolean> {
+  return invoke("toggle_entity_active", { id });
+}
+
 export async function getGraphView(
   startId?: string,
   depth: number = 2,

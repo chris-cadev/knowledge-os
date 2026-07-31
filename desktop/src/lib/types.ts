@@ -22,6 +22,8 @@ export interface RelationshipInfo {
   target_id: string;
   source_title: string;
   target_title: string;
+  source_type: string;
+  target_type: string;
   is_active: boolean;
 }
 
