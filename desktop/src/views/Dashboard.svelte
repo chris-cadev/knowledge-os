@@ -3,11 +3,14 @@
   import { onMount } from "svelte";
   import { listEntities } from "../lib/api.js";
   import { navigateTo } from "../lib/router.svelte.js";
+  import { getEntityTypeColor } from "../lib/theme.svelte.js";
+  import TypeBadge from "../components/TypeBadge.svelte";
   import type { EntitySummary } from "../lib/types.js";
 
   const app = getState();
 
   let loading = $state(true);
+  let error = $state("");
   let typeDistribution = $state<Array<{ type: string; count: number }>>([]);
   let recentEntities = $state<EntitySummary[]>([]);
 
@@ -17,12 +20,12 @@
 
   async function loadDashboard() {
     loading = true;
+    error = "";
     try {
       const entities = await listEntities();
       app.entities = entities;
       app.entityCount = entities.length;
 
-      // Derive type distribution
       const typeMap = new Map<string, number>();
       for (const e of entities) {
         typeMap.set(e.entity_type, (typeMap.get(e.entity_type) ?? 0) + 1);
@@ -31,13 +34,13 @@
         .map(([type, count]) => ({ type, count }))
         .sort((a, b) => b.count - a.count);
 
-      // Derive recent entities (top 5 by created_at)
       recentEntities = entities
         .slice()
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5);
     } catch (e) {
-      app.statusMessage = `Failed to load dashboard: ${e}`;
+      error = `Failed to load dashboard: ${e}`;
+      app.statusMessage = error;
     } finally {
       loading = false;
     }
@@ -51,15 +54,20 @@
     navigateTo(view);
   }
 
+  function navigateToBrowse() {
+    navigateTo("browse");
+  }
+
   function getTotalEntityCount(): number {
     return typeDistribution.reduce((sum, t) => sum + t.count, 0);
   }
 
-  // Colors for type distribution
-  const typeColors = [
-    "#3b82f6", "#10b981", "#f59e0b", "#ef4444",
-    "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16",
-  ];
+  function handleCardKeydown(event: KeyboardEvent) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      (event.currentTarget as HTMLElement).click();
+    }
+  }
 </script>
 
 <div class="dashboard">
@@ -76,15 +84,52 @@
     </div>
   </div>
 
-  {#if loading}
-    <div class="loading-container">
-      <p class="text-muted">Loading dashboard...</p>
+  {#if error}
+    <div class="state-banner error" role="alert">
+      <span class="material-symbols-outlined">error</span>
+      <span>{error}</span>
+      <button class="btn btn-sm" onclick={loadDashboard}>Retry</button>
     </div>
-  {:else}
-    <!-- Bento Grid -->
+  {/if}
+
+  {#if loading}
+    <div class="bento-grid skeleton-pulse" aria-label="Loading dashboard">
+      <div class="bento-card skeleton-stat">
+        <div class="skeleton-block skeleton-block-sm"></div>
+        <div class="skeleton-block skeleton-block-xl"></div>
+        <div class="skeleton-block skeleton-block-sm"></div>
+      </div>
+      <div class="bento-card skeleton-stat">
+        <div class="skeleton-block skeleton-block-sm"></div>
+        <div class="skeleton-block skeleton-block-xl"></div>
+        <div class="skeleton-block skeleton-block-sm"></div>
+      </div>
+      <div class="bento-card skeleton-stat">
+        <div class="skeleton-block skeleton-block-sm"></div>
+        <div class="skeleton-block skeleton-block-xl"></div>
+        <div class="skeleton-block skeleton-block-sm"></div>
+      </div>
+      <div class="bento-card skeleton-stat">
+        <div class="skeleton-block skeleton-block-sm"></div>
+        <div class="skeleton-block skeleton-block-md"></div>
+        <div class="skeleton-block skeleton-block-md"></div>
+      </div>
+      <div class="bento-card skeleton-distribution">
+        <div class="skeleton-block skeleton-block-md"></div>
+        <div class="skeleton-block skeleton-block-lg"></div>
+        <div class="skeleton-block skeleton-block-lg"></div>
+        <div class="skeleton-block skeleton-block-lg"></div>
+      </div>
+      <div class="bento-card skeleton-recent">
+        <div class="skeleton-block skeleton-block-md"></div>
+        <div class="skeleton-block skeleton-block-lg"></div>
+        <div class="skeleton-block skeleton-block-lg"></div>
+        <div class="skeleton-block skeleton-block-lg"></div>
+      </div>
+    </div>
+  {:else if !error}
     <div class="bento-grid">
-      <!-- Summary Stats -->
-      <div class="bento-card card-summary">
+      <div class="bento-card card-summary" tabindex="0" role="button" aria-label="Total entities: {getTotalEntityCount()}" onclick={navigateToBrowse} onkeydown={handleCardKeydown}>
         <div class="card-icon">
           <span class="material-symbols-outlined">database</span>
         </div>
@@ -92,7 +137,7 @@
         <div class="card-label">Total Entities</div>
       </div>
 
-      <div class="bento-card card-active">
+      <div class="bento-card card-active" tabindex="0" role="button" aria-label="Active entities: {app.entities.filter((e) => e.is_active).length}" onclick={navigateToBrowse} onkeydown={handleCardKeydown}>
         <div class="card-icon">
           <span class="material-symbols-outlined">check_circle</span>
         </div>
@@ -100,7 +145,7 @@
         <div class="card-label">Active</div>
       </div>
 
-      <div class="bento-card card-types">
+      <div class="bento-card card-types" tabindex="0" role="button" aria-label="Entity types: {typeDistribution.length}" onclick={navigateToBrowse} onkeydown={handleCardKeydown}>
         <div class="card-icon">
           <span class="material-symbols-outlined">category</span>
         </div>
@@ -130,20 +175,19 @@
         </div>
       </div>
 
-      <!-- Type Distribution -->
-      <div class="bento-card card-distribution">
+      <div class="bento-card card-distribution" tabindex="0" aria-label="Entity distribution by type" onkeydown={handleCardKeydown}>
         <div class="card-header">Entity Distribution by Type</div>
         {#if typeDistribution.length === 0}
           <p class="text-muted empty-text">No entities found.</p>
         {:else}
           <div class="distribution-bars">
-            {#each typeDistribution as item, i}
+            {#each typeDistribution as item}
               <div class="dist-row">
                 <span class="dist-type">{item.type}</span>
                 <div class="dist-bar-track">
                   <div
                     class="dist-bar-fill"
-                    style="width: {(item.count / getTotalEntityCount()) * 100}%; background: {typeColors[i % typeColors.length]}"
+                    style="width: {(item.count / getTotalEntityCount()) * 100}%; background: {getEntityTypeColor(item.type)}"
                   ></div>
                 </div>
                 <span class="dist-count">{item.count}</span>
@@ -153,8 +197,7 @@
         {/if}
       </div>
 
-      <!-- Recent Entities -->
-      <div class="bento-card card-recent">
+      <div class="bento-card card-recent" tabindex="0" aria-label="Recent entities" onkeydown={handleCardKeydown}>
         <div class="card-header">Recent Entities</div>
         {#if recentEntities.length === 0}
           <p class="text-muted empty-text">No entities yet. Import some documents to get started.</p>
@@ -162,7 +205,7 @@
           <div class="recent-list">
             {#each recentEntities as entity}
               <button class="recent-item" onclick={() => openEntity(entity.id)}>
-                <span class="recent-type">{entity.entity_type}</span>
+                <TypeBadge type={entity.entity_type} />
                 <span class="recent-title truncate">{entity.title}</span>
                 <span class="recent-date text-muted">{entity.created_at.slice(0, 10)}</span>
               </button>
@@ -171,10 +214,6 @@
         {/if}
       </div>
     </div>
-
-    {#if app.statusMessage}
-      <div class="status-message">{app.statusMessage}</div>
-    {/if}
   {/if}
 </div>
 
@@ -200,8 +239,26 @@
     gap: var(--spacing-md);
   }
 
-  .loading-container {
-    padding: var(--spacing-xl) 0;
+  /* ===== Error Banner ===== */
+  .state-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-body-sm);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .state-banner.error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--text-primary);
+  }
+
+  .state-banner .material-symbols-outlined {
+    color: #ef4444;
+    flex-shrink: 0;
   }
 
   /* ===== Bento Grid ===== */
@@ -225,6 +282,12 @@
   .bento-card:hover {
     border-color: var(--accent);
     box-shadow: var(--shadow-sm);
+  }
+
+  .bento-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-color: var(--accent);
   }
 
   .card-header {
@@ -252,17 +315,55 @@
     margin-top: var(--spacing-xs);
   }
 
-  /* Summary cards span 1 column each */
   .card-summary { grid-column: span 1; }
   .card-active { grid-column: span 1; }
   .card-types { grid-column: span 1; }
   .card-quick-actions { grid-column: span 1; }
 
-  /* Distribution spans 2 columns */
   .card-distribution { grid-column: span 2; grid-row: span 1; }
 
-  /* Recent spans 2 columns */
   .card-recent { grid-column: span 2; grid-row: span 1; }
+
+  /* ===== Skeleton Bento ===== */
+  .skeleton-block {
+    background: var(--border);
+    border-radius: var(--radius-sm);
+    height: 14px;
+  }
+
+  .skeleton-block-xs {
+    width: 40px;
+    height: 14px;
+  }
+
+  .skeleton-block-sm {
+    width: 80px;
+    height: 14px;
+  }
+
+  .skeleton-block-md {
+    width: 60%;
+    height: 14px;
+  }
+
+  .skeleton-block-lg {
+    width: 100%;
+    height: 14px;
+  }
+
+  .skeleton-block-xl {
+    width: 100%;
+    height: 28px;
+  }
+
+  .skeleton-stat {
+    gap: var(--spacing-sm);
+  }
+
+  .skeleton-distribution,
+  .skeleton-recent {
+    gap: var(--spacing-sm);
+  }
 
   /* ===== Quick Actions ===== */
   .action-buttons {
@@ -290,6 +391,12 @@
   .action-btn:hover {
     border-color: var(--accent);
     background: var(--bg-secondary);
+  }
+
+  .action-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-color: var(--accent);
   }
 
   .action-btn .material-symbols-outlined {
@@ -369,15 +476,9 @@
     background: var(--bg-secondary);
   }
 
-  .recent-type {
-    display: inline-block;
-    padding: 1px 6px;
-    background: var(--accent);
-    color: white;
-    border-radius: var(--radius-sm);
-    font-size: 10px;
-    font-weight: 500;
-    flex-shrink: 0;
+  .recent-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
 
   .recent-title {
@@ -391,14 +492,6 @@
   }
 
   .empty-text {
-    font-size: var(--font-size-sm);
-  }
-
-  .status-message {
-    margin-top: var(--spacing-md);
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--bg-secondary);
-    border-radius: var(--radius-sm);
     font-size: var(--font-size-sm);
   }
 </style>
