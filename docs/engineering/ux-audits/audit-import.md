@@ -114,10 +114,15 @@ None. This is the strongest view.
 
 ## Recommendations
 
-1. Add real-time per-file progress during import (streaming progress events)
-2. Add keyboard shortcuts for tab switching (arrow keys or Ctrl+1/2/3/4)
-3. Add "Test Connection" button for database tab
-4. Add ARIA tab roles (`role="tablist"`, `role="tab"`, `aria-selected`)
-5. Remember recursive preference in session storage
-6. Add import history view
+Status of the audit's recommendations as of the Import UX pass (`feat/ux-import`, PRD-0008):
+
+1. ~~Add real-time per-file progress during import (streaming progress events)~~ — Deferred to [PRD-0009](../prds/prd-0009-import-workflow.md) (F1)
+2. ~~Add keyboard shortcuts for tab switching (arrow keys or Ctrl+1/2/3/4)~~ — Resolved and reversed: removed. App-level `Ctrl+1-8` view navigation in `shortcuts.svelte.ts` already covers section switching; per-tab shortcuts conflicted with it.
+3. ~~Add "Test Connection" button for database tab~~ — Done (Import view, database tab)
+4. ~~Add ARIA tab roles (`role="tablist"`, `role="tab"`, `aria-selected`)~~ — Done (Import view)
+5. ~~Remember recursive preference in session storage~~ — Done (localStorage, Import view)
+6. Add import history view — Planned in [PRD-0009](../prds/prd-0009-import-workflow.md) (F2)
 7. This view is the reference for undo/redo patterns — apply to other views
+8. Add batch import from multiple directories — Planned in [PRD-0009](../prds/prd-0009-import-workflow.md) (F3)
+9. Add drag-and-drop for URL tab — Planned in [PRD-0009](../prds/prd-0009-import-workflow.md) (F4)
+10. Make clipboard format overrideable — Done (Text/HTML toggle, Import view)
