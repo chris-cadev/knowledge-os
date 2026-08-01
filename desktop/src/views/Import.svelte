@@ -5,6 +5,7 @@
     importUrl,
     importClipboard,
     importDatabase,
+    testDatabaseConnection,
     importFileRecursive,
     importImage,
     undoImport,
@@ -23,7 +24,47 @@
 
   const app = getState();
 
-  let activeTab = $state<"files" | "url" | "clipboard" | "database">("files");
+  const TAB_IDS = ["files", "url", "clipboard", "database"] as const;
+  type TabId = (typeof TAB_IDS)[number];
+
+  const ACTIVE_TAB_KEY = "kos:import:activeTab";
+  const RECURSIVE_KEY = "kos:import:recursive";
+
+  function readPref(key: string): string | null {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  function writePref(key: string, value: string): void {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  function initialActiveTab(): TabId {
+    const saved = readPref(ACTIVE_TAB_KEY);
+    return saved !== null && TAB_IDS.includes(saved as TabId) ? (saved as TabId) : "files";
+  }
+
+  function initialRecursive(): boolean {
+    return readPref(RECURSIVE_KEY) === "true";
+  }
+
+  let activeTab = $state<TabId>(initialActiveTab());
+  let recursive = $state(initialRecursive());
+
+  $effect(() => {
+    writePref(ACTIVE_TAB_KEY, activeTab);
+  });
+
+  $effect(() => {
+    writePref(RECURSIVE_KEY, String(recursive));
+  });
 
   // Shared state
   let importing = $state(false);
@@ -33,13 +74,27 @@
 
   // Files tab
   let dropZoneEl = $state<HTMLElement | null>(null);
-  let recursive = $state(false);
   let directoryPreview = $state<DirectoryPreview | null>(null);
   let previewLoading = $state(false);
 
   // URL tab
   let urlInput = $state("");
   let urlFetching = $state(false);
+  let urlError = $state<string | null>(null);
+
+  function validateUrl(input: string): string | null {
+    if (!input.trim()) return null;
+    let parsed: URL;
+    try {
+      parsed = new URL(input.trim());
+    } catch {
+      return "Enter a valid URL, including the http:// or https:// scheme.";
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "Only http:// and https:// URLs are supported.";
+    }
+    return null;
+  }
 
   // Clipboard tab
   let clipboardContent = $state("");
@@ -50,6 +105,8 @@
   let dbConnStr = $state("");
   let dbTablesInput = $state("");
   let dbImporting = $state(false);
+  let dbTesting = $state(false);
+  let dbTestResult = $state<{ ok: boolean; message: string } | null>(null);
 
   // Conflict detection
   let conflicts = $state<string[]>([]);
@@ -224,6 +281,12 @@
   // ---- URL Tab ----
   async function handleUrlImport() {
     if (!urlInput.trim() || urlFetching) return;
+    const validationError = validateUrl(urlInput);
+    if (validationError) {
+      urlError = validationError;
+      return;
+    }
+    urlError = null;
     urlFetching = true;
     importing = true;
     progressItems = [];
@@ -282,6 +345,27 @@
   }
 
   // ---- Database Tab ----
+  async function handleTestConnection() {
+    if (!dbConnStr.trim() || dbTesting) return;
+    dbTesting = true;
+    dbTestResult = null;
+    try {
+      const info = await testDatabaseConnection(dbConnStr.trim());
+      if (info.reachable) {
+        dbTestResult = {
+          ok: true,
+          message: `Connected to ${info.database_name} (${info.server_version}) in ${info.latency_ms}ms`,
+        };
+      } else {
+        dbTestResult = { ok: false, message: "Could not reach the database." };
+      }
+    } catch (e) {
+      dbTestResult = { ok: false, message: `${e}` };
+    } finally {
+      dbTesting = false;
+    }
+  }
+
   async function handleDatabaseImport() {
     if (!dbConnStr.trim() || dbImporting) return;
     dbImporting = true;
@@ -309,10 +393,12 @@
   <h2>Import Knowledge</h2>
 
   <!-- Tabs -->
-  <div class="tabs">
+  <div class="tabs" role="tablist" aria-label="Import source">
     <button
       class="tab"
       class:active={activeTab === "files"}
+      role="tab"
+      aria-selected={activeTab === "files"}
       onclick={() => (activeTab = "files")}
     >
       <span class="material-symbols-outlined">folder</span>
@@ -321,6 +407,8 @@
     <button
       class="tab"
       class:active={activeTab === "url"}
+      role="tab"
+      aria-selected={activeTab === "url"}
       onclick={() => (activeTab = "url")}
     >
       <span class="material-symbols-outlined">language</span>
@@ -329,6 +417,8 @@
     <button
       class="tab"
       class:active={activeTab === "clipboard"}
+      role="tab"
+      aria-selected={activeTab === "clipboard"}
       onclick={() => (activeTab = "clipboard")}
     >
       <span class="material-symbols-outlined">content_paste</span>
@@ -337,6 +427,8 @@
     <button
       class="tab"
       class:active={activeTab === "database"}
+      role="tab"
+      aria-selected={activeTab === "database"}
       onclick={() => (activeTab = "database")}
     >
       <span class="material-symbols-outlined">storage</span>
@@ -425,9 +517,12 @@
           <input
             type="url"
             class="input"
+            class:input-error={urlError !== null}
             placeholder="https://example.com/article"
             bind:value={urlInput}
             disabled={urlFetching}
+            aria-invalid={urlError !== null}
+            oninput={() => (urlError = null)}
           />
           <button
             class="btn btn-primary"
@@ -443,6 +538,12 @@
             {/if}
           </button>
         </div>
+        {#if urlError}
+          <p class="input-error-text" role="alert">
+            <span class="material-symbols-outlined error-icon">error</span>
+            {urlError}
+          </p>
+        {/if}
       </div>
 
     {:else if activeTab === "clipboard"}
@@ -453,6 +554,24 @@
             <span class="badge">HTML detected</span>
           {/if}
         </p>
+        <div class="format-toggle" role="group" aria-label="Clipboard format">
+          <button
+            class="format-toggle-btn"
+            class:active={clipboardFormat === "text"}
+            aria-pressed={clipboardFormat === "text"}
+            onclick={() => (clipboardFormat = "text")}
+          >
+            Text
+          </button>
+          <button
+            class="format-toggle-btn"
+            class:active={clipboardFormat === "html"}
+            aria-pressed={clipboardFormat === "html"}
+            onclick={() => (clipboardFormat = "html")}
+          >
+            HTML
+          </button>
+        </div>
         <textarea
           class="clipboard-textarea"
           placeholder="Paste text or HTML here..."
@@ -491,7 +610,8 @@
               class="input"
               placeholder="sqlite:///path/to/db.db or postgres://user:pass@host/db"
               bind:value={dbConnStr}
-              disabled={dbImporting}
+              disabled={dbImporting || dbTesting}
+              oninput={() => (dbTestResult = null)}
             />
           </label>
           <label>
@@ -504,19 +624,48 @@
               disabled={dbImporting}
             />
           </label>
-          <button
-            class="btn btn-primary"
-            onclick={handleDatabaseImport}
-            disabled={!dbConnStr.trim() || dbImporting}
-          >
-            {#if dbImporting}
-              <span class="material-symbols-outlined spinning">sync</span>
-              Importing...
-            {:else}
-              <span class="material-symbols-outlined">storage</span>
-              Import from Database
-            {/if}
-          </button>
+          <div class="db-actions">
+            <button
+              class="btn btn-secondary"
+              onclick={handleTestConnection}
+              disabled={!dbConnStr.trim() || dbImporting || dbTesting}
+            >
+              {#if dbTesting}
+                <span class="material-symbols-outlined spinning">sync</span>
+                Testing...
+              {:else}
+                <span class="material-symbols-outlined">link</span>
+                Test Connection
+              {/if}
+            </button>
+            <button
+              class="btn btn-primary"
+              onclick={handleDatabaseImport}
+              disabled={!dbConnStr.trim() || dbImporting || dbTesting}
+            >
+              {#if dbImporting}
+                <span class="material-symbols-outlined spinning">sync</span>
+                Importing...
+              {:else}
+                <span class="material-symbols-outlined">storage</span>
+                Import from Database
+              {/if}
+            </button>
+          </div>
+          {#if dbTestResult}
+            <p
+              class="db-test-result"
+              class:success={dbTestResult.ok}
+              class:error={!dbTestResult.ok}
+              role="status"
+              aria-live="polite"
+            >
+              <span class="material-symbols-outlined">
+                {dbTestResult.ok ? "check_circle" : "error"}
+              </span>
+              {dbTestResult.message}
+            </p>
+          {/if}
         </div>
       </div>
     {/if}
@@ -827,6 +976,50 @@
     font-size: var(--font-size-body-sm);
   }
 
+  .input-error {
+    border-color: var(--danger);
+  }
+
+  .input-error:focus {
+    outline-color: var(--danger);
+  }
+
+  .input-error-text {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    color: var(--danger);
+    font-size: var(--font-size-sm);
+  }
+
+  .format-toggle {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .format-toggle-btn {
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--bg-card);
+    border: none;
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    transition: background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .format-toggle-btn + .format-toggle-btn {
+    border-left: 1px solid var(--border);
+  }
+
+  .format-toggle-btn.active {
+    background: var(--accent);
+    color: white;
+  }
+
   .clipboard-textarea {
     width: 100%;
     min-height: 200px;
@@ -857,6 +1050,28 @@
     gap: var(--spacing-xs);
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
+  }
+
+  .db-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+  }
+
+  .db-test-result {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    margin: 0;
+  }
+
+  .db-test-result.success {
+    color: var(--success, #2e7d32);
+  }
+
+  .db-test-result.error {
+    color: var(--danger);
   }
 
   /* Progress List */

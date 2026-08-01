@@ -11,6 +11,7 @@ import type {
   EntityDetail,
   ImportResult,
   ImportProgressResult,
+  ConnectionInfo,
   DirectoryPreview,
   StructuredPreview,
   UndoResult,
@@ -53,6 +54,12 @@ export async function importDatabase(
     connectionString,
     tables: tables ?? [],
   });
+}
+
+export async function testDatabaseConnection(
+  connectionString: string
+): Promise<ConnectionInfo> {
+  return invoke("import_database_test_connection", { connectionString });
 }
 
 export async function importFileRecursive(path: string): Promise<ImportProgressResult> {
