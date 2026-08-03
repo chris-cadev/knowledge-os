@@ -51,7 +51,7 @@ These issues make the application feel like a prototype rather than a polished p
 ### Out of Scope
 
 - New views or features (deferred to future PRDs)
-- Backend changes (no new API endpoints required)
+- Major backend or core changes (moderate to minor backend changes are allowed; significant backend or core work is deferred to PRD-0009)
 - New entity types, relationship types, or component types
 - Real-time collaboration features
 - Mobile or responsive layouts beyond sidebar collapse

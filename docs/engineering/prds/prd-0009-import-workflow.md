@@ -10,7 +10,7 @@
 
 ## Purpose
 
-This PRD completes the Import workflow so that large imports feel responsive, safe, and recoverable. The anchor feature is real-time per-file progress, deferred from PRD-0008 (which scoped backend changes out). It also consolidates the remaining import UX gaps identified by `docs/engineering/ux-audits/audit-import.md` and the cross-cutting import requirements in PRD-0007. This is a living draft — additional import features are added here as they are specified, rather than scattered across other PRDs.
+This PRD completes the Import workflow so that large imports feel responsive, safe, and recoverable. The anchor feature is real-time per-file progress, deferred from PRD-0008 because it requires major backend work that PRD-0008 excludes (major backend and core changes live here). It also consolidates the remaining import UX gaps identified by `docs/engineering/ux-audits/audit-import.md` and the cross-cutting import requirements in PRD-0007. This is a living draft — additional import features are added here as they are specified, rather than scattered across other PRDs.
 
 ---
 
