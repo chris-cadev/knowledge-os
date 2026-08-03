@@ -2,6 +2,7 @@
 // Browser-level keyboard navigation for the desktop app.
 
 import { navigateTo } from "./router.svelte.js";
+import { getState } from "./state.svelte.js";
 import type { View } from "./types.js";
 
 const viewShortcuts: Record<string, View> = {
@@ -35,8 +36,9 @@ export function initShortcuts() {
       return;
     }
 
-    // Ctrl+F → Search
+    // Ctrl+F → Search (except in Chat, which owns in-conversation find)
     if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+      if (getState().currentView === "chat") return;
       e.preventDefault();
       navigateTo("search");
       return;

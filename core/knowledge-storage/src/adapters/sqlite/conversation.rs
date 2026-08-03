@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use knowledge_core::ports::{
     CitationSource, ConversationDetail, ConversationRepository, ConversationSummary, MessageDetail,
-    MessageRole, StorageError,
+    MessageRole, ResponseFeedback, StorageError,
 };
 use rusqlite::OptionalExtension;
 use uuid::Uuid;
@@ -80,6 +80,30 @@ fn parse_rfc3339(s: &str) -> chrono::DateTime<chrono::Utc> {
     chrono::DateTime::parse_from_rfc3339(s)
         .unwrap()
         .with_timezone(&chrono::Utc)
+}
+
+fn load_feedback(
+    conn: &rusqlite::Connection,
+    message_id: &Uuid,
+    provenance_ct: &str,
+) -> Result<Option<ResponseFeedback>, StorageError> {
+    let data: Option<String> = conn
+        .query_row(
+            "SELECT data FROM components WHERE entity_id = ?1 AND component_type = ?2 ORDER BY created_at DESC LIMIT 1",
+            rusqlite::params![message_id.to_string(), provenance_ct],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+    let Some(data) = data else {
+        return Ok(None);
+    };
+
+    match serde_json::from_str::<ResponseFeedback>(&data) {
+        Ok(fb) if fb.message_id == *message_id => Ok(Some(fb)),
+        _ => Ok(None),
+    }
 }
 
 #[async_trait]
@@ -172,6 +196,7 @@ impl ConversationRepository for SqliteStore {
         let title_ct = component_type_json("Title");
         let msg_content_ct = component_type_json("MessageContent");
         let entity_refs_ct = component_type_json("EntityRefs");
+        let provenance_ct = component_type_json("Provenance");
 
         let mut conv_stmt = conn
             .prepare(&format!(
@@ -294,12 +319,15 @@ impl ConversationRepository for SqliteStore {
                 }
             }
 
+            let feedback = load_feedback(&conn, &msg_id, &provenance_ct)?;
+
             messages.push(MessageDetail {
                 id: msg_id,
                 role,
                 text,
                 entity_refs: entity_ids,
                 citations,
+                feedback,
                 created_at: msg_entity.created_at,
             });
         }

@@ -93,14 +93,119 @@
   // --- Timers ---
   let statusTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // --- Sidebar search ---
+  let conversationSearch = $state("");
+
+  // --- Input settings panel ---
+  let showInputSettings = $state(false);
+
+  // --- Shortcuts help ---
+  let showShortcutsHelp = $state(false);
+
+  // --- Clear confirmation ---
+  let clearingConversation = $state(false);
+
+  // --- In-conversation search ---
+  let showFindBar = $state(false);
+  let findQuery = $state("");
+  let findActiveIndex = $state(0);
+
+  // --- Copy feedback ---
+  let copiedMessageId = $state<string | null>(null);
+
   onMount(() => {
     loadConversations();
+    window.addEventListener("keydown", handleWindowKeyDown);
   });
 
   onDestroy(() => {
     streamSession?.stop();
     if (statusTimer) clearTimeout(statusTimer);
+    window.removeEventListener("keydown", handleWindowKeyDown);
   });
+
+  function handleWindowKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement;
+    const isTyping =
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable;
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+      e.preventDefault();
+      openFindBar();
+      return;
+    }
+
+    if (e.key === "?" && !isTyping && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      showShortcutsHelp = true;
+      return;
+    }
+  }
+
+  let findState = $derived.by(() => {
+    const counter = { n: 0 };
+    const items = messages.map((m) => {
+      const base =
+        m.role === "user"
+          ? renderEntityPills(m.content)
+          : renderWithCitations(m.content, m.citations);
+      return { ...m, html: highlightFind(base, findQuery, counter) };
+    });
+    return { items, count: counter.n };
+  });
+
+  let filteredConversations = $derived(
+    conversations.filter((c) => {
+      const q = conversationSearch.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        (c.title || "").toLowerCase().includes(q) ||
+        (c.last_message_preview || "").toLowerCase().includes(q)
+      );
+    })
+  );
+
+  function openFindBar() {
+    showFindBar = true;
+    tick().then(() => {
+      const input = document.querySelector<HTMLInputElement>(".find-input");
+      input?.focus();
+      input?.select();
+    });
+  }
+
+  function closeFindBar() {
+    showFindBar = false;
+    findQuery = "";
+    findActiveIndex = 0;
+  }
+
+  function updateFindQuery(value: string) {
+    findQuery = value;
+    findActiveIndex = 0;
+    if (value.trim()) scrollToFind(0);
+  }
+
+  function findNext() {
+    if (findState.count === 0) return;
+    findActiveIndex = (findActiveIndex + 1) % findState.count;
+    scrollToFind(findActiveIndex);
+  }
+
+  function findPrev() {
+    if (findState.count === 0) return;
+    findActiveIndex = (findActiveIndex - 1 + findState.count) % findState.count;
+    scrollToFind(findActiveIndex);
+  }
+
+  function scrollToFind(idx: number) {
+    tick().then(() => {
+      const el = document.querySelector(`[data-find-idx="${idx}"]`);
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }
 
   // --- Conversation management ---
 
@@ -129,6 +234,8 @@
             id: m.id,
             role: m.role as "user" | "assistant" | "system",
             content: m.text,
+            citations: m.citations,
+            feedback: m.feedback?.rating,
             timestamp: m.created_at,
           };
           return display;
@@ -278,6 +385,7 @@
     processingStatus = null;
 
     const msgId = ++sendCounter;
+    const entityIds = getEntityRefIds();
     const userMsg: MessageDisplay = {
       id: `user-${msgId}`,
       role: "user",
@@ -289,7 +397,6 @@
     selectedEntityRefs = new Map();
     resetTextareaHeight();
 
-    const entityIds = getEntityRefIds();
     const assistantMsg: MessageDisplay = {
       id: `assistant-${msgId}`,
       role: "assistant",
@@ -363,11 +470,11 @@
         }
       );
     } catch (e) {
-      await fallbackSend(text);
+      await fallbackSend(text, entityIds);
     }
   }
 
-  async function fallbackSend(text: string) {
+  async function fallbackSend(text: string, entityIds: string[]) {
     if (messages.length > 0 && messages[messages.length - 1].role === "assistant" && !messages[messages.length - 1].content) {
       messages = messages.slice(0, -1);
     }
@@ -375,7 +482,7 @@
       const result = await chatSend(
         currentConversationId,
         text,
-        getEntityRefIds(),
+        entityIds,
         { knowledge_graph: knowledgeGraph, web_search: webSearch },
         mode
       );
@@ -427,16 +534,32 @@
 
   // --- Command palette ---
 
+  function runCommand(cmd: CommandDef, arg?: string) {
+    switch (cmd.id) {
+      case "help":
+        showShortcutsHelp = true;
+        break;
+      case "clear":
+        confirmClearConversation();
+        break;
+      case "export":
+        exportConversation();
+        break;
+      default:
+        cmd.action(arg);
+    }
+  }
+
   function executeCommandText(text: string) {
     const [cmd, ...args] = text.slice(1).split(/\s+/);
     const match = builtinCommands.find((c) => c.name === `/${cmd}`);
     if (match) {
-      match.action(args.join(" "));
+      runCommand(match, args.join(" "));
     }
   }
 
   function executeCommand(cmd: CommandDef) {
-    cmd.action();
+    runCommand(cmd);
     showCommandPalette = false;
     inputText = "";
     resetTextareaHeight();
@@ -913,6 +1036,90 @@
     node.focus();
     node.select();
   }
+
+  // --- Clear conversation ---
+
+  function confirmClearConversation() {
+    if (messages.length === 0) {
+      app.statusMessage = "Nothing to clear.";
+      return;
+    }
+    clearingConversation = true;
+  }
+
+  function doClear() {
+    currentConversationId = null;
+    messages = [];
+    inputText = "";
+    selectedEntityRefs = new Map();
+    errorMessage = null;
+    processingStatus = null;
+    showFindBar = false;
+    findQuery = "";
+    clearingConversation = false;
+  }
+
+  // --- Export conversation ---
+
+  function exportConversation() {
+    if (messages.length === 0) {
+      app.statusMessage = "Nothing to export yet.";
+      return;
+    }
+    const conv = conversations.find((c) => c.id === currentConversationId);
+    const title = (conv?.title || "conversation")
+      .replace(/[^\w\- ]+/g, "")
+      .trim()
+      .slice(0, 60) || "conversation";
+
+    const md = messages
+      .map((m) => {
+        const who = m.role === "user" ? "You" : "Assistant";
+        return `**${who}** (${formatDate(m.timestamp)}):\n\n${m.content}`;
+      })
+      .join("\n\n---\n\n");
+
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    app.statusMessage = `Conversation exported as ${title}.md`;
+  }
+
+  // --- Copy message ---
+
+  async function copyMessage(msg: MessageDisplay) {
+    try {
+      await navigator.clipboard.writeText(msg.content);
+      copiedMessageId = msg.id;
+      setTimeout(() => {
+        if (copiedMessageId === msg.id) copiedMessageId = null;
+      }, 1500);
+    } catch {
+      app.statusMessage = "Failed to copy message.";
+    }
+  }
+
+  // --- Find highlighting ---
+
+  function escapeRegex(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function highlightFind(html: string, term: string, counter: { n: number }): string {
+    if (!term.trim()) return html;
+    const escapedTerm = term.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const re = new RegExp(escapeRegex(escapedTerm), "gi");
+    return html.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
+      if (tag) return tag;
+      return text.replace(re, (m: string) => `<mark class="find-match" data-find-idx="${counter.n++}">${m}</mark>`);
+    });
+  }
 </script>
 
 <div class="chat-view">
@@ -923,15 +1130,32 @@
       New Chat
     </button>
 
+    <div class="conv-search">
+      <span class="material-symbols-outlined conv-search-icon">search</span>
+      <input
+        class="conv-search-input"
+        type="text"
+        placeholder="Search conversations..."
+        bind:value={conversationSearch}
+        aria-label="Search conversations"
+      />
+    </div>
+
     <div class="conv-list">
       {#if loadingConversations}
         <div class="conv-list-loading">
           <span class="material-symbols-outlined loading-spinner">sync</span>
         </div>
-      {:else if conversations.length === 0}
-        <p class="conv-list-empty">No conversations yet.<br />Start a new chat!</p>
+      {:else if filteredConversations.length === 0}
+        <p class="conv-list-empty">
+          {#if conversations.length === 0}
+            No conversations yet.<br />Start a new chat!
+          {:else}
+            No conversations match "{conversationSearch}".
+          {/if}
+        </p>
       {:else}
-        {#each conversations as conv}
+        {#each filteredConversations as conv}
           <div
             class="conv-item"
             class:active={conv.id === currentConversationId}
@@ -998,12 +1222,26 @@
     {#if deletingConvId}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="modal-backdrop" onclick={() => deletingConvId = null} onkeydown={(e) => { if (e.key === 'Escape') deletingConvId = null; }} role="presentation"></div>
-      <div class="modal">
-        <h3>Delete conversation?</h3>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-conv-title">
+        <h3 id="delete-conv-title">Delete conversation?</h3>
         <p>This action cannot be undone.</p>
         <div class="modal-actions">
           <button class="btn btn-secondary" onclick={() => deletingConvId = null}>Cancel</button>
           <button class="btn btn-danger" onclick={doDelete}>Delete</button>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Clear confirmation -->
+    {#if clearingConversation}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="modal-backdrop" onclick={() => clearingConversation = false} onkeydown={(e) => { if (e.key === 'Escape') clearingConversation = false; }} role="presentation"></div>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="clear-conv-title">
+        <h3 id="clear-conv-title">Clear conversation?</h3>
+        <p>This clears the current conversation and starts a new chat.</p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick={() => clearingConversation = false}>Cancel</button>
+          <button class="btn btn-danger" onclick={doClear}>Clear</button>
         </div>
       </div>
     {/if}
@@ -1034,13 +1272,46 @@
         </div>
       </div>
     {:else}
+      {#if showFindBar}
+        <div class="find-bar">
+          <span class="material-symbols-outlined find-bar-icon">search</span>
+          <input
+            class="find-input"
+            type="text"
+            placeholder="Find in conversation..."
+            bind:value={findQuery}
+            oninput={(e) => updateFindQuery((e.target as HTMLInputElement).value)}
+            onkeydown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); findNext(); }
+              if (e.key === "Escape") closeFindBar();
+            }}
+            aria-label="Find in conversation"
+          />
+          <span class="find-count">
+            {#if findQuery.trim() && findState.count === 0}
+              No matches
+            {:else if findQuery.trim()}
+              {findActiveIndex + 1}/{findState.count}
+            {/if}
+          </span>
+          <button class="find-nav" onclick={findPrev} title="Previous match (Shift+Enter)">
+            <span class="material-symbols-outlined">chevron_left</span>
+          </button>
+          <button class="find-nav" onclick={findNext} title="Next match (Enter)">
+            <span class="material-symbols-outlined">chevron_right</span>
+          </button>
+          <button class="find-close" onclick={closeFindBar} title="Close search">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      {/if}
       <div class="messages-container" bind:this={messagesContainer} aria-live="polite">
-        {#each messages as msg}
+        {#each findState.items as msg}
           <div class="message" class:message-user={msg.role === "user"} class:message-assistant={msg.role === "assistant" || msg.role === "system"}>
             <div class="message-bubble">
               {#if msg.role === "user"}
                 <div class="message-content chat-markdown">
-                  {@html renderEntityPills(msg.content)}
+                  {@html msg.html}
                 </div>
               {:else}
                 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_no_noninteractive_element_interactions -->
@@ -1051,7 +1322,7 @@
                   onmouseleave={handleCitationMouseLeave}
                   role="document"
                 >
-                  {@html renderWithCitations(msg.content, msg.citations)}
+                  {@html msg.html}
                 </div>
               {/if}
 
@@ -1087,34 +1358,46 @@
               {/if}
 
               <!-- Feedback buttons -->
-              {#if msg.role === "assistant" && msg.content}
+              {#if (msg.role === "assistant" || msg.role === "user") && msg.content}
                 <div class="message-feedback">
                   <button
                     class="feedback-btn"
-                    class:feedback-active={msg.feedback === "thumbs_up"}
-                    onclick={() => {
-                      if (msg.feedback === "thumbs_up") return;
-                      sendFeedback(msg.id, "thumbs_up");
-                    }}
-                    title="Thumbs up"
+                    class:feedback-active={copiedMessageId === msg.id}
+                    onclick={() => copyMessage(msg)}
+                    title="Copy message"
                   >
-                    <span class="material-symbols-outlined">thumb_up</span>
+                    <span class="material-symbols-outlined">
+                      {copiedMessageId === msg.id ? "check" : "content_copy"}
+                    </span>
                   </button>
-                  <button
-                    class="feedback-btn"
-                    class:feedback-active={msg.feedback === "thumbs_down"}
-                    onclick={() => {
-                      if (msg.feedback === "thumbs_down") return;
-                      if (feedbackForm?.messageId === msg.id) {
-                        closeFeedbackForm();
-                      } else {
-                        openFeedbackForm(msg.id);
-                      }
-                    }}
-                    title="Thumbs down"
-                  >
-                    <span class="material-symbols-outlined">thumb_down</span>
-                  </button>
+                  {#if msg.role === "assistant"}
+                    <button
+                      class="feedback-btn"
+                      class:feedback-active={msg.feedback === "thumbs_up"}
+                      onclick={() => {
+                        if (msg.feedback === "thumbs_up") return;
+                        sendFeedback(msg.id, "thumbs_up");
+                      }}
+                      title="Thumbs up"
+                    >
+                      <span class="material-symbols-outlined">thumb_up</span>
+                    </button>
+                    <button
+                      class="feedback-btn"
+                      class:feedback-active={msg.feedback === "thumbs_down"}
+                      onclick={() => {
+                        if (msg.feedback === "thumbs_down") return;
+                        if (feedbackForm?.messageId === msg.id) {
+                          closeFeedbackForm();
+                        } else {
+                          openFeedbackForm(msg.id);
+                        }
+                      }}
+                      title="Thumbs down"
+                    >
+                      <span class="material-symbols-outlined">thumb_down</span>
+                    </button>
+                  {/if}
                 </div>
               {/if}
 
@@ -1123,13 +1406,18 @@
                 <div class="feedback-form">
                   <p class="feedback-form-title">What went wrong?</p>
                   <div class="feedback-reasons">
-                    {#each ["Wrong Entity", "Missing Info", "Wrong Citation", "Other"] as reason}
+                    {#each [
+                      { value: "wrong_entity", label: "Wrong Entity" },
+                      { value: "missing_info", label: "Missing Info" },
+                      { value: "wrong_citation", label: "Wrong Citation" },
+                      { value: "other", label: "Other" },
+                    ] as reasonOption}
                       <button
                         class="feedback-reason-btn"
-                        class:selected={feedbackForm.reason === reason}
-                        onclick={() => { if (feedbackForm) feedbackForm = { ...feedbackForm, reason }; }}
+                        class:selected={feedbackForm.reason === reasonOption.value}
+                        onclick={() => { if (feedbackForm) feedbackForm = { ...feedbackForm, reason: reasonOption.value }; }}
                       >
-                        {reason}
+                        {reasonOption.label}
                       </button>
                     {/each}
                   </div>
@@ -1138,6 +1426,7 @@
                     placeholder="Additional comment (optional)..."
                     bind:value={feedbackForm.comment}
                     rows={2}
+                    aria-label="Feedback comment"
                   ></textarea>
                   <div class="feedback-actions">
                     <button class="btn btn-sm" onclick={closeFeedbackForm}>Cancel</button>
@@ -1227,39 +1516,41 @@
         </div>
       {/if}
 
-      <!-- Input row: toggles -->
-      <div class="input-toggles">
-        <div class="mode-toggle">
-          <button
-            class="mode-btn"
-            class:mode-active={mode === "fast"}
-            onclick={() => mode = "fast"}
-            disabled={streaming}
-          >
-            <span class="material-symbols-outlined">bolt</span>
-            Fast
-          </button>
-          <button
-            class="mode-btn"
-            class:mode-active={mode === "thinking"}
-            onclick={() => mode = "thinking"}
-            disabled={streaming}
-          >
-            <span class="material-symbols-outlined">psychology</span>
-            Thinking
-          </button>
+      <!-- Input settings panel (collapsible) -->
+      {#if showInputSettings}
+        <div class="input-toggles">
+          <div class="mode-toggle">
+            <button
+              class="mode-btn"
+              class:mode-active={mode === "fast"}
+              onclick={() => mode = "fast"}
+              disabled={streaming}
+            >
+              <span class="material-symbols-outlined">bolt</span>
+              Fast
+            </button>
+            <button
+              class="mode-btn"
+              class:mode-active={mode === "thinking"}
+              onclick={() => mode = "thinking"}
+              disabled={streaming}
+            >
+              <span class="material-symbols-outlined">psychology</span>
+              Thinking
+            </button>
+          </div>
+          <div class="source-toggles">
+            <label class="toggle-label" class:toggle-disabled={streaming}>
+              <input type="checkbox" bind:checked={knowledgeGraph} disabled={streaming} />
+              <span>Knowledge Graph</span>
+            </label>
+            <label class="toggle-label" class:toggle-disabled={streaming}>
+              <input type="checkbox" bind:checked={webSearch} disabled={streaming} />
+              <span>Web Search</span>
+            </label>
+          </div>
         </div>
-        <div class="source-toggles">
-          <label class="toggle-label" class:toggle-disabled={streaming}>
-            <input type="checkbox" bind:checked={knowledgeGraph} disabled={streaming} />
-            <span>Knowledge Graph</span>
-          </label>
-          <label class="toggle-label" class:toggle-disabled={streaming}>
-            <input type="checkbox" bind:checked={webSearch} disabled={streaming} />
-            <span>Web Search</span>
-          </label>
-        </div>
-      </div>
+      {/if}
 
       <!-- Input row: textarea + button -->
       <div class="input-row">
@@ -1273,7 +1564,29 @@
             onkeydown={handleKeyDown}
             disabled={streaming}
             rows={1}
+            aria-label="Message"
           ></textarea>
+        </div>
+        <div class="input-controls">
+          <button
+            class="icon-btn"
+            class:icon-btn-active={showInputSettings}
+            onclick={() => showInputSettings = !showInputSettings}
+            disabled={streaming}
+            title="Input settings"
+            aria-expanded={showInputSettings}
+            aria-label="Toggle input settings"
+          >
+            <span class="material-symbols-outlined">tune</span>
+          </button>
+          <button
+            class="icon-btn"
+            onclick={() => showShortcutsHelp = true}
+            title="Keyboard shortcuts (?)"
+            aria-label="Show keyboard shortcuts"
+          >
+            <span class="material-symbols-outlined">help</span>
+          </button>
         </div>
         {#if streaming}
           <button class="stop-btn" onclick={stopStreaming} title="Stop generating">
@@ -1291,6 +1604,29 @@
         {/if}
       </div>
     </div>
+
+    <!-- Shortcuts help modal -->
+    {#if showShortcutsHelp}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="modal-backdrop" onclick={() => showShortcutsHelp = false} onkeydown={(e) => { if (e.key === 'Escape') showShortcutsHelp = false; }} role="presentation"></div>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+        <h3 id="shortcuts-title">Keyboard Shortcuts</h3>
+        <div class="shortcuts-grid">
+          <div class="shortcut-row"><span class="shortcut-keys">Enter</span><span>Send message</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys">Shift + Enter</span><span>New line</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys">@</span><span>Reference an entity</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys">/</span><span>Commands (/help, /clear, /export)</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys">?</span><span>Show this help</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys">Ctrl + F</span><span>Find in conversation</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys">Ctrl + N</span><span>New import</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys">Ctrl + 1&ndash;8</span><span>Switch views</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys">Esc</span><span>Close popups / menus</span></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick={() => showShortcutsHelp = false}>Close</button>
+        </div>
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -1335,6 +1671,44 @@
   .new-chat-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .conv-search {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin: 0 var(--spacing-md) var(--spacing-sm);
+    padding: 0 var(--spacing-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-fast);
+  }
+
+  .conv-search:focus-within {
+    border-color: var(--accent);
+  }
+
+  .conv-search-icon {
+    font-size: 18px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .conv-search-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    outline: none;
+    padding: 8px 0;
+  }
+
+  .conv-search-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
   }
 
   .conv-list {
@@ -1406,11 +1780,11 @@
   }
 
   .conv-item.active .conv-preview {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-on-accent-secondary);
   }
 
   .conv-item.active .conv-meta {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--text-on-accent-muted);
   }
 
   .conv-meta {
@@ -1440,7 +1814,7 @@
   }
 
   .conv-menu-btn:hover {
-    background: rgba(0, 0, 0, 0.1);
+    background: var(--overlay-hover);
   }
 
   .rename-input {
@@ -1496,7 +1870,7 @@
   .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--overlay-scrim);
     z-index: 200;
   }
 
@@ -1528,6 +1902,32 @@
     display: flex;
     gap: var(--spacing-sm);
     justify-content: flex-end;
+  }
+
+  /* ===== Shortcuts help ===== */
+  .shortcuts-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin: var(--spacing-md) 0 var(--spacing-lg);
+  }
+
+  .shortcut-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    font-size: var(--font-size-sm);
+  }
+
+  .shortcut-keys {
+    min-width: 120px;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-code-md);
+    background: var(--color-surface-container-high);
+    border-radius: var(--radius-sm);
+    padding: 2px 8px;
+    text-align: center;
+    flex-shrink: 0;
   }
 
   /* ===== Chat main area ===== */
@@ -1591,6 +1991,71 @@
     gap: var(--spacing-md);
   }
 
+  /* ===== Find bar ===== */
+  .find-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin: var(--spacing-sm) var(--spacing-md) 0;
+    padding: 0 var(--spacing-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+  }
+
+  .find-bar:focus-within {
+    border-color: var(--accent);
+  }
+
+  .find-bar-icon {
+    font-size: 18px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .find-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    outline: none;
+    padding: 8px 0;
+  }
+
+  .find-count {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .find-nav,
+  .find-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    transition: background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .find-nav:hover,
+  .find-close:hover {
+    background: var(--color-surface-container-high);
+    color: var(--text-primary);
+  }
+
+  .find-nav .material-symbols-outlined,
+  .find-close .material-symbols-outlined {
+    font-size: 18px;
+  }
+
   /* ===== Message bubbles ===== */
   .message {
     display: flex;
@@ -1638,12 +2103,19 @@
   }
 
   .message-user .message-timestamp {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--text-on-accent-muted);
   }
 
   /* ===== Markdown ===== */
   .chat-markdown :global(p) {
     margin-bottom: var(--spacing-sm);
+  }
+
+  .chat-markdown :global(mark.find-match) {
+    background: var(--warning);
+    color: var(--color-on-surface);
+    border-radius: 2px;
+    padding: 0 1px;
   }
 
   .chat-markdown :global(p:last-child) {
@@ -1667,7 +2139,7 @@
   }
 
   .message-user .chat-markdown :global(code.chat-inline-code) {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--surface-on-accent-subtle);
   }
 
   .chat-markdown :global(pre.chat-code-block) {
@@ -1700,7 +2172,7 @@
   }
 
   .message-user .chat-markdown :global(a.chat-link) {
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--text-on-accent-high);
     text-decoration: underline;
   }
 
@@ -1753,7 +2225,7 @@
   }
 
   .message-user .sources-footer {
-    border-top-color: rgba(255, 255, 255, 0.2);
+    border-top-color: var(--border-on-accent);
   }
 
   .sources-toggle {
@@ -1771,7 +2243,7 @@
   }
 
   .message-user .sources-toggle {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--text-on-accent-muted);
   }
 
   .message-user .sources-toggle:hover {
@@ -1812,11 +2284,11 @@
   }
 
   .message-user .source-item {
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--text-on-accent-high);
   }
 
   .message-user .source-item:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--hover-on-accent);
   }
 
   .source-number {
@@ -1827,7 +2299,7 @@
   }
 
   .message-user .source-number {
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--text-on-accent-high);
   }
 
   .source-type {
@@ -1850,7 +2322,7 @@
   }
 
   .message-user .source-snippet {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--text-on-accent-muted);
   }
 
   /* ===== Feedback ===== */
@@ -1888,11 +2360,11 @@
   }
 
   .message-user .feedback-btn {
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--text-on-accent-faint);
   }
 
   .message-user .feedback-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--hover-on-accent);
     color: white;
   }
 
@@ -2003,8 +2475,8 @@
     align-items: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-sm) var(--spacing-md);
-    background: rgba(239, 68, 68, 0.1);
-    border-top: 1px solid rgba(239, 68, 68, 0.3);
+    background: var(--danger-soft);
+    border-top: 1px solid var(--danger-soft-border);
     color: var(--danger);
     font-size: var(--font-size-sm);
   }
@@ -2210,6 +2682,39 @@
     align-items: stretch;
   }
 
+  .input-controls {
+    display: flex;
+    gap: var(--spacing-xs);
+    align-items: stretch;
+    flex-shrink: 0;
+  }
+
+  .icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    transition: background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .icon-btn:hover:not(:disabled) {
+    background: var(--color-surface-container-high);
+    color: var(--text-primary);
+  }
+
+  .icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .icon-btn-active {
+    background: var(--color-surface-container-high);
+    color: var(--accent);
+  }
+
   .text-input-wrapper {
     flex: 1;
     display: flex;
@@ -2297,7 +2802,7 @@
   }
 
   .stop-btn:hover {
-    background: #dc2626;
+    background: var(--danger-hover);
   }
 
   /* ===== Shared buttons ===== */
@@ -2342,7 +2847,7 @@
   }
 
   :global(.btn-danger:hover) {
-    background: #dc2626;
+    background: var(--danger-hover);
   }
 
   /* ===== Utilities ===== */

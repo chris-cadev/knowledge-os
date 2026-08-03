@@ -126,6 +126,21 @@
   --color-entity-event: #F97316;
   --color-entity-collection: #14B8A6;
   --color-entity-default: #64748B;
+
+  /* ===== On-accent & overlay tokens ===== */
+  --text-on-accent: #ffffff;
+  --text-on-accent-high: rgba(255, 255, 255, 0.9);
+  --text-on-accent-secondary: rgba(255, 255, 255, 0.8);
+  --text-on-accent-muted: rgba(255, 255, 255, 0.7);
+  --text-on-accent-faint: rgba(255, 255, 255, 0.6);
+  --surface-on-accent-subtle: rgba(255, 255, 255, 0.15);
+  --hover-on-accent: rgba(255, 255, 255, 0.1);
+  --border-on-accent: rgba(255, 255, 255, 0.2);
+  --overlay-scrim: rgba(0, 0, 0, 0.4);
+  --overlay-hover: rgba(0, 0, 0, 0.1);
+  --danger-soft: rgba(186, 26, 26, 0.1);
+  --danger-soft-border: rgba(186, 26, 26, 0.3);
+  --danger-hover: #a31515;
 }
 
 /* ===== Dark Theme ===== */

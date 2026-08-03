@@ -117,12 +117,14 @@ pub struct ChatDelta {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FeedbackRating {
     ThumbsUp,
     ThumbsDown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FeedbackReason {
     WrongEntity,
     MissingInfo,

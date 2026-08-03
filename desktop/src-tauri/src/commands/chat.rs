@@ -221,6 +221,8 @@ pub struct MessageResponse {
     pub role: String,
     pub text: String,
     pub entity_refs: Vec<String>,
+    pub citations: Vec<CitationSource>,
+    pub feedback: Option<ResponseFeedback>,
     pub created_at: String,
 }
 
@@ -259,6 +261,8 @@ pub async fn chat_get_conversation(
                         role: format!("{:?}", m.role).to_lowercase(),
                         text: m.text,
                         entity_refs: m.entity_refs.iter().map(|r| r.to_string()).collect(),
+                        citations: m.citations,
+                        feedback: m.feedback,
                         created_at: m.created_at.to_rfc3339(),
                     })
                     .collect(),
