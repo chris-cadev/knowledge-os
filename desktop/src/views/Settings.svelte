@@ -149,13 +149,17 @@
   }
 
   // ── Validation ───────────────────────────────────────────────
+  function isRemoteHttps(url: string): boolean {
+    return /^https:\/\//i.test(url.trim());
+  }
+
   function canSaveChat(): boolean {
     if (chatProviderKind === "mock") return true;
     if (!chatModel.trim()) return false;
     if (
       chatProviderKind === "openai-compatible" &&
       !chatApiKey.trim() &&
-      !chatBaseUrl.match(/^https?:\/\/localhost/)
+      (isRemoteHttps(chatBaseUrl) || !chatBaseUrl.trim())
     )
       return false;
     return true;

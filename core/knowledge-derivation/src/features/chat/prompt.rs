@@ -1,6 +1,16 @@
 use knowledge_core::ports::*;
 
-pub fn build_system_prompt(context: &[EntityContext], toggles: &SourceToggles) -> String {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContextSource {
+    Search,
+    RecentFallback,
+}
+
+pub fn build_system_prompt(
+    context: &[EntityContext],
+    toggles: &SourceToggles,
+    source: ContextSource,
+) -> String {
     let mut prompt = String::from(
         "You are Knowledge OS, a knowledge graph assistant.\n\
          You help the user explore and understand their personal knowledge graph.\n\n",
@@ -8,9 +18,16 @@ pub fn build_system_prompt(context: &[EntityContext], toggles: &SourceToggles) -
 
     if !context.is_empty() {
         prompt.push_str("## Context from the user's knowledge graph\n\n");
-        prompt.push_str(
-            "The following entities were explicitly referenced or retrieved as relevant:\n\n",
-        );
+        if source == ContextSource::RecentFallback {
+            prompt.push_str(
+                "No specific entity matched the question, so the most recently updated entities \
+                 are provided below. Summarize what they contain and cite them.\n\n",
+            );
+        } else {
+            prompt.push_str(
+                "The following entities were explicitly referenced or retrieved as relevant:\n\n",
+            );
+        }
         prompt.push_str("<entities>\n");
         for (i, entity) in context.iter().enumerate() {
             prompt.push_str(&format!(
@@ -89,11 +106,20 @@ mod tests {
     fn prompt_includes_context_when_entities_present() {
         let ctx = vec![make_entity_context("Test Entity")];
         let toggles = SourceToggles::default();
-        let prompt = build_system_prompt(&ctx, &toggles);
+        let prompt = build_system_prompt(&ctx, &toggles, ContextSource::Search);
         assert!(prompt.contains("Test Entity"));
         assert!(prompt.contains("<entities>"));
         assert!(prompt.contains("</entities>"));
         assert!(prompt.contains("--- Entity 1 ---"));
+    }
+
+    #[test]
+    fn prompt_notes_recent_fallback_when_sourced_from_fallback() {
+        let ctx = vec![make_entity_context("Test Entity")];
+        let toggles = SourceToggles::default();
+        let prompt = build_system_prompt(&ctx, &toggles, ContextSource::RecentFallback);
+        assert!(prompt.contains("most recently updated"));
+        assert!(prompt.contains("<entities>"));
     }
 
     #[test]
@@ -103,7 +129,7 @@ mod tests {
             knowledge_graph: false,
             web_search: false,
         };
-        let prompt = build_system_prompt(&ctx, &toggles);
+        let prompt = build_system_prompt(&ctx, &toggles, ContextSource::Search);
         assert!(prompt.contains("disabled knowledge graph"));
         assert!(!prompt.contains("<entities>"));
     }
@@ -112,7 +138,7 @@ mod tests {
     fn prompt_suggests_import_when_empty_and_enabled() {
         let ctx = vec![];
         let toggles = SourceToggles::default();
-        let prompt = build_system_prompt(&ctx, &toggles);
+        let prompt = build_system_prompt(&ctx, &toggles, ContextSource::Search);
         assert!(prompt.contains("suggest importing"));
         assert!(!prompt.contains("<entities>"));
     }
@@ -121,7 +147,7 @@ mod tests {
     fn prompt_includes_response_rules() {
         let ctx = vec![];
         let toggles = SourceToggles::default();
-        let prompt = build_system_prompt(&ctx, &toggles);
+        let prompt = build_system_prompt(&ctx, &toggles, ContextSource::Search);
         assert!(prompt.contains("## Response rules"));
         assert!(prompt.contains("Ground answers"));
         assert!(prompt.contains("Cite your sources"));

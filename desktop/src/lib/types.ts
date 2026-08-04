@@ -191,6 +191,7 @@ export interface Citation {
   entity_type: string;
   title: string;
   snippet: string;
+  source?: string;
 }
 
 export interface ChatSendResult {
@@ -229,7 +230,16 @@ export interface MessageDetail {
   role: string;
   text: string;
   entity_refs: string[];
+  citations?: Citation[];
+  feedback?: MessageFeedback | null;
   created_at: string;
+}
+
+export interface MessageFeedback {
+  message_id: string;
+  rating: FeedbackRating;
+  reason?: string | null;
+  comment?: string | null;
 }
 
 export interface ConversationDetail {

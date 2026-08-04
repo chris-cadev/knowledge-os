@@ -221,6 +221,8 @@ pub struct MessageResponse {
     pub role: String,
     pub text: String,
     pub entity_refs: Vec<String>,
+    pub citations: Vec<CitationSource>,
+    pub feedback: Option<ResponseFeedback>,
     pub created_at: String,
 }
 
@@ -259,6 +261,8 @@ pub async fn chat_get_conversation(
                         role: format!("{:?}", m.role).to_lowercase(),
                         text: m.text,
                         entity_refs: m.entity_refs.iter().map(|r| r.to_string()).collect(),
+                        citations: m.citations,
+                        feedback: m.feedback,
                         created_at: m.created_at.to_rfc3339(),
                     })
                     .collect(),
@@ -345,4 +349,87 @@ pub async fn chat_send_feedback(
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MentionResolution {
+    pub entity_id: String,
+    pub entity_type: String,
+    pub title: String,
+}
+
+#[tauri::command]
+pub async fn resolve_entity_mention(
+    state: State<'_, AppState>,
+    entity_type: String,
+    title: String,
+) -> Result<Option<MentionResolution>, String> {
+    let store = &*state.store;
+
+    // Exact title match via find_by_title
+    let matches = knowledge_core::ports::EntityRepository::find_by_title(store, &title)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Filter by entity type
+    let entity_type_lower = entity_type.to_lowercase();
+    let filtered: Vec<_> = matches
+        .into_iter()
+        .filter(|e| e.entity_type.to_string().to_lowercase() == entity_type_lower)
+        .collect();
+
+    if let Some(entity) = filtered.first() {
+        use knowledge_core::ports::ComponentRepository;
+        let components = ComponentRepository::get(store, entity.id)
+            .await
+            .map_err(|e| e.to_string())?;
+        let resolved_title = components
+            .iter()
+            .find(|c| c.component_type == knowledge_core::features::component::ComponentType::Title)
+            .and_then(|c| c.data.as_str())
+            .unwrap_or("Untitled")
+            .to_string();
+        return Ok(Some(MentionResolution {
+            entity_id: entity.id.to_string(),
+            entity_type: entity.entity_type.to_string(),
+            title: resolved_title,
+        }));
+    }
+
+    // Prefix fallback: search for entities matching the prefix
+    let search_query = SearchQuery {
+        query: title.clone(),
+        entity_type: Some(entity_type.clone()),
+        tag: None,
+    };
+    let search_results = SearchIndex::search(store, &search_query)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if let Some(first) = search_results.first() {
+        let entity = knowledge_core::ports::EntityRepository::get(store, first.entity_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        if let Some(entity) = entity {
+            use knowledge_core::ports::ComponentRepository;
+            let components = ComponentRepository::get(store, entity.id)
+                .await
+                .map_err(|e| e.to_string())?;
+            let resolved_title = components
+                .iter()
+                .find(|c| {
+                    c.component_type == knowledge_core::features::component::ComponentType::Title
+                })
+                .and_then(|c| c.data.as_str())
+                .unwrap_or("Untitled")
+                .to_string();
+            return Ok(Some(MentionResolution {
+                entity_id: entity.id.to_string(),
+                entity_type: entity.entity_type.to_string(),
+                title: resolved_title,
+            }));
+        }
+    }
+
+    Ok(None)
 }

@@ -168,3 +168,46 @@ pub async fn get_entity_detail(
         versions: vec![],
     })
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EntitySourceEntry {
+    pub entity_id: String,
+    pub source: Option<String>,
+}
+
+/// Batch-fetch source file paths for multiple entities.
+#[tauri::command]
+pub async fn get_entity_sources(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+) -> Result<Vec<EntitySourceEntry>, String> {
+    let store = &*state.store;
+    let mut results = Vec::with_capacity(ids.len());
+
+    for id_str in &ids {
+        let entity_id = match Uuid::parse_str(id_str) {
+            Ok(id) => id,
+            Err(_) => {
+                results.push(EntitySourceEntry {
+                    entity_id: id_str.clone(),
+                    source: None,
+                });
+                continue;
+            }
+        };
+
+        let components = ComponentRepository::get(store, entity_id)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let source = extract_source_from_provenance(&components)
+            .or_else(|| extract_reference_from_binary(&components));
+
+        results.push(EntitySourceEntry {
+            entity_id: id_str.clone(),
+            source,
+        });
+    }
+
+    Ok(results)
+}

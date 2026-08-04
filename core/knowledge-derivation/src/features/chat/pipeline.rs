@@ -7,7 +7,7 @@ use knowledge_core::features::relationship::{Relationship, RelationshipType};
 use knowledge_core::ports::*;
 use uuid::Uuid;
 
-use super::prompt::build_system_prompt;
+use super::prompt::{build_system_prompt, ContextSource};
 use super::status::{ChatStreamEvent, ChatStreamHandle};
 
 #[allow(dead_code)]
@@ -73,17 +73,20 @@ impl ChatPipeline {
             .await
             .map_err(|e| ChatError::Provider(e.to_string()))?;
 
-        let context_entities = if source_toggles.knowledge_graph {
+        let (context_entities, context_source) = if source_toggles.knowledge_graph {
             if !entity_refs.is_empty() {
-                self.build_context_for_entities(entity_refs).await
+                (
+                    self.build_context_for_entities(entity_refs).await,
+                    ContextSource::Search,
+                )
             } else {
                 self.search_context(user_message, 10).await
             }
         } else {
-            vec![]
+            (vec![], ContextSource::Search)
         };
 
-        let system_prompt = build_system_prompt(&context_entities, source_toggles);
+        let system_prompt = build_system_prompt(&context_entities, source_toggles, context_source);
 
         let request = ChatRequest {
             system_prompt,
@@ -135,17 +138,20 @@ impl ChatPipeline {
             .await
             .map_err(|e| ChatError::Provider(e.to_string()))?;
 
-        let context_entities = if source_toggles.knowledge_graph {
+        let (context_entities, context_source) = if source_toggles.knowledge_graph {
             if !entity_refs.is_empty() {
-                self.build_context_for_entities(entity_refs).await
+                (
+                    self.build_context_for_entities(entity_refs).await,
+                    ContextSource::Search,
+                )
             } else {
                 self.search_context(user_message, 10).await
             }
         } else {
-            vec![]
+            (vec![], ContextSource::Search)
         };
 
-        let system_prompt = build_system_prompt(&context_entities, source_toggles);
+        let system_prompt = build_system_prompt(&context_entities, source_toggles, context_source);
 
         let request = ChatRequest {
             system_prompt,
@@ -328,12 +334,20 @@ impl ChatPipeline {
             }),
         );
 
-        let cited_ids: Vec<String> = citations.iter().map(|c| c.entity_id.to_string()).collect();
+        let cited_refs: Vec<serde_json::Value> = citations
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "id": c.entity_id.to_string(),
+                    "n": c.number,
+                })
+            })
+            .collect();
         let refs_component = Component::new(
             msg_id,
             ComponentType::EntityRefs,
             serde_json::json!({
-                "refs": cited_ids,
+                "refs": cited_refs,
             }),
         );
 
@@ -413,9 +427,21 @@ impl ChatPipeline {
         contexts
     }
 
-    async fn search_context(&self, query: &str, limit: usize) -> Vec<EntityContext> {
+    async fn search_context(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> (Vec<EntityContext>, ContextSource) {
+        let terms = extract_fts_terms(query);
+        if terms.is_empty() {
+            return (
+                self.fallback_recent_context(limit).await,
+                ContextSource::RecentFallback,
+            );
+        }
+
         let search_query = SearchQuery {
-            query: query.to_string(),
+            query: terms.join(" OR "),
             entity_type: None,
             tag: None,
         };
@@ -429,8 +455,55 @@ impl ChatPipeline {
             .take(limit)
             .map(|r| r.entity_id)
             .collect();
+
+        if ids.is_empty() {
+            return (
+                self.fallback_recent_context(limit).await,
+                ContextSource::RecentFallback,
+            );
+        }
+
+        (
+            self.build_context_for_entities(&ids).await,
+            ContextSource::Search,
+        )
+    }
+
+    async fn fallback_recent_context(&self, limit: usize) -> Vec<EntityContext> {
+        let all = self.entity_repo.list().await.unwrap_or_default();
+        let mut content: Vec<Entity> = all
+            .into_iter()
+            .filter(|e| {
+                let t = e.entity_type.to_string();
+                t != "Conversation" && t != "Message"
+            })
+            .collect();
+        content.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
+        let ids: Vec<Uuid> = content.iter().take(limit).map(|e| e.id).collect();
         self.build_context_for_entities(&ids).await
     }
+}
+
+const STOPWORDS: &[&str] = &[
+    "what", "when", "where", "which", "who", "whom", "whose", "why", "how", "do", "does", "did",
+    "doing", "have", "has", "had", "having", "you", "your", "yours", "yourself", "i", "me", "my",
+    "mine", "we", "our", "us", "they", "them", "their", "theirs", "it", "its", "this", "that",
+    "these", "those", "is", "are", "was", "were", "be", "been", "being", "am", "can", "could",
+    "would", "should", "will", "shall", "may", "might", "must", "of", "in", "on", "at", "to",
+    "for", "from", "with", "by", "about", "into", "through", "during", "the", "a", "an", "and",
+    "or", "but", "not", "no", "so", "if", "then", "than", "too", "very", "just", "like", "also",
+    "there", "here",
+];
+
+fn extract_fts_terms(query: &str) -> Vec<String> {
+    let mut terms: Vec<String> = Vec::new();
+    for token in query.split(|c: char| !c.is_alphanumeric()) {
+        let t = token.to_lowercase();
+        if t.len() >= 3 && !STOPWORDS.contains(&t.as_str()) {
+            terms.push(t);
+        }
+    }
+    terms
 }
 
 async fn persist_assistant_message(
@@ -453,12 +526,20 @@ async fn persist_assistant_message(
         }),
     );
 
-    let cited_ids: Vec<String> = citations.iter().map(|c| c.entity_id.to_string()).collect();
+    let cited_refs: Vec<serde_json::Value> = citations
+        .iter()
+        .map(|c| {
+            serde_json::json!({
+                "id": c.entity_id.to_string(),
+                "n": c.number,
+            })
+        })
+        .collect();
     let refs_component = Component::new(
         msg_id,
         ComponentType::EntityRefs,
         serde_json::json!({
-            "refs": cited_ids,
+            "refs": cited_refs,
         }),
     );
 
@@ -732,6 +813,36 @@ mod tests {
         }
     }
 
+    struct MockSearchIndexWithResults {
+        results: Vec<SearchResult>,
+    }
+
+    #[async_trait]
+    impl SearchIndex for MockSearchIndexWithResults {
+        async fn index_entity(
+            &self,
+            _entity: &Entity,
+            _components: &[Component],
+        ) -> Result<(), StorageError> {
+            Ok(())
+        }
+        async fn remove_entity(&self, _entity_id: Uuid) -> Result<(), StorageError> {
+            Ok(())
+        }
+        async fn search(
+            &self,
+            _query: &SearchQuery,
+        ) -> Result<Vec<knowledge_core::ports::SearchResult>, StorageError> {
+            Ok(self.results.clone())
+        }
+        async fn rebuild(
+            &self,
+            _entities: &[(Entity, Vec<Component>)],
+        ) -> Result<(), StorageError> {
+            Ok(())
+        }
+    }
+
     struct MockVectorStore;
 
     #[async_trait]
@@ -767,11 +878,21 @@ mod tests {
         Arc<MockComponentRepo>,
         Arc<MockRelationshipRepo>,
     ) {
+        setup_pipeline_with_search(Arc::new(MockSearchIndex))
+    }
+
+    fn setup_pipeline_with_search(
+        search_index: Arc<dyn SearchIndex>,
+    ) -> (
+        ChatPipeline,
+        Arc<MockEntityRepo>,
+        Arc<MockComponentRepo>,
+        Arc<MockRelationshipRepo>,
+    ) {
         let chat_provider = Arc::new(MockChatAdapter::default());
         let entity_repo = Arc::new(MockEntityRepo::new());
         let component_repo = Arc::new(MockComponentRepo::new());
         let relationship_repo = Arc::new(MockRelationshipRepo::new());
-        let search_index = Arc::new(MockSearchIndex);
         let vector_store = Arc::new(MockVectorStore);
 
         let pipeline = ChatPipeline::new(
@@ -779,7 +900,7 @@ mod tests {
             entity_repo.clone() as Arc<dyn EntityRepository>,
             component_repo.clone() as Arc<dyn ComponentRepository>,
             relationship_repo.clone() as Arc<dyn RelationshipRepository>,
-            search_index.clone() as Arc<dyn SearchIndex>,
+            search_index,
             vector_store.clone() as Arc<dyn VectorStore>,
         );
 
@@ -1158,5 +1279,67 @@ mod tests {
             }
         }
         assert!(count < 10, "stream should stop early after cancel");
+    }
+
+    #[test]
+    fn extract_fts_terms_filters_stopwords_and_punctuation() {
+        assert_eq!(extract_fts_terms("What do you know?"), vec!["know"]);
+        assert_eq!(
+            extract_fts_terms("the attention is all you need"),
+            vec!["attention", "all", "need"]
+        );
+        assert_eq!(
+            extract_fts_terms("summarize transformers -- architecture!"),
+            vec!["summarize", "transformers", "architecture"]
+        );
+        assert_eq!(extract_fts_terms("?!@#"), Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn search_context_falls_back_to_recent_when_no_match() {
+        let (pipeline, entity_repo, _, _) = setup_pipeline();
+
+        let now = chrono::Utc::now();
+        let mut old = Entity::new(EntityType::new("Article"));
+        old.updated_at = now - chrono::Duration::days(2);
+        let mut mid = Entity::new(EntityType::new("Article"));
+        mid.updated_at = now - chrono::Duration::days(1);
+        let mut fresh = Entity::new(EntityType::new("Article"));
+        fresh.updated_at = now;
+        let conv = Entity::new(EntityType::new("Conversation"));
+        let msg = Entity::new(EntityType::new("Message"));
+
+        for e in [&old, &mid, &fresh, &conv, &msg] {
+            entity_repo.save(e).await.unwrap();
+        }
+
+        let (context, source) = pipeline.search_context("zzzzzzzzzzz", 10).await;
+        assert_eq!(source, ContextSource::RecentFallback);
+        let ids: Vec<Uuid> = context.iter().map(|c| c.entity_id).collect();
+        assert_eq!(
+            ids,
+            vec![fresh.id, mid.id, old.id],
+            "chat artifacts excluded and most recent first"
+        );
+    }
+
+    #[tokio::test]
+    async fn search_context_uses_search_hits_when_available() {
+        let hit = Entity::new(EntityType::new("Article"));
+        let search_index = Arc::new(MockSearchIndexWithResults {
+            results: vec![SearchResult {
+                entity_id: hit.id,
+                score: 1.0,
+                confidence: None,
+                snippet: None,
+            }],
+        });
+        let (pipeline, entity_repo, _, _) = setup_pipeline_with_search(search_index);
+        entity_repo.save(&hit).await.unwrap();
+
+        let (context, source) = pipeline.search_context("attention transformers", 10).await;
+        assert_eq!(source, ContextSource::Search);
+        assert_eq!(context.len(), 1);
+        assert_eq!(context[0].entity_id, hit.id);
     }
 }

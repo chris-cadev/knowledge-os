@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use knowledge_core::ports::{
     CitationSource, ConversationDetail, ConversationRepository, ConversationSummary, MessageDetail,
-    MessageRole, StorageError,
+    MessageRole, ResponseFeedback, StorageError,
 };
 use rusqlite::OptionalExtension;
 use uuid::Uuid;
@@ -69,17 +69,79 @@ fn extract_entity_ids(data: Option<String>) -> Vec<Uuid> {
             .and_then(|ids| {
                 ids.as_array()?
                     .iter()
-                    .map(|id| Uuid::parse_str(id.as_str()?).ok())
+                    .map(|entry| {
+                        // Support both formats: plain string IDs and {id, n} objects
+                        if let Some(s) = entry.as_str() {
+                            Uuid::parse_str(s).ok()
+                        } else if let Some(id_str) = entry.get("id").and_then(|v| v.as_str()) {
+                            Uuid::parse_str(id_str).ok()
+                        } else {
+                            None
+                        }
+                    })
                     .collect::<Option<Vec<_>>>()
             })
     })
     .unwrap_or_default()
 }
 
+/// Extract citation numbers from the EntityRefs data.
+/// Returns a map of entity_id → citation number.
+/// If the data uses the new {id, n} format, returns the stored numbers.
+/// If the data uses the old string format, returns None (caller should renumber).
+fn extract_citation_numbers(
+    data: Option<String>,
+) -> Option<std::collections::HashMap<Uuid, usize>> {
+    data.and_then(|d| {
+        let v: serde_json::Value = serde_json::from_str(&d).ok()?;
+        let refs = v.get("refs").or_else(|| v.get("entity_ids"))?.as_array()?;
+        // Only return numbers if the first entry is an object with "n"
+        if refs.first().and_then(|e| e.get("n")).is_some() {
+            let mut map = std::collections::HashMap::new();
+            for entry in refs {
+                if let Some(id_str) = entry.get("id").and_then(|v| v.as_str()) {
+                    if let Ok(uuid) = Uuid::parse_str(id_str) {
+                        if let Some(n) = entry.get("n").and_then(|v| v.as_u64()) {
+                            map.insert(uuid, n as usize);
+                        }
+                    }
+                }
+            }
+            Some(map)
+        } else {
+            None
+        }
+    })
+}
+
 fn parse_rfc3339(s: &str) -> chrono::DateTime<chrono::Utc> {
     chrono::DateTime::parse_from_rfc3339(s)
         .unwrap()
         .with_timezone(&chrono::Utc)
+}
+
+fn load_feedback(
+    conn: &rusqlite::Connection,
+    message_id: &Uuid,
+    provenance_ct: &str,
+) -> Result<Option<ResponseFeedback>, StorageError> {
+    let data: Option<String> = conn
+        .query_row(
+            "SELECT data FROM components WHERE entity_id = ?1 AND component_type = ?2 ORDER BY created_at DESC LIMIT 1",
+            rusqlite::params![message_id.to_string(), provenance_ct],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+    let Some(data) = data else {
+        return Ok(None);
+    };
+
+    match serde_json::from_str::<ResponseFeedback>(&data) {
+        Ok(fb) if fb.message_id == *message_id => Ok(Some(fb)),
+        _ => Ok(None),
+    }
 }
 
 #[async_trait]
@@ -172,6 +234,7 @@ impl ConversationRepository for SqliteStore {
         let title_ct = component_type_json("Title");
         let msg_content_ct = component_type_json("MessageContent");
         let entity_refs_ct = component_type_json("EntityRefs");
+        let provenance_ct = component_type_json("Provenance");
 
         let mut conv_stmt = conn
             .prepare(&format!(
@@ -248,7 +311,8 @@ impl ConversationRepository for SqliteStore {
                 .optional()
                 .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-            let entity_ids = extract_entity_ids(entity_refs_data);
+            let entity_ids = extract_entity_ids(entity_refs_data.clone());
+            let citation_numbers = extract_citation_numbers(entity_refs_data);
 
             let mut citations = Vec::new();
             for (i, ref_id) in entity_ids.iter().enumerate() {
@@ -284,8 +348,12 @@ impl ConversationRepository for SqliteStore {
                     let snippet = snippet_data
                         .and_then(|s| serde_json::from_str::<String>(&s).ok())
                         .unwrap_or_default();
+                    let number = citation_numbers
+                        .as_ref()
+                        .and_then(|m| m.get(ref_id).copied())
+                        .unwrap_or(i + 1);
                     citations.push(CitationSource {
-                        number: i + 1,
+                        number,
                         entity_id: *ref_id,
                         entity_type: entity_type_str,
                         title,
@@ -294,12 +362,15 @@ impl ConversationRepository for SqliteStore {
                 }
             }
 
+            let feedback = load_feedback(&conn, &msg_id, &provenance_ct)?;
+
             messages.push(MessageDetail {
                 id: msg_id,
                 role,
                 text,
                 entity_refs: entity_ids,
                 citations,
+                feedback,
                 created_at: msg_entity.created_at,
             });
         }

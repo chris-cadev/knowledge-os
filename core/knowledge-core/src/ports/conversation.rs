@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::error::StorageError;
-use crate::ports::chat::{CitationSource, MessageRole};
+use crate::ports::chat::{CitationSource, MessageRole, ResponseFeedback};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversationSummary {
@@ -33,6 +33,7 @@ pub struct MessageDetail {
     pub text: String,
     pub entity_refs: Vec<Uuid>,
     pub citations: Vec<CitationSource>,
+    pub feedback: Option<ResponseFeedback>,
     pub created_at: DateTime<Utc>,
 }
 
