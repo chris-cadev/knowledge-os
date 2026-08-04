@@ -80,7 +80,10 @@ pub fn create_chat_provider_from_config(
             let mut s = format!("ollama://{}", model);
             if let Some(url) = &config.base_url {
                 if !url.is_empty() {
-                    s.push_str(&format!("?url={}", url));
+                    s.push_str(&format!(
+                        "?url={}",
+                        knowledge_derivation::features::chat::factory::encode_query_value(url)
+                    ));
                 }
             }
             s
@@ -92,10 +95,17 @@ pub fn create_chat_provider_from_config(
                 config.model.clone()
             };
             let api_key = config.api_key.clone().unwrap_or_default();
-            let mut s = format!("openai://{}?api_key={}", model, api_key);
+            let mut s = format!(
+                "openai://{}?api_key={}",
+                model,
+                knowledge_derivation::features::chat::factory::encode_query_value(&api_key)
+            );
             if let Some(url) = &config.base_url {
                 if !url.is_empty() {
-                    s.push_str(&format!("&base_url={}", url));
+                    s.push_str(&format!(
+                        "&base_url={}",
+                        knowledge_derivation::features::chat::factory::encode_query_value(url)
+                    ));
                 }
             }
             s

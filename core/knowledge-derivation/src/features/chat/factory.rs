@@ -40,6 +40,53 @@ pub fn create_chat_provider(config: &str) -> Result<Box<dyn ChatCompletion>, Cha
     Ok(Box::new(super::mock::MockChatAdapter::default()))
 }
 
+pub fn encode_query_value(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for b in value.bytes() {
+        match b {
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'-'
+            | b'.'
+            | b'_'
+            | b'~'
+            | b':'
+            | b'/'
+            | b'@' => out.push(b as char),
+            _ => out.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    out
+}
+
+pub fn decode_query_value(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(hi), Some(lo)) = (hex_value(bytes[i + 1]), hex_value(bytes[i + 2])) {
+                out.push((hi << 4) | lo);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| value.to_string())
+}
+
+fn hex_value(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
 fn parse_query(s: &str) -> (String, HashMap<String, String>) {
     let mut parts = s.split('?');
     let model = parts.next().unwrap_or("").to_string();
@@ -47,7 +94,7 @@ fn parse_query(s: &str) -> (String, HashMap<String, String>) {
     if let Some(query) = parts.next() {
         for pair in query.split('&') {
             if let Some((k, v)) = pair.split_once('=') {
-                params.insert(k.to_string(), v.to_string());
+                params.insert(k.to_string(), decode_query_value(v));
             }
         }
     }
@@ -128,5 +175,43 @@ mod tests {
         let result = rt.block_on(provider.chat(test_request()));
         assert!(result.is_err());
         std::env::remove_var("OPENAI_API_KEY");
+    }
+
+    #[test]
+    fn query_value_encode_keeps_url_characters() {
+        assert_eq!(
+            encode_query_value("http://192.168.100.27:1234/v1"),
+            "http://192.168.100.27:1234/v1"
+        );
+    }
+
+    #[test]
+    fn query_value_encode_escapes_reserved_characters() {
+        assert_eq!(
+            encode_query_value("a&b=c?d#e+f%g"),
+            "a%26b%3Dc%3Fd%23e%2Bf%25g"
+        );
+    }
+
+    #[test]
+    fn query_value_round_trip() {
+        let values = [
+            "http://localhost:11434",
+            "sk-abc&key=1?x",
+            "https://api.openai.com/v1",
+            "a b+c%",
+        ];
+        for v in values {
+            assert_eq!(decode_query_value(&encode_query_value(v)), v);
+        }
+    }
+
+    #[test]
+    fn parse_query_decodes_encoded_values() {
+        let (model, params) =
+            parse_query("gpt-4o?api_key=sk%26x%3D1&base_url=http%3A%2F%2Fhost%3A1234%2Fv1%3Fk%3D1");
+        assert_eq!(model, "gpt-4o");
+        assert_eq!(params.get("api_key").unwrap(), "sk&x=1");
+        assert_eq!(params.get("base_url").unwrap(), "http://host:1234/v1?k=1");
     }
 }
