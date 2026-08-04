@@ -11,6 +11,12 @@
     chatRenameConversation,
     chatStopStream,
     chatSendFeedback,
+    getEntitySources,
+    resolveEntityMention,
+  } from "../lib/api.js";
+  import type {
+    EntitySourceEntry,
+    MentionResolution,
   } from "../lib/api.js";
   import { ChatStreamSession } from "../lib/chat-stream.js";
   import { getEntityTypeColor } from "../lib/theme.svelte.js";
@@ -68,6 +74,11 @@
 
   // --- Collapsible sources ---
   let expandedSources = $state<Set<string>>(new Set());
+
+  // --- Source enrichment cache ---
+  let sourceCache = $state<Map<string, string | null>>(new Map());
+  let sourceLoading = $state<Set<string>>(new Set());
+  let sourceError = $state<Map<string, string>>(new Map());
 
   // --- Context menus ---
   let contextMenuConvId = $state<string | null>(null);
@@ -228,20 +239,26 @@
     errorMessage = null;
     try {
       const detail = await chatGetConversation(id);
-      if (detail) {
-        messages = detail.messages.map((m) => {
-          const display: MessageDisplay = {
-            id: m.id,
-            role: m.role as "user" | "assistant" | "system",
-            content: m.text,
-            citations: m.citations,
-            feedback: m.feedback?.rating,
-            timestamp: m.created_at,
-          };
-          return display;
-        });
-        scrollToBottom();
-      }
+        if (detail) {
+          messages = detail.messages.map((m) => {
+            const display: MessageDisplay = {
+              id: m.id,
+              role: m.role as "user" | "assistant" | "system",
+              content: m.text,
+              citations: m.citations,
+              feedback: m.feedback?.rating,
+              timestamp: m.created_at,
+            };
+            return display;
+          });
+          scrollToBottom();
+          // Enrich sources for all assistant messages
+          for (const m of messages) {
+            if (m.role === "assistant" && m.citations && m.citations.length > 0) {
+              enrichMessageSources(m.id, m.citations);
+            }
+          }
+        }
     } catch (e) {
       errorMessage = `Failed to load conversation: ${e}`;
     } finally {
@@ -457,6 +474,10 @@
             currentConversationId = session.getConversationId();
             loadConversations();
             scrollToBottom();
+            // Enrich sources for the completed message
+            if (info.citations && info.citations.length > 0) {
+              enrichMessageSources(info.assistantMessageId, info.citations);
+            }
           },
           onError: (err) => {
             errorMessage = err;
@@ -499,6 +520,10 @@
       selectedEntityRefs = new Map();
       loadConversations();
       scrollToBottom();
+      // Enrich sources for the completed message
+      if (result.citations && result.citations.length > 0) {
+        enrichMessageSources(result.message_id, result.citations);
+      }
     } catch (e) {
       errorMessage = `Send failed: ${e}`;
       if (messages.length > 0 && messages[messages.length - 1].role === "user") {
@@ -638,20 +663,28 @@
     let html = content;
     html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-    html = html.replace(/@(\w+):([^\s]+)/g, (_, type, title) => {
-      const color = getEntityTypeColor(type);
-      return `<span class="entity-pill" style="background: ${color}"><span class="entity-pill-type">${type}</span><span class="entity-pill-title">${title}</span></span>`;
-    });
-
+    // P1: Extract code blocks FIRST to protect their content from mention regex
+    const codeBlocks: string[] = [];
     html = html.replace(/```([\s\S]*?)```/g, (_, code) => {
       const escaped = code
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
-      return `<pre class="chat-code-block"><code>${escaped}</code></pre>`;
+      const placeholder = `\x00CODEBLOCK_${codeBlocks.length}\x00`;
+      codeBlocks.push(`<pre class="chat-code-block"><code>${escaped}</code></pre>`);
+      return placeholder;
     });
 
     html = html.replace(/`([^`]+)`/g, '<code class="chat-inline-code">$1</code>');
+
+    // Convert @Type:Title to clickable pill buttons
+    html = html.replace(/@(\w+):([^\s]+)/g, (_, type, title) => {
+      const color = getEntityTypeColor(type);
+      return `<button class="entity-pill entity-pill-clickable" style="background: ${color}" data-entity-type="${type}" data-entity-title="${title}" type="button"><span class="entity-pill-type">${type}</span><span class="entity-pill-title">${title}</span></button>`;
+    });
+
+    // Restore code blocks
+    html = html.replace(/\x00CODEBLOCK_(\d+)\x00/g, (_, i) => codeBlocks[parseInt(i)]);
 
     html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
@@ -780,23 +813,34 @@
     let html = content;
     html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-    html = html.replace(/\[(\d+)\]/g, (_, num) => {
-      const citation = citations.find((c) => c.number === parseInt(num));
-      if (citation) {
-        return `<sup class="chat-citation" data-entity-id="${citation.entity_id}" data-citation-number="${citation.number}">[${num}]</sup>`;
-      }
-      return `<sup class="chat-citation">[${num}]</sup>`;
-    });
-
+    // P1: Extract code blocks FIRST to protect citations inside code
+    const codeBlocks: string[] = [];
     html = html.replace(/```([\s\S]*?)```/g, (_, code) => {
       const escaped = code
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
-      return `<pre class="chat-code-block"><code>${escaped}</code></pre>`;
+      const placeholder = `\x00CODEBLOCK_${codeBlocks.length}\x00`;
+      codeBlocks.push(`<pre class="chat-code-block"><code>${escaped}</code></pre>`);
+      return placeholder;
+    });
+
+    // Convert [N] citations to real <a> anchors with href routing
+    html = html.replace(/\[(\d+)\]/g, (_, num) => {
+      const citation = citations.find((c) => c.number === parseInt(num));
+      if (citation) {
+        const sourceInfo = citation.source
+          ? ` data-entity-source="${citation.source}"`
+          : "";
+        return `<a class="chat-citation" href="#/entity/${citation.entity_id}" data-entity-id="${citation.entity_id}" data-citation-number="${citation.number}"${sourceInfo}>[${num}]</a>`;
+      }
+      return `<span class="chat-citation">[${num}]</span>`;
     });
 
     html = html.replace(/`([^`]+)`/g, '<code class="chat-inline-code">$1</code>');
+
+    // Restore code blocks
+    html = html.replace(/\x00CODEBLOCK_(\d+)\x00/g, (_, i) => codeBlocks[parseInt(i)]);
 
     html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
@@ -976,20 +1020,47 @@
 
   // --- Citation click / hover ---
 
-  function handleCitationClick(e: MouseEvent) {
+  function handleMessageContentClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
-    const citation = target.closest("[data-entity-id]") as HTMLElement | null;
+
+    // Citation [N] click
+    const citation = target.closest(".chat-citation") as HTMLElement | null;
     if (citation) {
       const entityId = citation.dataset.entityId;
       if (entityId) {
         navigateTo("detail", entityId);
       }
+      return;
+    }
+
+    // Entity pill @Type:Title click
+    const pill = target.closest(".entity-pill-clickable") as HTMLElement | null;
+    if (pill) {
+      const entityType = pill.dataset.entityType;
+      const title = pill.dataset.entityTitle;
+      if (entityType && title) {
+        handlePillClick(entityType, title);
+      }
+      return;
     }
   }
 
-  function handleCitationMouseEnter(e: MouseEvent) {
+  async function handlePillClick(entityType: string, title: string) {
+    try {
+      const resolution = await resolveEntityMention(entityType, title);
+      if (resolution) {
+        navigateTo("detail", resolution.entity_id);
+      } else {
+        app.statusMessage = `No entity found for @${entityType}:${title}`;
+      }
+    } catch (err) {
+      app.statusMessage = `Failed to resolve @${entityType}:${title}: ${err}`;
+    }
+  }
+
+  function handleMessageContentMouseEnter(e: MouseEvent) {
     const target = e.target as HTMLElement;
-    const el = target.closest("[data-entity-id]") as HTMLElement | null;
+    const el = target.closest(".chat-citation") as HTMLElement | null;
     if (el) {
       const entityId = el.dataset.entityId;
       const num = el.dataset.citationNumber;
@@ -1011,7 +1082,7 @@
     }
   }
 
-  function handleCitationMouseLeave() {
+  function handleMessageContentMouseLeave() {
     citationTooltip = null;
   }
 
@@ -1029,6 +1100,60 @@
 
   function openEntityDetail(entityId: string) {
     navigateTo("detail", entityId);
+  }
+
+  // --- Source enrichment ---
+
+  async function enrichMessageSources(msgId: string, citations: Citation[]) {
+    const uncachedIds = citations
+      .filter((c) => !sourceCache.has(c.entity_id) && !sourceLoading.has(c.entity_id))
+      .map((c) => c.entity_id);
+
+    if (uncachedIds.length === 0) return;
+
+    const loadingSet = new Set(sourceLoading);
+    uncachedIds.forEach((id) => loadingSet.add(id));
+    sourceLoading = loadingSet;
+
+    try {
+      const entries = await getEntitySources(uncachedIds);
+      const cache = new Map(sourceCache);
+      for (const entry of entries) {
+        cache.set(entry.entity_id, entry.source);
+      }
+      sourceCache = cache;
+    } catch (err) {
+      const errMap = new Map(sourceError);
+      for (const id of uncachedIds) {
+        errMap.set(id, `Failed to fetch source: ${err}`);
+      }
+      sourceError = errMap;
+    } finally {
+      const loadedSet = new Set(sourceLoading);
+      uncachedIds.forEach((id) => loadedSet.delete(id));
+      sourceLoading = loadedSet;
+    }
+  }
+
+  async function openEntitySource(entityId: string) {
+    const source = sourceCache.get(entityId);
+    if (source === undefined) {
+      app.statusMessage = "Source not available for this entity.";
+      return;
+    }
+    if (source === null) {
+      app.statusMessage = "This entity has no associated source file.";
+      return;
+    }
+    try {
+      const { openInDefaultApp } = await import("../lib/api.js");
+      await openInDefaultApp(source);
+    } catch (err) {
+      const errMap = new Map(sourceError);
+      errMap.set(entityId, `Failed to open: ${err}`);
+      sourceError = errMap;
+      app.statusMessage = `Failed to open source: ${err}`;
+    }
   }
 
   // --- Actions ---
@@ -1314,12 +1439,11 @@
                   {@html msg.html}
                 </div>
               {:else}
-                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_no_noninteractive_element_interactions -->
                 <div
                   class="message-content chat-markdown"
-                  onclick={handleCitationClick}
-                  onmouseenter={handleCitationMouseEnter}
-                  onmouseleave={handleCitationMouseLeave}
+                  onclick={handleMessageContentClick}
+                  onmouseenter={handleMessageContentMouseEnter}
+                  onmouseleave={handleMessageContentMouseLeave}
                   role="document"
                 >
                   {@html msg.html}
@@ -1342,15 +1466,41 @@
                   {#if expandedSources.has(msg.id)}
                     <div class="sources-list">
                       {#each msg.citations as citation}
-                        <button
+                        <!-- P1 fix: single interactive element per source row -->
+                        <div
                           class="source-item"
+                          role="button"
+                          tabindex="0"
                           onclick={() => openEntityDetail(citation.entity_id)}
+                          onkeydown={(e) => { if (e.key === 'Enter') openEntityDetail(citation.entity_id); }}
                         >
                           <span class="source-number">[{citation.number}]</span>
                           <span class="source-type" style="background: {getEntityTypeColor(citation.entity_type)}; color: white">{citation.entity_type}</span>
                           <span class="source-title">{citation.title}</span>
-                          <span class="source-snippet truncate">{citation.snippet}</span>
-                        </button>
+                          {#if sourceLoading.has(citation.entity_id)}
+                            <span class="source-status">
+                              <span class="material-symbols-outlined loading-spinner" style="font-size: 14px;">sync</span>
+                            </span>
+                          {:else if sourceError.has(citation.entity_id)}
+                            <button
+                              class="source-open-btn source-error"
+                              onclick={(e) => { e.stopPropagation(); app.statusMessage = sourceError.get(citation.entity_id) ?? "Unknown error"; }}
+                              title="Source error"
+                              type="button"
+                            >
+                              <span class="material-symbols-outlined" style="font-size: 14px;">error</span>
+                            </button>
+                          {:else if sourceCache.get(citation.entity_id) !== undefined}
+                            <button
+                              class="source-open-btn"
+                              onclick={(e) => { e.stopPropagation(); openEntitySource(citation.entity_id); }}
+                              title={sourceCache.get(citation.entity_id) || "No source file"}
+                              type="button"
+                            >
+                              <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
+                            </button>
+                          {/if}
+                        </div>
                       {/each}
                     </div>
                   {/if}
@@ -1468,6 +1618,12 @@
         <span class="tooltip-type" style="color: {getEntityTypeColor(citationTooltip.citation.entity_type)}">{citationTooltip.citation.entity_type}</span>
         <span class="tooltip-title">{citationTooltip.citation.title}</span>
         <span class="tooltip-snippet">{citationTooltip.citation.snippet}</span>
+        {#if citationTooltip.citation.source}
+          <span class="tooltip-source">
+            <span class="material-symbols-outlined" style="font-size: 12px;">link</span>
+            {citationTooltip.citation.source}
+          </span>
+        {/if}
       </div>
     {/if}
 
@@ -2177,16 +2333,17 @@
   }
 
   /* ===== Citations ===== */
-  .chat-markdown :global(sup.chat-citation) {
+  .chat-markdown :global(a.chat-citation) {
     color: var(--accent);
     font-weight: 700;
     cursor: pointer;
     font-size: 12px;
     padding: 0 2px;
     user-select: none;
+    text-decoration: none;
   }
 
-  .chat-markdown :global(sup.chat-citation:hover) {
+  .chat-markdown :global(a.chat-citation:hover) {
     text-decoration: underline;
   }
 
@@ -2201,6 +2358,17 @@
     font-size: var(--font-size-sm);
     line-height: 1.4;
     vertical-align: middle;
+  }
+
+  .chat-markdown :global(.entity-pill-clickable) {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity var(--transition-fast);
+  }
+
+  .chat-markdown :global(.entity-pill-clickable:hover) {
+    opacity: 0.85;
   }
 
   .message-user .chat-markdown :global(.entity-pill) {
@@ -2277,6 +2445,7 @@
     color: var(--text-primary);
     text-align: left;
     transition: background var(--transition-fast);
+    cursor: pointer;
   }
 
   .source-item:hover {
@@ -2315,14 +2484,40 @@
     flex-shrink: 0;
   }
 
-  .source-snippet {
+  .source-open-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
     color: var(--text-secondary);
-    flex: 1;
-    min-width: 0;
+    flex-shrink: 0;
+    transition: background var(--transition-fast), color var(--transition-fast);
   }
 
-  .message-user .source-snippet {
-    color: var(--text-on-accent-muted);
+  .source-open-btn:hover {
+    background: var(--color-surface-container-high);
+    color: var(--accent);
+  }
+
+  .source-open-btn.source-error {
+    color: var(--danger);
+  }
+
+  .source-open-btn.source-error:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+
+  .source-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    color: var(--text-secondary);
   }
 
   /* ===== Feedback ===== */
@@ -2600,6 +2795,16 @@
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
     line-height: 1.3;
+  }
+
+  .tooltip-source {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 2px;
+    word-break: break-all;
   }
 
   /* ===== Input toggles ===== */

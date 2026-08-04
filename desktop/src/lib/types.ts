@@ -191,6 +191,7 @@ export interface Citation {
   entity_type: string;
   title: string;
   snippet: string;
+  source?: string;
 }
 
 export interface ChatSendResult {

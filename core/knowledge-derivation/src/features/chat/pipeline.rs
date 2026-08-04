@@ -334,12 +334,20 @@ impl ChatPipeline {
             }),
         );
 
-        let cited_ids: Vec<String> = citations.iter().map(|c| c.entity_id.to_string()).collect();
+        let cited_refs: Vec<serde_json::Value> = citations
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "id": c.entity_id.to_string(),
+                    "n": c.number,
+                })
+            })
+            .collect();
         let refs_component = Component::new(
             msg_id,
             ComponentType::EntityRefs,
             serde_json::json!({
-                "refs": cited_ids,
+                "refs": cited_refs,
             }),
         );
 
@@ -518,12 +526,20 @@ async fn persist_assistant_message(
         }),
     );
 
-    let cited_ids: Vec<String> = citations.iter().map(|c| c.entity_id.to_string()).collect();
+    let cited_refs: Vec<serde_json::Value> = citations
+        .iter()
+        .map(|c| {
+            serde_json::json!({
+                "id": c.entity_id.to_string(),
+                "n": c.number,
+            })
+        })
+        .collect();
     let refs_component = Component::new(
         msg_id,
         ComponentType::EntityRefs,
         serde_json::json!({
-            "refs": cited_ids,
+            "refs": cited_refs,
         }),
     );
 

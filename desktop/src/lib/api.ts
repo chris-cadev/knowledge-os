@@ -244,6 +244,34 @@ export async function chatSendFeedback(feedback: {
   return invoke("chat_send_feedback", { feedback });
 }
 
+// === Entity Mention Resolution ===
+
+export interface MentionResolution {
+  entity_id: string;
+  entity_type: string;
+  title: string;
+}
+
+export async function resolveEntityMention(
+  entityType: string,
+  title: string
+): Promise<MentionResolution | null> {
+  return invoke("resolve_entity_mention", { entityType, title });
+}
+
+// === Batch Entity Sources ===
+
+export interface EntitySourceEntry {
+  entity_id: string;
+  source: string | null;
+}
+
+export async function getEntitySources(
+  ids: string[]
+): Promise<EntitySourceEntry[]> {
+  return invoke("get_entity_sources", { ids });
+}
+
 // === Provider Configuration API ===
 
 export async function setProvider(

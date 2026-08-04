@@ -69,11 +69,49 @@ fn extract_entity_ids(data: Option<String>) -> Vec<Uuid> {
             .and_then(|ids| {
                 ids.as_array()?
                     .iter()
-                    .map(|id| Uuid::parse_str(id.as_str()?).ok())
+                    .map(|entry| {
+                        // Support both formats: plain string IDs and {id, n} objects
+                        if let Some(s) = entry.as_str() {
+                            Uuid::parse_str(s).ok()
+                        } else if let Some(id_str) = entry.get("id").and_then(|v| v.as_str()) {
+                            Uuid::parse_str(id_str).ok()
+                        } else {
+                            None
+                        }
+                    })
                     .collect::<Option<Vec<_>>>()
             })
     })
     .unwrap_or_default()
+}
+
+/// Extract citation numbers from the EntityRefs data.
+/// Returns a map of entity_id → citation number.
+/// If the data uses the new {id, n} format, returns the stored numbers.
+/// If the data uses the old string format, returns None (caller should renumber).
+fn extract_citation_numbers(
+    data: Option<String>,
+) -> Option<std::collections::HashMap<Uuid, usize>> {
+    data.and_then(|d| {
+        let v: serde_json::Value = serde_json::from_str(&d).ok()?;
+        let refs = v.get("refs").or_else(|| v.get("entity_ids"))?.as_array()?;
+        // Only return numbers if the first entry is an object with "n"
+        if refs.first().and_then(|e| e.get("n")).is_some() {
+            let mut map = std::collections::HashMap::new();
+            for entry in refs {
+                if let Some(id_str) = entry.get("id").and_then(|v| v.as_str()) {
+                    if let Ok(uuid) = Uuid::parse_str(id_str) {
+                        if let Some(n) = entry.get("n").and_then(|v| v.as_u64()) {
+                            map.insert(uuid, n as usize);
+                        }
+                    }
+                }
+            }
+            Some(map)
+        } else {
+            None
+        }
+    })
 }
 
 fn parse_rfc3339(s: &str) -> chrono::DateTime<chrono::Utc> {
@@ -273,7 +311,8 @@ impl ConversationRepository for SqliteStore {
                 .optional()
                 .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-            let entity_ids = extract_entity_ids(entity_refs_data);
+            let entity_ids = extract_entity_ids(entity_refs_data.clone());
+            let citation_numbers = extract_citation_numbers(entity_refs_data);
 
             let mut citations = Vec::new();
             for (i, ref_id) in entity_ids.iter().enumerate() {
@@ -309,8 +348,12 @@ impl ConversationRepository for SqliteStore {
                     let snippet = snippet_data
                         .and_then(|s| serde_json::from_str::<String>(&s).ok())
                         .unwrap_or_default();
+                    let number = citation_numbers
+                        .as_ref()
+                        .and_then(|m| m.get(ref_id).copied())
+                        .unwrap_or(i + 1);
                     citations.push(CitationSource {
-                        number: i + 1,
+                        number,
                         entity_id: *ref_id,
                         entity_type: entity_type_str,
                         title,
