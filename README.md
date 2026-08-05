@@ -1,5 +1,7 @@
 # Knowledge Operating System
 
+[![wakatime](https://wakatime.com/badge/user/4ba2e342-69c2-49e1-ab9e-9577a61d6a33/project/187f4e6f-8942-49b6-a0d9-0d2f75145f7d.svg)](https://wakatime.com/@4ba2e342-69c2-49e1-ab9e-9577a61d6a33)
+
 > A deterministic knowledge engine that treats knowledge as source code and retrieval as compilation.
 
 Knowledge OS is an open-source platform for ingesting, normalizing, and reasoning over heterogeneous knowledge. It replaces the document-centric mental model with an entity-centric one, where everything -- concepts, people, papers, code, decisions -- becomes a first-class citizen in a queryable knowledge graph.
